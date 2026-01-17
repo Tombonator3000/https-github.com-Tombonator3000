@@ -36,6 +36,13 @@ export interface Player extends Character {
   isDead: boolean;
   madness: string[]; // Deprecated, keeping for safety
   activeMadness: Madness | null;
+  instanceId?: string; // Unique ID for veterans to distinguish multiple of same class
+}
+
+// Data structure for a saved character in the roster
+export interface SavedInvestigator extends Player {
+    saveDate: number;
+    scenariosSurvived: number;
 }
 
 export interface Item {
@@ -59,7 +66,7 @@ export interface Enemy {
   visionRange: number;
 }
 
-export type TileObjectType = 'altar' | 'bookshelf' | 'crate' | 'gate' | 'barricade' | 'locked_door' | 'rubble' | 'fire';
+export type TileObjectType = 'altar' | 'bookshelf' | 'crate' | 'chest' | 'cabinet' | 'gate' | 'barricade' | 'locked_door' | 'rubble' | 'fire';
 
 export interface TileObject {
   type: TileObjectType;

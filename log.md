@@ -45,3 +45,32 @@ Track all major milestones, feature additions, and bug fixes here.
 *   **Contextual Actions:** The Action Bar now adapts dynamically. Clicking a blocked tile offers specific interactions (e.g., "Break Down Door") instead of generic actions.
 *   **Skill Checks:** Implemented specific attribute tests (Strength, Insight, Agility) for clearing obstacles.
 *   **Dungeon Generation:** Indoor exploration now has a high chance of spawning obstacles, simulating the feeling of exploring a restricted, dangerous building room-by-room.
+
+## [v2.1 Update - Tile Graphics]
+*   **Procedural Visuals:** Implemented a system in `GameBoard` to assign specific visual themes (Wood, Cobblestone, Tiles, Swamp) to board tiles based on their name.
+*   **CSS Patterns:** Used CSS gradients to create lightweight textures (planks, stones, dirt) without external assets.
+*   **Watermarks:** Added thematic icons (Book, Tree, Cross, Anchor) as background watermarks for tiles to improve readability and atmosphere.
+
+## [v2.2 Update - Searchable Objects]
+*   **Container Objects:** Added Chests, Crates, Bookshelves, and Cabinets as spawnable objects.
+*   **Targeted Investigation:** The 'Investigate' action now prioritizes searching these objects if present on the tile.
+*   **Loot Logic:** Searching a container has a high chance of dropping Items or Clues compared to searching an empty room.
+*   **Visual Indicators:** Searchable objects appear as gold/amber icons on the board and turn gray/dim when successfully searched.
+
+## [v2.3 Update - Veteran System (Campaign Mode)]
+*   **Investigator Persistence:** Implemented a secondary save system (`shadows_1920s_roster`) to store characters between games.
+*   **Save Mechanics:** Players can now save surviving investigators on the Game Over screen. This preserves their HP, Sanity, Inventory, Insight, and Madness.
+*   **Roster UI:** Added a tabbed interface in the Character Selection screen to switch between "New Recruits" (default stats) and "Veterans" (saved stats).
+*   **Legacy Features:** Veterans appear with a gold border and a list of their carried equipment in the selection screen.
+
+## [v2.4 Update - Madness Mechanics]
+*   **Gameplay Impact:** Specific madness conditions now apply mechanical penalties:
+    *   *Paranoia:* Disables the 'Rest' action.
+    *   *Hysteria:* -1 Die on all skill checks.
+    *   *Catatonia:* Limits actions to 1 per turn.
+*   **Visual Overhaul:** Updated CSS shaders for madness effects (hallucinations, vignettes, color shifting).
+
+## [v2.5 Update - Personalized Identity]
+*   **Renaming:** Players can now click on the name of a selected character during the Setup phase to rename them.
+*   **UI Integration:** Added inline input fields for selected character cards that blend with the card design.
+*   **Veteran Renaming:** Saved veterans can also be renamed before starting a new case, allowing for character evolution or correction.

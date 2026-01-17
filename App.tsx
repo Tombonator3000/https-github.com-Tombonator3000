@@ -13,9 +13,15 @@ import {
   Target,
   FolderOpen,
   ArrowLeft,
-  Brain
+  Brain,
+  Save,
+  Users,
+  Briefcase,
+  Star,
+  Trash2,
+  Edit2
 } from 'lucide-react';
-import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction } from './types';
+import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator } from './types';
 import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS } from './constants';
 import GameBoard from './components/GameBoard';
 import CharacterPanel from './components/CharacterPanel';
@@ -25,6 +31,7 @@ import DiceRoller from './components/DiceRoller';
 import EventModal from './components/EventModal';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
+const ROSTER_KEY = 'shadows_1920s_roster';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- HEX MATH HELPERS ---
@@ -77,13 +84,12 @@ const hasLineOfSight = (start: {q: number, r: number}, end: {q: number, r: numbe
   if (dist > range) return false;
   
   const line = getHexLine(start, end);
-  // Check if every point in the line exists in the board array AND is not blocking sight (could add 'sightBlocking' later)
-  // For now, assume walls (implied by missing tiles) block sight.
   return line.every(point => board.some(t => t.q === point.q && t.r === point.r));
 };
 // ------------------------
 
 const App: React.FC = () => {
+  // --- STATE ---
   const [state, setState] = useState<GameState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -113,16 +119,28 @@ const App: React.FC = () => {
     };
   });
 
+  const [roster, setRoster] = useState<SavedInvestigator[]>(() => {
+    const saved = localStorage.getItem(ROSTER_KEY);
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [viewingVeterans, setViewingVeterans] = useState(false);
+
   const [hoveredEnemyId, setHoveredEnemyId] = useState<string | null>(null);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
   const audioInit = useRef(false);
 
+  // --- PERSISTENCE ---
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
+  useEffect(() => {
+    localStorage.setItem(ROSTER_KEY, JSON.stringify(roster));
+  }, [roster]);
+
+  // --- AUDIO ---
   const initAudio = async () => {
     if (audioInit.current) return;
     await Tone.start();
@@ -155,7 +173,8 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, log: [message, ...prev.log].slice(0, 50) }));
   };
 
-  // --- LOGIC: SANITY & MADNESS ---
+  // --- GAMEPLAY LOGIC ---
+
   const applySanityDamage = (player: Player, amount: number): { player: Player, log?: string, sound?: 'madness' } => {
     if (player.isDead) return { player };
 
@@ -165,14 +184,16 @@ const App: React.FC = () => {
     let updatedPlayer = { ...player };
 
     if (newSanity <= 0) {
+        // If already mad, they die
         if (player.activeMadness) {
             updatedPlayer.sanity = 0;
             updatedPlayer.isDead = true;
             logMsg = `Sinnslidelsen ble for mye. ${player.name} har mistet forstanden totalt. (Død)`;
         } else {
+            // New Madness
             const madness = MADNESS_CONDITIONS[Math.floor(Math.random() * MADNESS_CONDITIONS.length)];
             updatedPlayer.activeMadness = madness;
-            updatedPlayer.sanity = player.maxSanity;
+            updatedPlayer.sanity = player.maxSanity; // Reset sanity, but now they are broken
             logMsg = `SINNSSYKDOM! ${player.name} knekker sammen og utvikler: ${madness.name}.`;
             sound = 'madness';
         }
@@ -206,13 +227,46 @@ const App: React.FC = () => {
     if (state.phase !== GamePhase.SETUP) return;
     playStinger('click');
     setState(prev => {
-      const existing = prev.players.find(p => p.id === type);
-      if (existing) return { ...prev, players: prev.players.filter(p => p.id !== type) };
+      const existing = prev.players.find(p => p.id === type && !p.instanceId);
+      if (existing) return { ...prev, players: prev.players.filter(p => p !== existing) };
       if (prev.players.length >= 4) return prev;
+      
       const char = CHARACTERS[type];
       const newPlayer: Player = { ...char, position: { q: 0, r: 0 }, inventory: [], actions: 2, isDead: false, madness: [], activeMadness: null };
       return { ...prev, players: [...prev.players, newPlayer] };
     });
+  };
+
+  const toggleVeteranSelection = (vet: SavedInvestigator) => {
+      if (state.phase !== GamePhase.SETUP) return;
+      playStinger('click');
+      setState(prev => {
+          const existing = prev.players.find(p => p.instanceId === vet.instanceId);
+          if (existing) return { ...prev, players: prev.players.filter(p => p.instanceId !== vet.instanceId) };
+          if (prev.players.length >= 4) return prev;
+
+          // Convert SavedInvestigator back to Player (reset position/actions)
+          const player: Player = {
+              ...vet,
+              position: { q: 0, r: 0 },
+              actions: 2,
+              isDead: false
+          };
+          return { ...prev, players: [...prev.players, player] };
+      });
+  };
+
+  const updatePlayerName = (identifier: string, newName: string, isVeteran: boolean) => {
+      setState(prev => ({
+          ...prev,
+          players: prev.players.map(p => {
+              if (isVeteran) {
+                  return p.instanceId === identifier ? { ...p, name: newName } : p;
+              } else {
+                  return (p.id === identifier && !p.instanceId) ? { ...p, name: newName } : p;
+              }
+          })
+      }));
   };
 
   const startGame = () => {
@@ -232,20 +286,63 @@ const App: React.FC = () => {
     addToLog("Etterforskningen starter. Mørket senker seg over byen.");
   };
 
+  const saveToRoster = (player: Player) => {
+      if (player.isDead) return;
+      playStinger('click');
+      const newVet: SavedInvestigator = {
+          ...player,
+          instanceId: player.instanceId || `${player.id}-${Date.now()}`,
+          saveDate: Date.now(),
+          scenariosSurvived: (roster.find(v => v.instanceId === player.instanceId)?.scenariosSurvived || 0) + 1
+      };
+
+      setRoster(prev => {
+          const filtered = prev.filter(p => p.instanceId !== newVet.instanceId);
+          return [...filtered, newVet];
+      });
+      addToLog(`${player.name} er lagret i arkivet.`);
+  };
+
+  const deleteVeteran = (instanceId: string) => {
+      setRoster(prev => prev.filter(p => p.instanceId !== instanceId));
+  };
+
   const handleEndTurn = () => {
     playStinger('click');
     setState(prev => {
       const isLastPlayer = prev.activePlayerIndex === prev.players.length - 1;
+      let nextIndex = isLastPlayer ? 0 : prev.activePlayerIndex + 1;
+      let nextPhase = isLastPlayer ? GamePhase.MYTHOS : GamePhase.INVESTIGATOR;
+
+      // Skip dead players
+      if (nextPhase === GamePhase.INVESTIGATOR) {
+           while (prev.players[nextIndex].isDead) {
+               nextIndex++;
+               if (nextIndex >= prev.players.length) {
+                   nextIndex = 0;
+                   nextPhase = GamePhase.MYTHOS;
+                   break;
+               }
+           }
+      }
+
+      // Madness: Catatonia (Reset actions differently)
+      // We don't reset actions here, we do it at start of Investigator phase normally?
+      // Actually, standard pattern is to reset at start of round. 
+      // Current logic: we update players array in Mythos phase result.
+      
       return { 
         ...prev, 
-        activePlayerIndex: isLastPlayer ? 0 : prev.activePlayerIndex + 1, 
-        phase: isLastPlayer ? GamePhase.MYTHOS : GamePhase.INVESTIGATOR,
+        activePlayerIndex: nextIndex, 
+        phase: nextPhase,
         selectedEnemyId: null,
         selectedTileId: null
       };
     });
   };
 
+  // --- ACTIONS ---
+  
   const handleResolveEvent = useCallback(() => {
     if (!state.activeEvent) return;
     const event = state.activeEvent;
@@ -284,6 +381,7 @@ const App: React.FC = () => {
         setState(prev => {
           const newDoom = prev.doom - 1;
           
+          // Enemy Movement & Attacks
           const updatedEnemies = prev.enemies.map(enemy => {
             const alivePlayers = prev.players.filter(p => !p.isDead);
             if (alivePlayers.length === 0) return enemy;
@@ -343,12 +441,22 @@ const App: React.FC = () => {
           }
 
           const allDead = updatedPlayers.every(p => p.isDead);
+
+          // RESET ACTIONS & APPLY MADNESS (CATATONIA)
+          const finalPlayers = updatedPlayers.map(p => {
+              if (p.isDead) return { ...p, actions: 0 };
+              // Catatonia (m4) reduces actions to 1
+              const baseActions = p.activeMadness?.id === 'm4' ? 1 : 2;
+              return { ...p, actions: baseActions };
+          });
+
           return { 
             ...prev, 
             doom: newDoom, 
             round: prev.round + 1, 
             enemies: updatedEnemies, 
-            players: updatedPlayers.map(p => ({ ...p, actions: p.isDead ? 0 : 2 })), 
+            players: finalPlayers, 
+            activePlayerIndex: 0,
             phase: (newDoom <= 0 || allDead) ? GamePhase.GAME_OVER : GamePhase.INVESTIGATOR 
           };
         });
@@ -362,16 +470,22 @@ const App: React.FC = () => {
   const handleAction = (actionType: string, payload?: any) => {
     if (!activePlayer || activePlayer.actions <= 0 || activePlayer.isDead || state.phase !== GamePhase.INVESTIGATOR) return;
     
+    // MADNESS PENALTIES
+    const madness = activePlayer.activeMadness?.id;
+    
+    // Helper to calculate penalty dice
+    const getDiceCount = (base: number) => {
+        let count = base;
+        if (madness === 'm3') count -= 1; // Hysteria
+        return Math.max(1, count);
+    };
+
     switch (actionType) {
       case 'move':
         const { q, r } = payload;
-        
-        // Cannot move to self
         if (q === activePlayer.position.q && r === activePlayer.position.r) return;
-
         let targetTile = state.board.find(t => t.q === q && t.r === r);
         
-        // CHECK BLOCKED
         if (targetTile && targetTile.object?.blocking) {
             playStinger('block');
             addToLog(`Veien er blokkert av ${targetTile.object.type}. Du må fjerne det først.`);
@@ -385,16 +499,13 @@ const App: React.FC = () => {
           let newTileType: 'room' | 'street' = 'street';
           let newTileName = 'Unknown';
 
-          // Determine Type
           if (tileSet === 'indoor') newTileType = 'room';
           else if (tileSet === 'outdoor') newTileType = 'street';
           else newTileType = Math.random() > 0.5 ? 'room' : 'street';
 
-          // Naming
           const pool = newTileType === 'room' ? INDOOR_LOCATIONS : OUTDOOR_LOCATIONS;
           newTileName = pool[Math.floor(Math.random() * pool.length)];
 
-          // Generation Obstacles (The Dungeon Crawl Logic)
           let objectType: TileObjectType | undefined = undefined;
           let isBlocking = false;
           let difficulty = 0;
@@ -402,7 +513,6 @@ const App: React.FC = () => {
 
           const rng = Math.random();
           if (newTileType === 'room') {
-               // 40% chance of obstacle indoors
                if (rng > 0.6) {
                    const obsRng = Math.random();
                    if (obsRng > 0.6) {
@@ -412,29 +522,20 @@ const App: React.FC = () => {
                    } else {
                        objectType = 'barricade'; isBlocking = true; difficulty = 3; reqSkill = 'agility';
                    }
-               } else if (rng < 0.2) {
-                   objectType = 'bookshelf'; // Searchable
+               } else {
+                   const lootRng = Math.random();
+                   if (lootRng > 0.7) {
+                        const containers: TileObjectType[] = ['bookshelf', 'crate', 'chest', 'cabinet'];
+                        objectType = containers[Math.floor(Math.random() * containers.length)];
+                        isBlocking = false;
+                   }
                }
           }
 
           const isGate = Math.random() > 0.9;
-          
           const newTile: Tile = { 
-            id: `tile-${state.board.length}`, 
-            q, r, 
-            name: newTileName, 
-            type: newTileType, 
-            explored: true, 
-            searchable: true, 
-            searched: false, 
-            isGate, 
-            object: objectType ? { 
-                type: objectType, 
-                searched: false, 
-                blocking: isBlocking, 
-                difficulty, 
-                reqSkill 
-            } : undefined 
+            id: `tile-${state.board.length}`, q, r, name: newTileName, type: newTileType, explored: true, searchable: true, searched: false, isGate, 
+            object: objectType ? { type: objectType, searched: false, blocking: isBlocking, difficulty, reqSkill } : undefined 
           };
           
           const eventTrigger = Math.random() > 0.85;
@@ -454,27 +555,20 @@ const App: React.FC = () => {
         break;
 
       case 'interact':
-          // Perform contextual skill check
           const selectedTile = state.board.find(t => t.id === state.selectedTileId);
           if (!selectedTile || !selectedTile.object?.blocking) return;
 
           playStinger('roll');
-          const skillRoll = Array.from({ length: 2 }, () => Math.floor(Math.random() * 6) + 1); // Base 2 dice
-          // Bonus dice based on character? For now, simplifying:
-          if (activePlayer.id === 'veteran' && selectedTile.object.reqSkill === 'strength') skillRoll.push(Math.floor(Math.random() * 6) + 1);
-          if (activePlayer.id === 'professor' && selectedTile.object.reqSkill === 'insight') skillRoll.push(Math.floor(Math.random() * 6) + 1);
+          // Apply Hysteria Penalty
+          const baseDice = 2 + (activePlayer.id === 'veteran' && selectedTile.object.reqSkill === 'strength' ? 1 : 0);
+          const diceCount = getDiceCount(baseDice);
+          const skillRoll = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
 
-          const total = skillRoll.reduce((a, b) => a + b, 0); // Sum or successes? Using simple sum vs difficulty for now? 
-          // Actually, let's stick to Success count (4,5,6) to be consistent with combat.
-          // Difficulty 3 = needs 1 success. Difficulty 4 = needs 1 success but harder?
-          // Let's redefine difficulty: Difficulty is target number.
-          
           const successes = skillRoll.filter(v => v >= 4).length;
-          const requiredSuccesses = 1; // Simplify: Always need 1 success to clear for now.
 
           setState(prev => ({ ...prev, lastDiceRoll: skillRoll }));
 
-          if (successes >= requiredSuccesses) {
+          if (successes >= 1) {
               playStinger('click');
               addToLog(`Suksess! ${activePlayer.name} fjernet ${selectedTile.object.type}.`);
               setState(prev => ({
@@ -500,8 +594,11 @@ const App: React.FC = () => {
 
         if (!enemyOnTile) { addToLog("Ingenting å angripe her..."); return; }
         playStinger('combat');
-        const roll = Array.from({ length: 2 }, () => Math.floor(Math.random() * 6) + 1);
+        
+        const atkDice = getDiceCount(2 + (activePlayer.id === 'veteran' ? 1 : 0));
+        const roll = Array.from({ length: atkDice }, () => Math.floor(Math.random() * 6) + 1);
         const hits = roll.filter(v => v >= 4).length;
+        
         setState(prev => ({ 
           ...prev, 
           lastDiceRoll: roll, 
@@ -511,34 +608,72 @@ const App: React.FC = () => {
         }));
         if (hits > 0) addToLog(`Du påførte ${hits} skade på ${enemyOnTile.name}!`); else addToLog(`Bom!`);
         break;
+        
       case 'investigate':
         const currentTile = state.board.find(t => t.q === activePlayer.position.q && t.r === activePlayer.position.r);
         playStinger('roll');
-        const iRoll = [Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1];
+        
+        const invDice = getDiceCount(2 + (activePlayer.id === 'detective' ? 1 : 0));
+        const iRoll = Array.from({ length: invDice }, () => Math.floor(Math.random() * 6) + 1);
         const searchSuccesses = iRoll.filter(v => v >= 4).length;
         setState(prev => ({ ...prev, lastDiceRoll: iRoll }));
-        if (searchSuccesses > 0) {
-          if (currentTile?.object && !currentTile.object.searched && !currentTile.object.blocking) {
-            playStinger('search');
-            const item = ITEMS[Math.floor(Math.random() * ITEMS.length)];
-            setState(prev => ({ ...prev, board: prev.board.map(t => t.id === currentTile.id ? { ...t, object: { ...t.object!, searched: true } } : t), players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, inventory: [...p.inventory, item], actions: p.actions - 1 } : p) }));
-            addToLog(`Du fant ${item.name}!`);
-          } else if (Math.random() > 0.7) {
-            setState(prev => ({ ...prev, cluesFound: prev.cluesFound + 1, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
-            addToLog("Et spor!");
-          } else {
-            addToLog("Ingenting her.");
-            setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
-          }
+
+        if (currentTile?.object && !currentTile.object.blocking && !currentTile.object.searched) {
+             if (searchSuccesses > 0) {
+                 playStinger('search');
+                 const rewardRng = Math.random();
+                 if (rewardRng > 0.4) {
+                     const item = ITEMS[Math.floor(Math.random() * ITEMS.length)];
+                     setState(prev => ({ 
+                         ...prev, 
+                         board: prev.board.map(t => t.id === currentTile.id ? { ...t, object: { ...t.object!, searched: true } } : t), 
+                         players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, inventory: [...p.inventory, item], actions: p.actions - 1 } : p) 
+                     }));
+                     addToLog(`Du ransaket ${currentTile.object.type} og fant: ${item.name}!`);
+                 } else {
+                     setState(prev => ({ 
+                         ...prev, 
+                         cluesFound: prev.cluesFound + 1,
+                         board: prev.board.map(t => t.id === currentTile.id ? { ...t, object: { ...t.object!, searched: true } } : t),
+                         players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) 
+                     }));
+                     addToLog(`Du fant et viktig spor gjemt i ${currentTile.object.type}!`);
+                 }
+             } else {
+                 addToLog(`Du fant ingenting av verdi i ${currentTile.object.type}.`);
+                 setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
+             }
         } else {
-          addToLog("Du overså noe.");
-          setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
+            if (searchSuccesses > 0) {
+                if (Math.random() > 0.8) {
+                    setState(prev => ({ ...prev, cluesFound: prev.cluesFound + 1, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
+                    addToLog("Et spor!");
+                } else if (Math.random() > 0.85) {
+                    const item = ITEMS[Math.floor(Math.random() * ITEMS.length)];
+                    setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, inventory: [...p.inventory, item], actions: p.actions - 1 } : p) }));
+                    addToLog(`Du fant ${item.name} på gulvet!`);
+                } else {
+                    addToLog("Ingenting her.");
+                    setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
+                }
+            } else {
+                addToLog("Du overså noe.");
+                setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
+            }
         }
         break;
+
       case 'rest':
+        if (madness === 'm2') { // Paranoia
+            playStinger('horror');
+            addToLog(`${activePlayer.name} er for paranoid til å hvile!`);
+            return; 
+        }
+
         setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, hp: Math.min(p.maxHp, p.hp + 1), sanity: Math.min(p.maxSanity, p.sanity + 1), actions: p.actions - 1 } : p) }));
         addToLog(`${activePlayer.name} hviler.`);
         break;
+
       case 'item':
         const medKit = activePlayer.inventory.find(i => i.id === 'med');
         const book = activePlayer.inventory.find(i => i.id === 'book');
@@ -591,7 +726,7 @@ const App: React.FC = () => {
 
   const resetGame = () => { localStorage.removeItem(STORAGE_KEY); window.location.reload(); };
 
-  // --- FOV CALCULATION FOR VISUALS ---
+  // --- RENDERING HELPERS ---
   const displayEnemyId = state.selectedEnemyId || hoveredEnemyId;
   const displayEnemy = state.enemies.find(e => e.id === displayEnemyId);
   const requiredClues = state.activeScenario?.cluesRequired || 3;
@@ -609,13 +744,10 @@ const App: React.FC = () => {
     return visibleSet;
   }, [displayEnemy, state.board]);
 
-  // --- CONTEXT ACTION CALCULATION ---
   const getContextAction = (): ContextAction | null => {
       if (!state.selectedTileId) return null;
       const tile = state.board.find(t => t.id === state.selectedTileId);
       if (!tile || !tile.object?.blocking) return null;
-      
-      // Is neighbor?
       const dist = hexDistance(activePlayer.position, tile);
       if (dist > 1) return null;
 
@@ -625,21 +757,16 @@ const App: React.FC = () => {
       if (obj.type === 'rubble') label = 'Clear Rubble';
       if (obj.type === 'barricade') label = 'Dismantle';
 
-      return {
-          id: 'interact-blocker',
-          label,
-          iconType: obj.reqSkill || 'strength',
-          difficulty: obj.difficulty || 3
-      };
+      return { id: 'interact-blocker', label, iconType: obj.reqSkill || 'strength', difficulty: obj.difficulty || 3 };
   };
   const currentContextAction = getContextAction();
-  // -----------------------------------
 
-  // Apply Madness Visuals to active player
+  // Active Madness Visuals
   const activeMadnessClass = activePlayer?.activeMadness?.visualClass || '';
   
+  // --- SCREENS ---
+
   if (state.phase === GamePhase.SETUP) {
-    // SCENARIO SELECTION SCREEN
     if (!state.activeScenario) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#05050a] relative overflow-hidden">
@@ -659,20 +786,10 @@ const App: React.FC = () => {
                                     </div>
                                     <h2 className="text-3xl font-display text-slate-200 mb-2">{scenario.title}</h2>
                                     <p className="text-slate-400 italic font-serif text-lg mb-6 flex-grow">"{scenario.description}"</p>
-                                    
                                     <div className="space-y-2 border-t border-slate-800 pt-4">
-                                        <div className="flex items-center gap-2 text-sm text-slate-500">
-                                            <Skull size={14} className="text-[#e94560]" />
-                                            <span>Starts at <strong className="text-slate-300">{scenario.startDoom} Doom</strong></span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-sm text-slate-500">
-                                            <Target size={14} className="text-purple-500" />
-                                            <span>Requires <strong className="text-slate-300">{scenario.cluesRequired} Clues</strong></span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-sm text-slate-500">
-                                            <ScrollText size={14} className="text-amber-500" />
-                                            <span>Start: <strong className="text-slate-300">{scenario.startLocation}</strong></span>
-                                        </div>
+                                        <div className="flex items-center gap-2 text-sm text-slate-500"><Skull size={14} className="text-[#e94560]" /><span>Starts at <strong className="text-slate-300">{scenario.startDoom} Doom</strong></span></div>
+                                        <div className="flex items-center gap-2 text-sm text-slate-500"><Target size={14} className="text-purple-500" /><span>Requires <strong className="text-slate-300">{scenario.cluesRequired} Clues</strong></span></div>
+                                        <div className="flex items-center gap-2 text-sm text-slate-500"><ScrollText size={14} className="text-amber-500" /><span>Start: <strong className="text-slate-300">{scenario.startLocation}</strong></span></div>
                                     </div>
                                 </div>
                             </div>
@@ -683,7 +800,6 @@ const App: React.FC = () => {
         )
     }
 
-    // CHARACTER SELECTION SCREEN
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#05050a] relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-paper.png')] opacity-20"></div>
@@ -693,25 +809,98 @@ const App: React.FC = () => {
                   <ArrowLeft size={16} /> Change Case
               </button>
               <div className="text-[#e94560] font-display text-2xl uppercase tracking-widest">{state.activeScenario.title}</div>
-              <div className="w-20"></div> {/* Spacer */}
+              <div className="w-20"></div>
           </div>
-          <div className="h-px bg-gradient-to-r from-transparent via-[#e94560] to-transparent w-full mb-6"></div>
-          <p className="text-xl mb-12 text-slate-400 italic font-serif tracking-widest uppercase">Select your team (1-4 investigators)</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-12">
-            {(Object.keys(CHARACTERS) as CharacterType[]).map(key => {
-              const isSelected = state.players.some(p => p.id === key);
-              return (
-                <button key={key} onClick={() => toggleCharacterSelection(key)} className={`group p-5 bg-[#0a0a1a] border-2 transition-all text-left relative overflow-hidden ${isSelected ? 'border-[#e94560] shadow-[0_0_20px_rgba(233,69,96,0.2)]' : 'border-slate-800 hover:border-slate-600'}`}>
-                  <div className={`text-xl font-bold uppercase tracking-tight ${isSelected ? 'text-[#e94560]' : 'text-slate-100'}`}>{CHARACTERS[key].name}</div>
-                  <div className="text-[9px] text-slate-500 mt-2 uppercase tracking-[0.2em] leading-tight font-sans h-8">{CHARACTERS[key].special}</div>
-                  <div className="flex gap-4 mt-4">
-                    <div className="flex items-center gap-1 text-red-500 font-bold"><Skull size={12} /> {CHARACTERS[key].hp}</div>
-                    <div className="flex items-center gap-1 text-purple-500 font-bold"><RotateCcw size={12} /> {CHARACTERS[key].sanity}</div>
-                  </div>
-                  {isSelected && <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-[#e94560] animate-pulse"></div>}
-                </button>
-              );
-            })}
+
+          <div className="flex justify-center gap-6 mb-8 border-b border-slate-700 pb-4">
+              <button onClick={() => setViewingVeterans(false)} className={`flex items-center gap-2 uppercase tracking-widest font-bold pb-2 transition-all ${!viewingVeterans ? 'text-[#e94560] border-b-2 border-[#e94560]' : 'text-slate-500 hover:text-slate-300'}`}>
+                  <Users size={18} /> New Recruits
+              </button>
+              <button onClick={() => setViewingVeterans(true)} className={`flex items-center gap-2 uppercase tracking-widest font-bold pb-2 transition-all ${viewingVeterans ? 'text-amber-500 border-b-2 border-amber-500' : 'text-slate-500 hover:text-slate-300'}`}>
+                  <Star size={18} /> Veterans ({roster.length})
+              </button>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-12 min-h-[400px]">
+            {!viewingVeterans ? (
+                // NEW RECRUITS
+                (Object.keys(CHARACTERS) as CharacterType[]).map(key => {
+                  const selectedPlayer = state.players.find(p => p.id === key && !p.instanceId);
+                  const isSelected = !!selectedPlayer;
+                  
+                  return (
+                    <button key={key} onClick={() => toggleCharacterSelection(key)} className={`group p-5 bg-[#0a0a1a] border-2 transition-all text-left relative overflow-hidden ${isSelected ? 'border-[#e94560] shadow-[0_0_20px_rgba(233,69,96,0.2)]' : 'border-slate-800 hover:border-slate-600'}`}>
+                      {isSelected ? (
+                        <div className="flex items-center gap-2 mb-1">
+                          <input 
+                              type="text" 
+                              value={selectedPlayer.name}
+                              onChange={(e) => updatePlayerName(key, e.target.value, false)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="bg-transparent border-b border-[#e94560] text-[#e94560] text-xl font-bold uppercase tracking-tight w-full focus:outline-none placeholder-slate-700"
+                              placeholder="Enter Name..."
+                          />
+                          <Edit2 size={12} className="text-slate-600" />
+                        </div>
+                      ) : (
+                        <div className={`text-xl font-bold uppercase tracking-tight text-slate-100`}>{CHARACTERS[key].name}</div>
+                      )}
+                      
+                      <div className="text-[9px] text-slate-500 mt-2 uppercase tracking-[0.2em] leading-tight font-sans h-8">{CHARACTERS[key].special}</div>
+                      <div className="flex gap-4 mt-4">
+                        <div className="flex items-center gap-1 text-red-500 font-bold"><Skull size={12} /> {CHARACTERS[key].hp}</div>
+                        <div className="flex items-center gap-1 text-purple-500 font-bold"><RotateCcw size={12} /> {CHARACTERS[key].sanity}</div>
+                      </div>
+                      {isSelected && <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-[#e94560] animate-pulse"></div>}
+                    </button>
+                  );
+                })
+            ) : (
+                // VETERANS
+                roster.length === 0 ? (
+                    <div className="col-span-3 flex flex-col items-center justify-center text-slate-600 italic h-60 border-2 border-dashed border-slate-800 rounded">
+                        <Star size={48} className="mb-4 opacity-20" />
+                        <p>No survivors in the archive yet.</p>
+                        <p className="text-xs mt-2">Finish a game with living investigators to save them.</p>
+                    </div>
+                ) : (
+                    roster.map(vet => {
+                        const selectedPlayer = state.players.find(p => p.instanceId === vet.instanceId);
+                        const isSelected = !!selectedPlayer;
+                        return (
+                            <button key={vet.instanceId} onClick={() => toggleVeteranSelection(vet)} className={`group p-5 bg-[#1a120b] border-2 transition-all text-left relative overflow-hidden ${isSelected ? 'border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.3)]' : 'border-amber-900/50 hover:border-amber-700'}`}>
+                              <div className="flex justify-between items-start">
+                                  {isSelected ? (
+                                    <input 
+                                        type="text" 
+                                        value={selectedPlayer.name}
+                                        onChange={(e) => updatePlayerName(vet.instanceId!, e.target.value, true)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="bg-transparent border-b border-amber-500 text-amber-400 text-xl font-bold uppercase tracking-tight w-full focus:outline-none placeholder-amber-900/50 mr-2"
+                                    />
+                                  ) : (
+                                    <div className={`text-xl font-bold uppercase tracking-tight ${isSelected ? 'text-amber-400' : 'text-amber-100/80'}`}>{vet.name}</div>
+                                  )}
+                                  <Trash2 size={14} className="text-slate-600 hover:text-red-500 z-20 flex-shrink-0" onClick={(e) => { e.stopPropagation(); deleteVeteran(vet.instanceId!); }} />
+                              </div>
+                              <div className="flex items-center gap-2 mt-2 mb-2">
+                                  <Star size={10} className="text-amber-500" />
+                                  <span className="text-[10px] text-amber-500 uppercase tracking-widest">Survived: {vet.scenariosSurvived}</span>
+                              </div>
+                              <div className="text-[9px] text-slate-400 uppercase tracking-[0.1em] font-sans truncate mb-4">
+                                  {vet.inventory.length > 0 ? `Has: ${vet.inventory.map(i=>i.name).join(', ')}` : 'Empty Pockets'}
+                              </div>
+                              <div className="flex gap-4 border-t border-amber-900/30 pt-3">
+                                <div className="flex items-center gap-1 text-red-400 font-bold text-sm"><Skull size={12} /> {vet.hp}</div>
+                                <div className="flex items-center gap-1 text-purple-400 font-bold text-sm"><RotateCcw size={12} /> {vet.sanity}</div>
+                                <div className="flex items-center gap-1 text-green-400 font-bold text-sm"><Brain size={12} /> {vet.insight}</div>
+                              </div>
+                              {isSelected && <div className="absolute top-3 right-8 w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>}
+                            </button>
+                        );
+                    })
+                )
+            )}
           </div>
           <button disabled={state.players.length === 0} onClick={startGame} className={`px-20 py-6 rounded-none font-display text-3xl italic tracking-[0.3em] transition-all uppercase border-2 ${state.players.length > 0 ? 'bg-[#e94560] border-white text-white hover:scale-105 shadow-[0_0_40px_rgba(233,69,96,0.5)]' : 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed'}`}>BEGIN INVESTIGATION</button>
         </div>
@@ -846,6 +1035,32 @@ const App: React.FC = () => {
              <p className="text-xl text-slate-400 mb-16 italic leading-relaxed font-serif px-10">
                {state.cluesFound >= requiredClues ? "Portalen er forseglet. Skyggene trekker seg tilbake..." : state.players.every(p => p.isDead) ? "Alle etterforskere er tapt. Mørket har seiret." : "Tiden rant ut. Dommedag er her."}
              </p>
+             
+             {/* SAVE VETERANS UI */}
+             {state.players.some(p => !p.isDead) && (
+                 <div className="mb-10">
+                     <p className="text-sm uppercase tracking-widest text-slate-500 mb-4 font-bold">Overlevende (Klikk for å lagre)</p>
+                     <div className="flex justify-center gap-4 flex-wrap">
+                         {state.players.map(p => {
+                             if (p.isDead) return null;
+                             const isSaved = roster.some(v => v.instanceId === p.instanceId);
+                             return (
+                                 <button 
+                                    key={p.id} 
+                                    onClick={() => saveToRoster(p)}
+                                    disabled={isSaved}
+                                    className={`flex items-center gap-2 px-6 py-3 border border-slate-700 rounded bg-[#1a1a2e] hover:border-amber-500 transition-all ${isSaved ? 'opacity-50 cursor-default' : ''}`}
+                                 >
+                                     <Save size={16} className="text-amber-500" />
+                                     <span className="text-amber-100 font-bold uppercase text-xs tracking-wider">{p.name}</span>
+                                     {isSaved && <span className="text-[8px] text-green-500 ml-1">(SAVED)</span>}
+                                 </button>
+                             );
+                         })}
+                     </div>
+                 </div>
+             )}
+
              <button onClick={resetGame} className="px-16 py-5 border-2 border-[#e94560] text-[#e94560] font-bold hover:bg-[#e94560] hover:text-white transition-all text-sm uppercase tracking-[0.4em]">AVSLUTT</button>
            </div>
         </div>

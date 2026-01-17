@@ -79,28 +79,28 @@ export const MADNESS_CONDITIONS: Madness[] = [
     id: 'm1', 
     name: 'Hallucinations', 
     description: 'You see things that are not there. The world warps around you.', 
-    effect: 'Visual distortions. You may see fake enemies.', 
+    effect: 'Severe visual distortion. No gameplay penalty... yet.', 
     visualClass: 'madness-hallucination' 
   },
   { 
     id: 'm2', 
     name: 'Paranoia', 
-    description: 'They are all against you. You hear whispers in the silence.', 
-    effect: 'Screen desaturation and vignetting.', 
+    description: 'They are watching you. You cannot close your eyes.', 
+    effect: 'CANNOT use the Rest action. Tunnel vision.', 
     visualClass: 'madness-paranoia' 
   },
   { 
     id: 'm3', 
     name: 'Hysteria', 
-    description: 'You cannot stop shaking. The terror is overwhelming.', 
-    effect: 'Camera shake and red tint.', 
+    description: 'Your hands shake uncontrollably. Panic sets in.', 
+    effect: '-1 Die on ALL skill checks. Screen shakes.', 
     visualClass: 'madness-hysteria' 
   },
   { 
     id: 'm4', 
     name: 'Catatonia', 
-    description: 'Your mind retreats into darkness.', 
-    effect: 'Extreme darkness and tunnel vision.', 
+    description: 'Your mind retreats into darkness. You move sluggishly.', 
+    effect: 'Max 1 Action per turn. World is dark.', 
     visualClass: 'madness-catatonia' 
   }
 ];
