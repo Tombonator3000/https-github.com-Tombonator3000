@@ -59,7 +59,7 @@ export type EnemyAttackType = 'melee' | 'ranged' | 'sanity' | 'doom';
 export interface Enemy {
   id: string;
   name: string;
-  type: 'cultist' | 'deepone' | 'ghoul' | 'shoggoth' | 'boss' | 'sniper' | 'priest';
+  type: 'cultist' | 'deepone' | 'ghoul' | 'shoggoth' | 'boss' | 'sniper' | 'priest' | 'mi-go' | 'nightgaunt' | 'hound' | 'dark_young';
   hp: number;
   maxHp: number;
   damage: number;

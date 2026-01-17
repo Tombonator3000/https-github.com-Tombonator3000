@@ -86,6 +86,10 @@ const EnemyPanel: React.FC<EnemyPanelProps> = ({ enemy, onClose }) => {
             {enemy.type === 'deepone' && "En vederstyggelighet fra dypet."}
             {enemy.type === 'shoggoth' && "En formløs masse av boblende kjøtt og øyne."}
             {enemy.type === 'boss' && "En eldgammel kraft hinsides menneskelig fatteevne."}
+            {enemy.type === 'mi-go' && "En bevinget sopp-skapning fra Yuggoth med merkelig teknologi."}
+            {enemy.type === 'nightgaunt' && "En ansiktsløs flyger som beveger seg lydløst gjennom natten."}
+            {enemy.type === 'hound' && "En jeger fra Tindalos som beveger seg gjennom vinkler i tid og rom."}
+            {enemy.type === 'dark_young' && "Et enormt avkom av Shub-Niggurath, en masse av tentakler og hover."}
           </p>
         </div>
       </div>

@@ -92,15 +92,5 @@ Track all major milestones, feature additions, and bug fixes here.
 *   **Monster Visualization:** Targeting an enemy generates a terrifying illustration of the specific creature type.
 *   **Asset Persistence:** Generated images are stored in the game state, ensuring continuity throughout the session.
 
-## [Audit & Roadmap - State Analysis]
-*Current status audit conducted to identify gaps in gameplay depth and polish.*
-
-### 1. Dynamic Sound
-*   **Missing:** Audio is a static loop.
-*   **Improvement:** Adaptive music that increases tempo/dissonance as Doom decreases.
-*   **Priority:** Low.
-
-### 2. Endgame Screen
-*   **Missing:** Detailed feedback on performance.
-*   **Improvement:** Add a "Debriefing" screen with stats (Damage Dealt, Clues Found, Rounds Survived).
-*   **Priority:** Medium.
+## [Protocol Update]
+*   **Agents:** Updated `agents.md` with strict architectural pillars to enforce modularity and prevent spaghetti code. Defined clear roles for "The Architect", "The Keeper", "The Visionary", and "The Virtuoso".

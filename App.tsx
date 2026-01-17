@@ -618,14 +618,22 @@ const App: React.FC = () => {
           if (gateTiles.length > 0 && Math.random() > 0.6) {
             const spawnGate = gateTiles[Math.floor(Math.random() * gateTiles.length)];
             
-            const rng = Math.random();
+            const spawnRoll = Math.random();
             let newEnemy: Enemy;
             const base = { id: `enemy-${Date.now()}`, position: { q: spawnGate.q, r: spawnGate.r }, visionRange: 3 };
             
-            if (rng > 0.8) {
-                newEnemy = { ...base, name: 'Sniper', type: 'sniper', hp: 2, maxHp: 2, damage: 1, horror: 0, speed: 1, attackRange: 3, attackType: 'ranged' };
-            } else if (rng > 0.9) {
+            if (spawnRoll > 0.9) {
+                 newEnemy = { ...base, name: 'Dark Young', type: 'dark_young', hp: 6, maxHp: 6, damage: 2, horror: 3, speed: 1, attackRange: 1, attackType: 'melee' };
+            } else if (spawnRoll > 0.8) {
+                 newEnemy = { ...base, name: 'Hound of Tindalos', type: 'hound', hp: 4, maxHp: 4, damage: 2, horror: 2, speed: 2, attackRange: 1, attackType: 'melee' };
+            } else if (spawnRoll > 0.7) {
+                 newEnemy = { ...base, name: 'Nightgaunt', type: 'nightgaunt', hp: 3, maxHp: 3, damage: 1, horror: 0, speed: 2, attackRange: 1, attackType: 'melee' };
+            } else if (spawnRoll > 0.6) {
+                 newEnemy = { ...base, name: 'Mi-Go', type: 'mi-go', hp: 3, maxHp: 3, damage: 1, horror: 1, speed: 1, attackRange: 3, attackType: 'ranged' };
+            } else if (spawnRoll > 0.5) {
                 newEnemy = { ...base, name: 'Dark Priest', type: 'priest', hp: 3, maxHp: 3, damage: 0, horror: 2, speed: 1, attackRange: 2, attackType: 'doom' };
+            } else if (spawnRoll > 0.4) {
+                 newEnemy = { ...base, name: 'Sniper', type: 'sniper', hp: 2, maxHp: 2, damage: 1, horror: 0, speed: 1, attackRange: 3, attackType: 'ranged' };
             } else {
                 newEnemy = { ...base, name: 'Kultist', type: 'cultist', hp: 2, maxHp: 2, damage: 1, horror: 1, speed: 1, attackRange: 1, attackType: 'melee' };
             }
@@ -711,6 +719,7 @@ const App: React.FC = () => {
                    const lootRng = Math.random();
                    if (lootRng > 0.7) {
                         const containers: TileObjectType[] = ['bookshelf', 'crate', 'chest', 'cabinet'];
+                        objectType = containers[Math.floor(Math.random() * containers.length)];
                         objectType = containers[Math.floor(Math.random() * containers.length)];
                         isBlocking = false;
                    }
