@@ -74,3 +74,99 @@ Track all major milestones, feature additions, and bug fixes here.
 *   **Renaming:** Players can now click on the name of a selected character during the Setup phase to rename them.
 *   **UI Integration:** Added inline input fields for selected character cards that blend with the card design.
 *   **Veteran Renaming:** Saved veterans can also be renamed before starting a new case, allowing for character evolution or correction.
+
+---
+
+## Implementation Status Report (2026-01-17)
+
+### ✅ FULLY IMPLEMENTED FEATURES
+
+**Core Game Engine:**
+- Hexagonal grid system with pixel-to-hex conversion
+- Turn-based gameplay (Investigator → Mythos phases)
+- Multiplayer support (1-4 investigators)
+- Game state persistence via localStorage
+- Victory/defeat conditions
+
+**Character System:**
+- 6 unique investigator classes with special abilities
+- HP, Sanity, and Insight tracking
+- Death system with visual indicators
+- Character renaming system
+- Veteran roster system (campaign mode)
+
+**Board & Exploration:**
+- Dynamic tile generation (indoor/outdoor/mixed)
+- Pan & zoom camera controls
+- Line of Sight (LOS) system with hex raycasting
+- Procedural tile graphics with CSS patterns
+- Environmental theming based on scenarios
+
+**Enemy AI:**
+- Vision cone system with range-based detection
+- Enemy movement towards detected players
+- Random wandering when no targets visible
+- Automatic attacks during Mythos phase
+- Enemy info panel with hover/click interaction
+
+**Obstacles & Interactions:**
+- Physical obstacles (Locked Doors, Rubble, Barricades)
+- Contextual action bar for obstacle removal
+- Skill checks (Strength, Insight, Agility)
+- Searchable objects (Chests, Crates, Bookshelves, Cabinets)
+- Visual state indicators (gold icons → gray when searched)
+
+**Madness System:**
+- 4 unique madness conditions with mechanical penalties:
+  - Paranoia: Disables Rest action
+  - Hysteria: -1 Die on all skill checks
+  - Catatonia: Limits to 1 action per turn
+  - Hallucinations: Visual distortion only
+- CSS shaders for visual effects
+- Progressive sanity system (0 sanity → Madness → 0 sanity again → Death)
+
+**Scenario System:**
+- 3 distinct case files with varying difficulty
+- Scenario selection screen
+- Custom doom timers, clue requirements, and tile sets
+- Goal descriptions and special rules
+
+**Audio & Atmosphere:**
+- Tone.js integration for procedural music
+- Spooky Pad ambient background
+- Audio stingers for dice rolls, horror, combat, healing, madness, and blocked actions
+
+**UI/UX:**
+- Minimizable character and log panels
+- Floating HUD layout
+- Enemy targeting system with purple pulse effect
+- Dice roller animation
+- Event modal system
+- Game over screen with survivor saving
+
+**Actions:**
+- Move (with dynamic tile generation)
+- Attack (with combat dice)
+- Investigate (with loot/clue system)
+- Rest (HP + Sanity recovery)
+- Use Item (Medical Kit, Necronomicon)
+- Interact (obstacle removal)
+
+### 🎯 CURRENT STATE: PRODUCTION-READY
+
+All features from the development log (v0.0 → v2.5) are **fully implemented and functional**.
+
+The game is a complete, playable Lovecraft-inspired board game with:
+- Deep character progression
+- Campaign mode with veteran saving
+- Atmospheric audiovisual presentation
+- Challenging tactical combat and exploration
+- Multiple scenarios with unique mechanics
+
+**Next Steps (if requested):**
+- Additional scenarios
+- New enemy types
+- More items and relics
+- Multiplayer online functionality
+- Additional madness conditions
+- Boss enemies with unique mechanics
