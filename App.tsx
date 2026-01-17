@@ -152,10 +152,24 @@ const App: React.FC = () => {
     if (audioInit.current) return;
     await Tone.start();
     audioInit.current = true;
-    const pad = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'sine' }, envelope: { attack: 4, release: 4 } }).toDestination();
-    pad.set({ volume: -28 });
-    new Tone.LFO(0.05, 100, 300).connect(pad.frequency).start();
-    new Tone.Loop(time => { pad.triggerAttackRelease(['G1', 'D2', 'Bb2'], '2n', time); }, '1n').start(0);
+    
+    // Create a Lowpass Filter to modulate for the "spooky" breathing effect
+    const filter = new Tone.Filter(200, "lowpass").toDestination();
+    
+    const pad = new Tone.PolySynth(Tone.Synth, { 
+      oscillator: { type: 'sine' }, 
+      envelope: { attack: 4, release: 4 } 
+    }).connect(filter); // Connect synth to filter instead of direct destination
+    
+    pad.set({ volume: -20 });
+    
+    // Connect LFO to the Filter's frequency, not the PolySynth's frequency (which doesn't exist)
+    new Tone.LFO(0.05, 100, 300).connect(filter.frequency).start();
+    
+    new Tone.Loop(time => { 
+      pad.triggerAttackRelease(['G1', 'D2', 'Bb2'], '2n', time); 
+    }, '1n').start(0);
+    
     Tone.getTransport().start();
   };
 
