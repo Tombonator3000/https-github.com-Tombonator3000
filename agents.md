@@ -1,3 +1,4 @@
+
 # Shadows of the 1920s - Development Agents
 
 This document defines the specialized roles involved in the creation and maintenance of the "Shadows of the 1920s" project.
@@ -25,7 +26,15 @@ This document defines the specialized roles involved in the creation and mainten
     *   Creating the "Spooky Pad" ambient background logic.
     *   Designing audio stingers for dice rolls, horror checks, and exploration.
 
-## 4. QA & Testing
+## 4. AI Art Director (Nano Banana)
+*   **Role:** Generative Graphics Engine.
+*   **Expertise:** Gemini 2.5 Flash Image Model.
+*   **Responsibilities:**
+    *   Generating dynamic character portraits based on archetypes (e.g., "The Veteran").
+    *   Creating atmospheric tile backgrounds for new locations (e.g., "Abandoned Manor").
+    *   Visualizing eldritch horrors during combat.
+
+## 5. QA & Testing
 *   **Role:** Logic Verification.
 *   **Responsibilities:**
     *   Ensuring hex-grid navigation logic is bug-free.

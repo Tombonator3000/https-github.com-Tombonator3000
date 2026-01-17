@@ -194,9 +194,77 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, log: [message, ...prev.log].slice(0, 50) }));
   };
 
+  // --- AI IMAGE GENERATION (NANO BANANA) ---
+  const generateImage = async (prompt: string): Promise<string | null> => {
+    if (!process.env.API_KEY) return null;
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: prompt }] },
+            config: {
+                imageConfig: { aspectRatio: "1:1" }
+            }
+        });
+        
+        // Find image part
+        const candidates = response.candidates;
+        if (candidates && candidates[0] && candidates[0].content && candidates[0].content.parts) {
+            for (const part of candidates[0].content.parts) {
+                if (part.inlineData) {
+                    return `data:image/png;base64,${part.inlineData.data}`;
+                }
+            }
+        }
+        return null;
+    } catch (e) {
+        console.warn("AI Image gen failed:", e);
+        return null;
+    }
+  };
+
+  // Generate Character Portrait
+  const generateCharacterPortrait = async (player: Player) => {
+      if (player.imageUrl) return;
+      const prompt = `A dark, moody, oil painting style portrait of a 1920s ${player.name} (${player.id}) in a Lovecraftian horror setting. High contrast, atmospheric, vintage.`;
+      const img = await generateImage(prompt);
+      if (img) {
+          setState(prev => ({
+              ...prev,
+              players: prev.players.map(p => p.instanceId === player.instanceId || (p.id === player.id && !p.instanceId && !player.instanceId) ? { ...p, imageUrl: img } : p)
+          }));
+      }
+  };
+
+  // Generate Tile Background
+  const generateTileVisual = async (tile: Tile) => {
+      if (tile.imageUrl) return;
+      // Don't generate for streets too often to save tokens, or maybe specific ones
+      const prompt = `A top-down, hand-painted battlemap tile of a ${tile.name} (${tile.type}), 1920s Lovecraftian horror style. Dark, gritty texture, fog, eldritch atmosphere. No grid lines.`;
+      const img = await generateImage(prompt);
+      if (img) {
+          setState(prev => ({
+              ...prev,
+              board: prev.board.map(t => t.id === tile.id ? { ...t, imageUrl: img } : t)
+          }));
+      }
+  };
+
+  // Generate Enemy Visual
+  const generateEnemyVisual = async (enemy: Enemy) => {
+      if (enemy.imageUrl) return;
+      const prompt = `A terrifying, nightmarish illustration of a ${enemy.name} (${enemy.type}) from Cthulhu mythos. Dark fantasy art, creature design, horror, menacing, detailed, isolated on dark background.`;
+      const img = await generateImage(prompt);
+      if (img) {
+          setState(prev => ({
+              ...prev,
+              enemies: prev.enemies.map(e => e.id === enemy.id ? { ...e, imageUrl: img } : e)
+          }));
+      }
+  };
+
+
   const triggerFloatingText = (q: number, r: number, content: string, colorClass: string) => {
     const id = `ft-${Date.now()}-${Math.random()}`;
-    // Add randomness to position to prevent perfect overlap
     const offsetX = (Math.random() - 0.5) * 40; 
     const offsetY = (Math.random() - 0.5) * 40;
 
@@ -209,7 +277,7 @@ const App: React.FC = () => {
             ...prev,
             floatingTexts: prev.floatingTexts.filter(ft => ft.id !== id)
         }));
-    }, 2000); // slightly longer duration to match CSS
+    }, 2000); 
   };
 
   const triggerShake = () => {
@@ -233,16 +301,14 @@ const App: React.FC = () => {
     }
 
     if (newSanity <= 0) {
-        // If already mad, they die
         if (player.activeMadness) {
             updatedPlayer.sanity = 0;
             updatedPlayer.isDead = true;
             logMsg = `Sinnslidelsen ble for mye. ${player.name} har mistet forstanden totalt. (Død)`;
         } else {
-            // New Madness
             const madness = MADNESS_CONDITIONS[Math.floor(Math.random() * MADNESS_CONDITIONS.length)];
             updatedPlayer.activeMadness = madness;
-            updatedPlayer.sanity = player.maxSanity; // Reset sanity, but now they are broken
+            updatedPlayer.sanity = player.maxSanity;
             logMsg = `SINNSSYKDOM! ${player.name} knekker sammen og utvikler: ${madness.name}.`;
             sound = 'madness';
             triggerFloatingText(player.position.q, player.position.r, "MADNESS!", 'text-fuchsia-500');
@@ -256,6 +322,10 @@ const App: React.FC = () => {
 
   const generateNarrative = async (tile: Tile) => {
     if (!process.env.API_KEY) return;
+    
+    // Trigger Visual Generation
+    generateTileVisual(tile);
+
     try {
       const prompt = `Skriv en kort, atmosfærisk beskrivelse (maks 2 setninger) på norsk for en etterforsker som går inn i "${tile.name}" i et Lovecraft-inspirert spill. Rommet inneholder: ${tile.object ? tile.object.type : 'ingenting spesielt'}. Doom-nivået er ${state.doom}.`;
       const response = await ai.models.generateContent({
@@ -283,6 +353,10 @@ const App: React.FC = () => {
       
       const char = CHARACTERS[type];
       const newPlayer: Player = { ...char, position: { q: 0, r: 0 }, inventory: [], actions: 2, isDead: false, madness: [], activeMadness: null };
+      
+      // Generate Portrait
+      generateCharacterPortrait(newPlayer);
+
       return { ...prev, players: [...prev.players, newPlayer] };
     });
   };
@@ -295,7 +369,6 @@ const App: React.FC = () => {
           if (existing) return { ...prev, players: prev.players.filter(p => p.instanceId !== vet.instanceId) };
           if (prev.players.length >= 4) return prev;
 
-          // Convert SavedInvestigator back to Player (reset position/actions)
           const player: Player = {
               ...vet,
               position: { q: 0, r: 0 },
@@ -324,6 +397,10 @@ const App: React.FC = () => {
     initAudio();
     const scenario = state.activeScenario;
     const startTile: Tile = { ...START_TILE, name: scenario.startLocation };
+    
+    // Generate initial tile visual
+    generateTileVisual(startTile);
+
     setState(prev => ({ 
       ...prev, 
       phase: GamePhase.INVESTIGATOR, 
@@ -364,7 +441,6 @@ const App: React.FC = () => {
       let nextIndex = isLastPlayer ? 0 : prev.activePlayerIndex + 1;
       let nextPhase = isLastPlayer ? GamePhase.MYTHOS : GamePhase.INVESTIGATOR;
 
-      // Skip dead players
       if (nextPhase === GamePhase.INVESTIGATOR) {
            while (prev.players[nextIndex].isDead) {
                nextIndex++;
@@ -429,7 +505,7 @@ const App: React.FC = () => {
     playStinger('click');
   }, [state.activeEvent, state.activePlayerIndex]);
 
-  // Mythos Phase Logic (Updated with Ranged/Doom AI)
+  // Mythos Phase Logic
   useEffect(() => {
     if (state.phase === GamePhase.MYTHOS) {
       const timer = setTimeout(() => {
@@ -438,35 +514,28 @@ const App: React.FC = () => {
         setState(prev => {
           let newDoom = prev.doom - 1;
           
-          // Enemy Movement & Attacks
           const updatedEnemies = prev.enemies.map(enemy => {
             const alivePlayers = prev.players.filter(p => !p.isDead);
             if (alivePlayers.length === 0) return enemy;
             
-            // 1. Find best target
             let targetPlayer: Player | null = null;
             let minDist = Infinity;
             
             alivePlayers.forEach(p => {
               const dist = hexDistance(enemy.position, p.position);
-              // AI knows where you are generally, but only attacks if LOS
               if (dist < minDist) {
                 minDist = dist;
                 targetPlayer = p;
               }
             });
 
-            // 2. Decide: Attack or Move?
             const canSee = targetPlayer && hasLineOfSight(enemy.position, targetPlayer.position, prev.board, enemy.visionRange);
             const inRange = minDist <= enemy.attackRange;
 
-            // Attack immediately if in range and can see
             if (targetPlayer && canSee && inRange) {
-                // Enemy stays put and attacks in next loop block
                 return enemy; 
             }
 
-            // Otherwise, Move towards target
             let newQ = enemy.position.q;
             let newR = enemy.position.r;
 
@@ -474,7 +543,6 @@ const App: React.FC = () => {
               if (targetPlayer.position.q > enemy.position.q) newQ++; else if (targetPlayer.position.q < enemy.position.q) newQ--;
               if (targetPlayer.position.r > enemy.position.r) newR++; else if (targetPlayer.position.r < enemy.position.r) newR--;
             } else {
-               // Random wander
               const neighbors = [{q: newQ+1, r: newR}, {q: newQ-1, r: newR}, {q: newQ, r: newR+1}, {q: newQ, r: newR-1}, {q: newQ+1, r: newR-1}, {q: newQ-1, r: newR+1}];
               const validNeighbors = neighbors.filter(n => prev.board.some(t => t.q === n.q && t.r === n.r && !t.object?.blocking));
               if (validNeighbors.length > 0) {
@@ -489,7 +557,6 @@ const App: React.FC = () => {
           // Resolve Attacks
           let updatedPlayers = [...prev.players];
           updatedEnemies.forEach(e => {
-            // Find player in Range and LOS
             const victimIdx = updatedPlayers.findIndex(p => {
                 if (p.isDead) return false;
                 const dist = hexDistance(e.position, p.position);
@@ -500,7 +567,6 @@ const App: React.FC = () => {
             if (victimIdx !== -1) {
               const victim = updatedPlayers[victimIdx];
               
-              // Attack Logic based on Type
               if (e.attackType === 'doom') {
                    newDoom = Math.max(0, newDoom - 1);
                    addToLog(`${e.name} kaster en forbannelse! Doom øker.`);
@@ -537,7 +603,6 @@ const App: React.FC = () => {
           if (gateTiles.length > 0 && Math.random() > 0.6) {
             const spawnGate = gateTiles[Math.floor(Math.random() * gateTiles.length)];
             
-            // VARY ENEMY TYPES
             const rng = Math.random();
             let newEnemy: Enemy;
             const base = { id: `enemy-${Date.now()}`, position: { q: spawnGate.q, r: spawnGate.r }, visionRange: 3 };
@@ -653,6 +718,10 @@ const App: React.FC = () => {
           generateNarrative(newTile);
         } else {
           setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p), selectedTileId: null }));
+          // Also generate visual if revisiting an old tile that has no image
+          if (targetTile && !targetTile.imageUrl) {
+              generateTileVisual(targetTile);
+          }
         }
         break;
 
@@ -880,6 +949,12 @@ const App: React.FC = () => {
     if (type === 'click') {
       playStinger('click');
       setState(prev => ({ ...prev, selectedEnemyId: prev.selectedEnemyId === id ? null : id, selectedTileId: null }));
+      
+      // Generate Enemy Visual on click
+      if (id) {
+          const enemy = state.enemies.find(e => e.id === id);
+          if (enemy) generateEnemyVisual(enemy);
+      }
     } else {
       setHoveredEnemyId(id);
     }
@@ -930,6 +1005,7 @@ const App: React.FC = () => {
 
   if (state.phase === GamePhase.SETUP) {
       if (!state.activeScenario) {
+        // ... (Scenario selection logic remains same) ...
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#05050a] relative overflow-hidden">
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-paper.png')] opacity-20"></div>
@@ -960,9 +1036,9 @@ const App: React.FC = () => {
                 </div>
             </div>
         )
-    }
+      }
 
-    return (
+      return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#05050a] relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-paper.png')] opacity-20"></div>
         <div className="bg-[#16213e]/95 p-12 rounded border-2 border-[#e94560] shadow-[0_0_80px_rgba(233,69,96,0.3)] max-w-4xl w-full text-center backdrop-blur-md relative z-10 animate-in fade-in slide-in-from-right duration-500">
@@ -992,6 +1068,15 @@ const App: React.FC = () => {
                   
                   return (
                     <button key={key} onClick={() => toggleCharacterSelection(key)} className={`group p-5 bg-[#0a0a1a] border-2 transition-all text-left relative overflow-hidden ${isSelected ? 'border-[#e94560] shadow-[0_0_20px_rgba(233,69,96,0.2)]' : 'border-slate-800 hover:border-slate-600'}`}>
+                      {/* Show Generated Portrait if Available */}
+                      {isSelected && selectedPlayer.imageUrl ? (
+                           <div className="w-full h-32 mb-3 bg-black rounded overflow-hidden border border-slate-700">
+                               <img src={selectedPlayer.imageUrl} alt={selectedPlayer.name} className="w-full h-full object-cover opacity-80" />
+                           </div>
+                      ) : (
+                          <div className="w-full h-10 mb-2"></div>
+                      )}
+
                       {isSelected ? (
                         <div className="flex items-center gap-2 mb-1">
                           <input 
@@ -1070,6 +1155,7 @@ const App: React.FC = () => {
     );
   }
 
+  // ... (Rest of App.tsx render return statement remains largely the same, just closing brackets correctly)
   return (
     <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative transition-all duration-1000 ${activeMadnessClass} ${shakeClass}`}>
       <div className="absolute inset-0 pointer-events-none z-50 shadow-[inset_0_0_200px_rgba(0,0,0,0.9)] opacity-60"></div>
@@ -1117,7 +1203,6 @@ const App: React.FC = () => {
                     onDrop={(item) => handleAction('drop', { item })}
                />
                <div className="p-6 border-t border-slate-800 overflow-y-auto">
-                 {/* Inventory now in CharacterPanel, maybe use this space for something else? Keeping generic for now */}
                </div>
             </div>
           )}

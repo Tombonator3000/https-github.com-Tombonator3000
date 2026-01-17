@@ -26,6 +26,11 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
   return (
     <div className="p-6 h-full flex flex-col">
       <div className="mb-6">
+        {player.imageUrl && (
+            <div className="w-full h-40 mb-4 rounded-lg overflow-hidden border-2 border-slate-700 shadow-lg">
+                <img src={player.imageUrl} alt={player.name} className="w-full h-full object-cover" />
+            </div>
+        )}
         <h2 className="text-3xl font-display text-white italic leading-none">{player.name}</h2>
         <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">Investigator</p>
       </div>

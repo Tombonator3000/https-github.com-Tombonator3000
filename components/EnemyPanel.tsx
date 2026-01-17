@@ -23,6 +23,13 @@ const EnemyPanel: React.FC<EnemyPanelProps> = ({ enemy, onClose }) => {
         )}
       </div>
 
+      {enemy.imageUrl && (
+          <div className="w-full h-48 bg-black relative">
+              <img src={enemy.imageUrl} alt={enemy.name} className="w-full h-full object-cover opacity-90" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a1a] to-transparent"></div>
+          </div>
+      )}
+
       <div className="p-6 space-y-5">
         {/* Enemy HP */}
         <div>

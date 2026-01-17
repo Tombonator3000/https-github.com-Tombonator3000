@@ -281,17 +281,30 @@ const GameBoard: React.FC<GameBoardProps> = ({
                   ${visuals.bg}
                   transition-all duration-300
                 `}
-                style={isThreatened ? {} : visuals.style}
+                style={{
+                    ...(isThreatened ? {} : visuals.style),
+                    ...(tile.imageUrl ? { 
+                        backgroundImage: `url(${tile.imageUrl})`, 
+                        backgroundSize: 'cover', 
+                        backgroundPosition: 'center',
+                        backgroundColor: '#000' // Fallback
+                    } : {})
+                }}
               >
-                 {/* Background Watermark Icon */}
-                 <visuals.Icon 
-                    size={80} 
-                    className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10 pointer-events-none ${visuals.iconColor}`} 
-                    strokeWidth={1}
-                 />
+                 {/* Background Watermark Icon - ONLY if no image */}
+                 {!tile.imageUrl && (
+                     <visuals.Icon 
+                        size={80} 
+                        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10 pointer-events-none ${visuals.iconColor}`} 
+                        strokeWidth={1}
+                     />
+                 )}
+                 
+                 {/* Dark overlay for text readability if image exists */}
+                 {tile.imageUrl && <div className="absolute inset-0 bg-black/40"></div>}
 
                  {/* Content */}
-                 <div className="relative z-10 bg-black/60 px-2 py-1 rounded backdrop-blur-[2px]">
+                 <div className="relative z-10 bg-black/70 px-2 py-1 rounded backdrop-blur-[2px] border border-black/50">
                     <h4 className={`text-[10px] font-bold font-display italic tracking-tight ${isThreatened ? 'text-red-300' : 'text-slate-200'}`}>{tile.name}</h4>
                  </div>
                 
@@ -362,11 +375,16 @@ const GameBoard: React.FC<GameBoardProps> = ({
               onMouseLeave={() => onEnemyHover?.(null)}
             >
                <div className={`
-                 w-14 h-14 bg-black/90 rounded-full flex items-center justify-center border-2 transition-all duration-300
+                 w-14 h-14 bg-black/90 rounded-full flex items-center justify-center border-2 transition-all duration-300 overflow-hidden
                  ${isSelected ? 'border-purple-400 scale-125 shadow-[0_0_30px_rgba(168,85,247,0.8)]' : 'border-purple-600/60 shadow-[0_0_20px_rgba(168,85,247,0.4)] group-hover:scale-110 group-hover:border-purple-400'}
                  ${!enemy.isDying && 'animate-spooky-pulse'}
                `}>
-                  <Skull size={24} className={`${isSelected ? 'text-purple-300' : 'text-purple-500'}`} />
+                  {enemy.imageUrl ? (
+                      <img src={enemy.imageUrl} alt={enemy.name} className="w-full h-full object-cover" />
+                  ) : (
+                      <Skull size={24} className={`${isSelected ? 'text-purple-300' : 'text-purple-500'}`} />
+                  )}
+                  
                   {isSelected && !enemy.isDying && (
                     <div className="absolute -top-1 -right-1 bg-purple-500 rounded-full p-1 border border-white shadow-lg animate-bounce">
                       <Target size={12} className="text-white" />
@@ -389,12 +407,16 @@ const GameBoard: React.FC<GameBoardProps> = ({
             <div key={player.id} className="absolute -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-700 pointer-events-none" style={{ left: x, top: y }}>
               <div className="relative flex flex-col items-center">
                 <div className={`
-                  w-14 h-14 rounded-full flex items-center justify-center border-4 shadow-2xl transition-all 
-                  ${player.isDead ? 'bg-slate-900 border-slate-700 grayscale opacity-40 scale-75 shadow-none' : 
-                    isCurrent ? 'bg-[#e94560] border-white scale-110 shadow-[0_0_30px_rgba(233,69,96,0.6)]' : 
-                    'bg-slate-800 border-slate-600 scale-90 opacity-80'}
+                  w-14 h-14 rounded-full flex items-center justify-center border-4 shadow-2xl transition-all overflow-hidden bg-slate-800
+                  ${player.isDead ? 'border-slate-700 grayscale opacity-40 scale-75 shadow-none' : 
+                    isCurrent ? 'border-[#e94560] scale-110 shadow-[0_0_30px_rgba(233,69,96,0.6)]' : 
+                    'border-slate-500 scale-90 opacity-80'}
                 `}>
-                  {player.isDead ? <Skull size={24} className="text-slate-600" /> : <User size={30} className="text-white" />}
+                  {player.imageUrl ? (
+                      <img src={player.imageUrl} alt={player.name} className="w-full h-full object-cover" />
+                  ) : (
+                      player.isDead ? <Skull size={24} className="text-slate-600" /> : <User size={30} className="text-white" />
+                  )}
                 </div>
                 {!player.isDead && (
                   <div className="mt-1 flex gap-0.5 w-12">

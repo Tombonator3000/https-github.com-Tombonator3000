@@ -19,6 +19,7 @@ export interface Character {
   maxSanity: number;
   insight: number;
   special: string;
+  imageUrl?: string; // New: Base64 image data
 }
 
 export interface Madness {
@@ -69,6 +70,7 @@ export interface Enemy {
   attackRange: number;
   attackType: EnemyAttackType;
   isDying?: boolean; // For death animation
+  imageUrl?: string; // New: Base64 image data
 }
 
 export type TileObjectType = 'altar' | 'bookshelf' | 'crate' | 'chest' | 'cabinet' | 'gate' | 'barricade' | 'locked_door' | 'rubble' | 'fire';
@@ -94,6 +96,7 @@ export interface Tile {
   searched: boolean;
   object?: TileObject;
   isGate?: boolean;
+  imageUrl?: string; // New: Base64 image data
 }
 
 export interface Scenario {

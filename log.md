@@ -85,6 +85,13 @@ Track all major milestones, feature additions, and bug fixes here.
     *   Added `Doom` casters (Priests) that increase Doom instead of dealing damage.
     *   Enemies now check Line of Sight and Range before deciding to move or attack.
 
+## [v2.7 Update - The Imaginarium (Nano Banana Integration)]
+*   **Generative Art:** Integrated `gemini-2.5-flash-image` model to generate dynamic assets on the fly.
+*   **Character Portraits:** Selecting a character now generates a unique, oil-painting style portrait based on their class (e.g., Detective, Occultist).
+*   **Dynamic Environments:** Entering a new tile generates an atmospheric background image specific to that location (e.g., "Misty Docks", "Abandoned Manor"), replacing generic CSS patterns.
+*   **Monster Visualization:** Targeting an enemy generates a terrifying illustration of the specific creature type.
+*   **Asset Persistence:** Generated images are stored in the game state, ensuring continuity throughout the session.
+
 ## [Audit & Roadmap - State Analysis]
 *Current status audit conducted to identify gaps in gameplay depth and polish.*
 
