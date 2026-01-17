@@ -621,19 +621,46 @@ const App: React.FC = () => {
             const spawnRoll = Math.random();
             let newEnemy: Enemy;
             const base = { id: `enemy-${Date.now()}`, position: { q: spawnGate.q, r: spawnGate.r }, visionRange: 3 };
-            
-            if (spawnRoll > 0.9) {
+
+            // Very Rare Spawns (0-2%)
+            if (spawnRoll > 0.985) {
+                 newEnemy = { ...base, name: 'Shantak', type: 'shantak', hp: 7, maxHp: 7, damage: 3, horror: 3, speed: 3, attackRange: 1, attackType: 'melee' };
+            } else if (spawnRoll > 0.97) {
+                 newEnemy = { ...base, name: 'Star Spawn', type: 'star_spawn', hp: 8, maxHp: 8, damage: 3, horror: 4, speed: 1, attackRange: 1, attackType: 'melee' };
+            } else if (spawnRoll > 0.955) {
+                 newEnemy = { ...base, name: 'Shoggoth', type: 'shoggoth', hp: 7, maxHp: 7, damage: 2, horror: 3, speed: 1, attackRange: 1, attackType: 'melee' };
+            } else if (spawnRoll > 0.94) {
                  newEnemy = { ...base, name: 'Dark Young', type: 'dark_young', hp: 6, maxHp: 6, damage: 2, horror: 3, speed: 1, attackRange: 1, attackType: 'melee' };
-            } else if (spawnRoll > 0.8) {
+
+            // Rare Spawns (2-10%)
+            } else if (spawnRoll > 0.92) {
+                 newEnemy = { ...base, name: 'Elder Thing', type: 'elder_thing', hp: 5, maxHp: 5, damage: 2, horror: 1, speed: 1, attackRange: 2, attackType: 'ranged' };
+            } else if (spawnRoll > 0.90) {
+                 newEnemy = { ...base, name: 'Formless Spawn', type: 'formless_spawn', hp: 5, maxHp: 5, damage: 2, horror: 2, speed: 1, attackRange: 1, attackType: 'melee' };
+            } else if (spawnRoll > 0.88) {
+                 newEnemy = { ...base, name: 'Moon-Beast', type: 'moon_beast', hp: 4, maxHp: 4, damage: 1, horror: 2, speed: 1, attackRange: 1, attackType: 'sanity' };
+            } else if (spawnRoll > 0.86) {
                  newEnemy = { ...base, name: 'Hound of Tindalos', type: 'hound', hp: 4, maxHp: 4, damage: 2, horror: 2, speed: 2, attackRange: 1, attackType: 'melee' };
-            } else if (spawnRoll > 0.7) {
-                 newEnemy = { ...base, name: 'Nightgaunt', type: 'nightgaunt', hp: 3, maxHp: 3, damage: 1, horror: 0, speed: 2, attackRange: 1, attackType: 'melee' };
-            } else if (spawnRoll > 0.6) {
+
+            // Uncommon Spawns (10-30%)
+            } else if (spawnRoll > 0.81) {
+                 newEnemy = { ...base, name: 'Byakhee', type: 'byakhee', hp: 3, maxHp: 3, damage: 1, horror: 2, speed: 2, attackRange: 1, attackType: 'melee' };
+            } else if (spawnRoll > 0.76) {
+                 newEnemy = { ...base, name: 'Dark Priest', type: 'priest', hp: 3, maxHp: 3, damage: 0, horror: 2, speed: 1, attackRange: 2, attackType: 'doom' };
+            } else if (spawnRoll > 0.71) {
+                 newEnemy = { ...base, name: 'Nightgaunt', type: 'nightgaunt', hp: 3, maxHp: 3, damage: 1, horror: 1, speed: 2, attackRange: 1, attackType: 'melee' };
+            } else if (spawnRoll > 0.66) {
                  newEnemy = { ...base, name: 'Mi-Go', type: 'mi-go', hp: 3, maxHp: 3, damage: 1, horror: 1, speed: 1, attackRange: 3, attackType: 'ranged' };
-            } else if (spawnRoll > 0.5) {
-                newEnemy = { ...base, name: 'Dark Priest', type: 'priest', hp: 3, maxHp: 3, damage: 0, horror: 2, speed: 1, attackRange: 2, attackType: 'doom' };
-            } else if (spawnRoll > 0.4) {
+
+            // Common Spawns (30-60%)
+            } else if (spawnRoll > 0.56) {
+                 newEnemy = { ...base, name: 'Deep One', type: 'deepone', hp: 3, maxHp: 3, damage: 1, horror: 2, speed: 1, attackRange: 1, attackType: 'melee' };
+            } else if (spawnRoll > 0.46) {
+                 newEnemy = { ...base, name: 'Ghoul', type: 'ghoul', hp: 2, maxHp: 2, damage: 1, horror: 1, speed: 1, attackRange: 1, attackType: 'melee' };
+            } else if (spawnRoll > 0.36) {
                  newEnemy = { ...base, name: 'Sniper', type: 'sniper', hp: 2, maxHp: 2, damage: 1, horror: 0, speed: 1, attackRange: 3, attackType: 'ranged' };
+
+            // Most Common (0-36%)
             } else {
                 newEnemy = { ...base, name: 'Kultist', type: 'cultist', hp: 2, maxHp: 2, damage: 1, horror: 1, speed: 1, attackRange: 1, attackType: 'melee' };
             }

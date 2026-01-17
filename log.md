@@ -94,3 +94,24 @@ Track all major milestones, feature additions, and bug fixes here.
 
 ## [Protocol Update]
 *   **Agents:** Updated `agents.md` with strict architectural pillars to enforce modularity and prevent spaghetti code. Defined clear roles for "The Architect", "The Keeper", "The Visionary", and "The Virtuoso".
+
+## [v2.8 Update - Cthulhu Mythos Enemy Expansion]
+*   **New Enemy Types:** Added 6 new enemy types from public domain Lovecraft mythos:
+    *   **Byakhee:** Flying servants of Hastur (3 HP, Speed 2, Melee, Horror 2)
+    *   **Shantak:** Giant bat-like flying beasts (7 HP, Speed 3, Melee, Horror 3)
+    *   **Star Spawn:** Colossal servants of Cthulhu (8 HP, Melee, Horror 4)
+    *   **Moon-Beast:** Pale toad-like creatures (4 HP, Sanity attacks, Horror 2)
+    *   **Formless Spawn:** Protoplasmic servants of Tsathoggua (5 HP, Melee, Horror 2)
+    *   **Elder Thing:** Ancient scientific beings (5 HP, Ranged, Horror 1)
+*   **Implemented Missing Enemies:** Fully implemented previously-defined but unused enemy types:
+    *   **Deep One:** Fish-human hybrids from the depths (3 HP, Melee, Horror 2)
+    *   **Ghoul:** Corpse-eating creatures (2 HP, Melee, Horror 1)
+    *   **Shoggoth:** Formless masses of bubbling flesh (7 HP, Melee, Horror 3)
+*   **Spawn Table Overhaul:** Redesigned enemy spawn system with 4 rarity tiers:
+    *   Very Rare (6%): Shantak, Star Spawn, Shoggoth, Dark Young
+    *   Rare (8%): Elder Thing, Formless Spawn, Moon-Beast, Hound of Tindalos
+    *   Uncommon (20%): Byakhee, Dark Priest, Nightgaunt, Mi-Go
+    *   Common (30%): Deep One, Ghoul, Sniper
+    *   Most Common (36%): Cultist
+*   **Localization:** Added Norwegian descriptions for all new enemy types in the Enemy Panel UI.
+*   **Balance:** Each enemy has unique stats, speeds, attack ranges, and horror values for varied tactical challenges.
