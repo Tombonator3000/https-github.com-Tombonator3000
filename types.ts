@@ -53,10 +53,12 @@ export interface Item {
   bonus?: number;
 }
 
+export type EnemyAttackType = 'melee' | 'ranged' | 'sanity' | 'doom';
+
 export interface Enemy {
   id: string;
   name: string;
-  type: 'cultist' | 'deepone' | 'ghoul' | 'shoggoth' | 'boss';
+  type: 'cultist' | 'deepone' | 'ghoul' | 'shoggoth' | 'boss' | 'sniper' | 'priest';
   hp: number;
   maxHp: number;
   damage: number;
@@ -64,6 +66,9 @@ export interface Enemy {
   speed: number;
   position: { q: number; r: number };
   visionRange: number;
+  attackRange: number;
+  attackType: EnemyAttackType;
+  isDying?: boolean; // For death animation
 }
 
 export type TileObjectType = 'altar' | 'bookshelf' | 'crate' | 'chest' | 'cabinet' | 'gate' | 'barricade' | 'locked_door' | 'rubble' | 'fire';
@@ -111,6 +116,15 @@ export interface ContextAction {
     difficulty: number;
 }
 
+export interface FloatingText {
+    id: string;
+    q: number;
+    r: number;
+    content: string;
+    colorClass: string;
+    randomOffset: { x: number; y: number }; // Visual jitter
+}
+
 export interface GameState {
   phase: GamePhase;
   doom: number;
@@ -127,6 +141,8 @@ export interface GameState {
   selectedEnemyId: string | null;
   selectedTileId: string | null; // New: For selecting tiles to interact with
   activeScenario: Scenario | null;
+  floatingTexts: FloatingText[];
+  screenShake: boolean;
 }
 
 export interface EventCard {

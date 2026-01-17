@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Enemy } from '../types';
-import { Skull, Swords, Brain, Activity } from 'lucide-react';
+import { Skull, Swords, Brain, Activity, Crosshair, Zap } from 'lucide-react';
 
 interface EnemyPanelProps {
   enemy: Enemy;
@@ -40,7 +40,10 @@ const EnemyPanel: React.FC<EnemyPanelProps> = ({ enemy, onClose }) => {
 
         {/* Threat Stats */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-black/40 border border-slate-800 p-3 rounded flex flex-col items-center">
+          <div className="bg-black/40 border border-slate-800 p-3 rounded flex flex-col items-center relative overflow-hidden">
+            {enemy.attackType === 'ranged' && <div className="absolute top-1 right-1 text-[8px] bg-red-900 text-white px-1 rounded">RANGED</div>}
+            {enemy.attackType === 'doom' && <div className="absolute top-1 right-1 text-[8px] bg-purple-900 text-white px-1 rounded">DOOM</div>}
+            
             <Swords size={18} className="text-red-500 mb-1" />
             <span className="text-lg font-bold text-white tabular-nums">{enemy.damage}</span>
             <span className="text-[8px] text-slate-500 uppercase font-sans tracking-tighter">Kampstyrke</span>
@@ -52,11 +55,26 @@ const EnemyPanel: React.FC<EnemyPanelProps> = ({ enemy, onClose }) => {
           </div>
         </div>
 
+        {/* Ranged Info */}
+        {(enemy.attackRange > 1 || enemy.attackType !== 'melee') && (
+            <div className="bg-slate-900/50 border border-slate-700 p-2 rounded flex items-center gap-3">
+                 <Crosshair size={16} className="text-amber-500" />
+                 <div>
+                     <div className="text-[10px] font-bold text-slate-300 uppercase">Attack Range: {enemy.attackRange}</div>
+                     <div className="text-[9px] text-slate-500 italic">
+                         {enemy.attackType === 'ranged' ? 'Fires projectiles from distance.' : enemy.attackType === 'doom' ? 'Chants rituals to increase Doom.' : 'Psychic attacks.'}
+                     </div>
+                 </div>
+            </div>
+        )}
+
         {/* Classification */}
         <div className="pt-2 border-t border-slate-800">
           <div className="text-[9px] text-slate-600 uppercase tracking-widest font-sans font-bold mb-1">Klassifisering</div>
           <p className="text-xs text-slate-400 italic">
             {enemy.type === 'cultist' && "En hjernevasket tjener av de ytre gudene."}
+            {enemy.type === 'sniper' && "En kultist bevæpnet med rifle, trener siktet fra skyggene."}
+            {enemy.type === 'priest' && "En mørk prest som kaster forbannelser for å fremskynde undergangen."}
             {enemy.type === 'ghoul' && "En kjøttetende skikkelse som trives i mørket."}
             {enemy.type === 'deepone' && "En vederstyggelighet fra dypet."}
             {enemy.type === 'shoggoth' && "En formløs masse av boblende kjøtt og øyne."}

@@ -21,7 +21,7 @@ import {
   Trash2,
   Edit2
 } from 'lucide-react';
-import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator } from './types';
+import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator, FloatingText, Item } from './types';
 import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS } from './constants';
 import GameBoard from './components/GameBoard';
 import CharacterPanel from './components/CharacterPanel';
@@ -95,7 +95,12 @@ const App: React.FC = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return { ...parsed, hoveredEnemyId: null };
+        return { 
+            ...parsed, 
+            hoveredEnemyId: null, 
+            floatingTexts: [], 
+            screenShake: false 
+        };
       } catch (e) {
         console.error("Failed to load save", e);
       }
@@ -115,7 +120,9 @@ const App: React.FC = () => {
       activeCombat: null,
       selectedEnemyId: null,
       selectedTileId: null,
-      activeScenario: null
+      activeScenario: null,
+      floatingTexts: [],
+      screenShake: false
     };
   });
 
@@ -173,6 +180,29 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, log: [message, ...prev.log].slice(0, 50) }));
   };
 
+  const triggerFloatingText = (q: number, r: number, content: string, colorClass: string) => {
+    const id = `ft-${Date.now()}-${Math.random()}`;
+    // Add randomness to position to prevent perfect overlap
+    const offsetX = (Math.random() - 0.5) * 40; 
+    const offsetY = (Math.random() - 0.5) * 40;
+
+    setState(prev => ({
+        ...prev,
+        floatingTexts: [...prev.floatingTexts, { id, q, r, content, colorClass, randomOffset: { x: offsetX, y: offsetY } }]
+    }));
+    setTimeout(() => {
+        setState(prev => ({
+            ...prev,
+            floatingTexts: prev.floatingTexts.filter(ft => ft.id !== id)
+        }));
+    }, 2000); // slightly longer duration to match CSS
+  };
+
+  const triggerShake = () => {
+      setState(prev => ({ ...prev, screenShake: true }));
+      setTimeout(() => setState(prev => ({ ...prev, screenShake: false })), 500);
+  };
+
   // --- GAMEPLAY LOGIC ---
 
   const applySanityDamage = (player: Player, amount: number): { player: Player, log?: string, sound?: 'madness' } => {
@@ -182,6 +212,11 @@ const App: React.FC = () => {
     let logMsg = '';
     let sound: 'madness' | undefined = undefined;
     let updatedPlayer = { ...player };
+
+    if (amount > 0) {
+        triggerFloatingText(player.position.q, player.position.r, `-${amount} SAN`, 'text-purple-400');
+        triggerShake();
+    }
 
     if (newSanity <= 0) {
         // If already mad, they die
@@ -196,6 +231,7 @@ const App: React.FC = () => {
             updatedPlayer.sanity = player.maxSanity; // Reset sanity, but now they are broken
             logMsg = `SINNSSYKDOM! ${player.name} knekker sammen og utvikler: ${madness.name}.`;
             sound = 'madness';
+            triggerFloatingText(player.position.q, player.position.r, "MADNESS!", 'text-fuchsia-500');
         }
     } else {
         updatedPlayer.sanity = newSanity;
@@ -325,11 +361,6 @@ const App: React.FC = () => {
                }
            }
       }
-
-      // Madness: Catatonia (Reset actions differently)
-      // We don't reset actions here, we do it at start of Investigator phase normally?
-      // Actually, standard pattern is to reset at start of round. 
-      // Current logic: we update players array in Mythos phase result.
       
       return { 
         ...prev, 
@@ -359,44 +390,69 @@ const App: React.FC = () => {
           if (result.sound) playStinger('madness');
       }
       else if (event.effectType === 'health') {
+          const dmg = Math.abs(event.value);
+          if (dmg > 0) {
+              triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `-${dmg} HP`, 'text-red-500');
+              triggerShake();
+          }
           const newHp = Math.max(0, Math.min(activePlayer.maxHp, activePlayer.hp + event.value));
           newPlayers[prev.activePlayerIndex] = { ...activePlayer, hp: newHp, isDead: newHp <= 0 };
           if (newHp <= 0) addToLog(`${activePlayer.name} har omkommet.`);
       }
-      else if (event.effectType === 'insight') newPlayers[prev.activePlayerIndex] = { ...activePlayer, insight: Math.max(0, activePlayer.insight + event.value) };
+      else if (event.effectType === 'insight') {
+          newPlayers[prev.activePlayerIndex] = { ...activePlayer, insight: Math.max(0, activePlayer.insight + event.value) };
+          triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `+${event.value} INSIGHT`, 'text-blue-400');
+      }
       else if (event.effectType === 'doom') newDoom = Math.max(0, prev.doom + event.value);
-      else if (event.effectType === 'spawn') newEnemies.push({ id: `enemy-${Date.now()}`, name: 'Kultist', type: 'cultist', hp: 2, maxHp: 2, damage: 1, horror: 1, speed: 1, position: { ...activePlayer.position }, visionRange: 3 });
+      else if (event.effectType === 'spawn') newEnemies.push({ 
+          id: `enemy-${Date.now()}`, name: 'Kultist', type: 'cultist', 
+          hp: 2, maxHp: 2, damage: 1, horror: 1, speed: 1, 
+          position: { ...activePlayer.position }, visionRange: 3, attackRange: 1, attackType: 'melee' 
+      });
       
       return { ...prev, players: newPlayers, doom: newDoom, enemies: newEnemies, activeEvent: null };
     });
     playStinger('click');
   }, [state.activeEvent, state.activePlayerIndex]);
 
-  // Mythos Phase Logic
+  // Mythos Phase Logic (Updated with Ranged/Doom AI)
   useEffect(() => {
     if (state.phase === GamePhase.MYTHOS) {
       const timer = setTimeout(() => {
         playStinger('horror');
         addToLog('Mythos-fase: Verden skjelver...');
         setState(prev => {
-          const newDoom = prev.doom - 1;
+          let newDoom = prev.doom - 1;
           
           // Enemy Movement & Attacks
           const updatedEnemies = prev.enemies.map(enemy => {
             const alivePlayers = prev.players.filter(p => !p.isDead);
             if (alivePlayers.length === 0) return enemy;
+            
+            // 1. Find best target
             let targetPlayer: Player | null = null;
             let minDist = Infinity;
+            
             alivePlayers.forEach(p => {
               const dist = hexDistance(enemy.position, p.position);
-              if (hasLineOfSight(enemy.position, p.position, prev.board, enemy.visionRange)) {
-                if (dist < minDist) {
-                  minDist = dist;
-                  targetPlayer = p;
-                }
+              // AI knows where you are generally, but only attacks if LOS
+              if (dist < minDist) {
+                minDist = dist;
+                targetPlayer = p;
               }
             });
 
+            // 2. Decide: Attack or Move?
+            const canSee = targetPlayer && hasLineOfSight(enemy.position, targetPlayer.position, prev.board, enemy.visionRange);
+            const inRange = minDist <= enemy.attackRange;
+
+            // Attack immediately if in range and can see
+            if (targetPlayer && canSee && inRange) {
+                // Enemy stays put and attacks in next loop block
+                return enemy; 
+            }
+
+            // Otherwise, Move towards target
             let newQ = enemy.position.q;
             let newR = enemy.position.r;
 
@@ -404,6 +460,7 @@ const App: React.FC = () => {
               if (targetPlayer.position.q > enemy.position.q) newQ++; else if (targetPlayer.position.q < enemy.position.q) newQ--;
               if (targetPlayer.position.r > enemy.position.r) newR++; else if (targetPlayer.position.r < enemy.position.r) newR--;
             } else {
+               // Random wander
               const neighbors = [{q: newQ+1, r: newR}, {q: newQ-1, r: newR}, {q: newQ, r: newR+1}, {q: newQ, r: newR-1}, {q: newQ+1, r: newR-1}, {q: newQ-1, r: newR+1}];
               const validNeighbors = neighbors.filter(n => prev.board.some(t => t.q === n.q && t.r === n.r && !t.object?.blocking));
               if (validNeighbors.length > 0) {
@@ -415,37 +472,78 @@ const App: React.FC = () => {
             return { ...enemy, position: { q: newQ, r: newR } };
           });
 
+          // Resolve Attacks
           let updatedPlayers = [...prev.players];
           updatedEnemies.forEach(e => {
-            const pIdx = updatedPlayers.findIndex(p => p.position.q === e.position.q && p.position.r === e.position.r && !p.isDead);
-            if (pIdx !== -1) {
-              const victim = updatedPlayers[pIdx];
-              const newHp = Math.max(0, victim.hp - e.damage);
-              const sanityResult = applySanityDamage(victim, e.horror);
-              let finalPlayer = sanityResult.player;
-              finalPlayer.hp = newHp;
-              finalPlayer.isDead = newHp <= 0 || finalPlayer.isDead;
-              updatedPlayers[pIdx] = finalPlayer;
-              addToLog(`${e.name} angriper ${victim.name}! Tap: ${e.damage} HP, ${e.horror} Sanity.`);
-              if (newHp <= 0) addToLog(`${victim.name} har blitt revet i stykker.`);
-              if (sanityResult.log) addToLog(sanityResult.log);
-              if (sanityResult.sound) playStinger('madness');
+            // Find player in Range and LOS
+            const victimIdx = updatedPlayers.findIndex(p => {
+                if (p.isDead) return false;
+                const dist = hexDistance(e.position, p.position);
+                const los = hasLineOfSight(e.position, p.position, prev.board, e.visionRange);
+                return dist <= e.attackRange && los;
+            });
+
+            if (victimIdx !== -1) {
+              const victim = updatedPlayers[victimIdx];
+              
+              // Attack Logic based on Type
+              if (e.attackType === 'doom') {
+                   newDoom = Math.max(0, newDoom - 1);
+                   addToLog(`${e.name} kaster en forbannelse! Doom øker.`);
+                   triggerFloatingText(e.position.q, e.position.r, "DOOM!", 'text-purple-600');
+              } else {
+                   const newHp = Math.max(0, victim.hp - e.damage);
+                   const sanityResult = applySanityDamage(victim, e.horror);
+                   
+                   if (e.damage > 0) {
+                       triggerFloatingText(victim.position.q, victim.position.r, `-${e.damage} HP`, 'text-red-600');
+                       triggerShake();
+                   }
+     
+                   let finalPlayer = sanityResult.player;
+                   finalPlayer.hp = newHp;
+                   finalPlayer.isDead = newHp <= 0 || finalPlayer.isDead;
+                   updatedPlayers[victimIdx] = finalPlayer;
+                   
+                   if (e.attackType === 'ranged') {
+                       addToLog(`${e.name} skyter på ${victim.name}!`);
+                   } else {
+                       addToLog(`${e.name} angriper ${victim.name}!`);
+                   }
+
+                   if (newHp <= 0) addToLog(`${victim.name} har omkommet.`);
+                   if (sanityResult.log) addToLog(sanityResult.log);
+                   if (sanityResult.sound) playStinger('madness');
+              }
             }
           });
 
+          // Spawns
           const gateTiles = prev.board.filter(t => t.isGate);
           if (gateTiles.length > 0 && Math.random() > 0.6) {
             const spawnGate = gateTiles[Math.floor(Math.random() * gateTiles.length)];
-            updatedEnemies.push({ id: `enemy-${Date.now()}`, name: 'Kultist', type: 'cultist', hp: 2, maxHp: 2, damage: 1, horror: 1, speed: 1, position: { q: spawnGate.q, r: spawnGate.r }, visionRange: 3 });
-            addToLog(`En skikkelse stiger ut av portalen ved ${spawnGate.name}!`);
+            
+            // VARY ENEMY TYPES
+            const rng = Math.random();
+            let newEnemy: Enemy;
+            const base = { id: `enemy-${Date.now()}`, position: { q: spawnGate.q, r: spawnGate.r }, visionRange: 3 };
+            
+            if (rng > 0.8) {
+                newEnemy = { ...base, name: 'Sniper', type: 'sniper', hp: 2, maxHp: 2, damage: 1, horror: 0, speed: 1, attackRange: 3, attackType: 'ranged' };
+            } else if (rng > 0.9) {
+                newEnemy = { ...base, name: 'Dark Priest', type: 'priest', hp: 3, maxHp: 3, damage: 0, horror: 2, speed: 1, attackRange: 2, attackType: 'doom' };
+            } else {
+                newEnemy = { ...base, name: 'Kultist', type: 'cultist', hp: 2, maxHp: 2, damage: 1, horror: 1, speed: 1, attackRange: 1, attackType: 'melee' };
+            }
+
+            updatedEnemies.push(newEnemy);
+            addToLog(`En ${newEnemy.name} stiger ut av portalen ved ${spawnGate.name}!`);
           }
 
           const allDead = updatedPlayers.every(p => p.isDead);
 
-          // RESET ACTIONS & APPLY MADNESS (CATATONIA)
           const finalPlayers = updatedPlayers.map(p => {
               if (p.isDead) return { ...p, actions: 0 };
-              // Catatonia (m4) reduces actions to 1
               const baseActions = p.activeMadness?.id === 'm4' ? 1 : 2;
               return { ...p, actions: baseActions };
           });
@@ -472,8 +570,6 @@ const App: React.FC = () => {
     
     // MADNESS PENALTIES
     const madness = activePlayer.activeMadness?.id;
-    
-    // Helper to calculate penalty dice
     const getDiceCount = (base: number) => {
         let count = base;
         if (madness === 'm3') count -= 1; // Hysteria
@@ -481,36 +577,31 @@ const App: React.FC = () => {
     };
 
     switch (actionType) {
+      // ... EXISTING ACTIONS (Move, Interact, Attack, Investigate, Rest) ... 
       case 'move':
         const { q, r } = payload;
         if (q === activePlayer.position.q && r === activePlayer.position.r) return;
         let targetTile = state.board.find(t => t.q === q && t.r === r);
-        
         if (targetTile && targetTile.object?.blocking) {
             playStinger('block');
             addToLog(`Veien er blokkert av ${targetTile.object.type}. Du må fjerne det først.`);
+            triggerFloatingText(q, r, "BLOCKED", 'text-amber-500');
             setState(prev => ({ ...prev, selectedTileId: targetTile!.id, selectedEnemyId: null }));
             return;
         }
-
         if (!targetTile) {
-          // --- GENERATION LOGIC ---
           const tileSet = state.activeScenario?.tileSet || 'mixed';
           let newTileType: 'room' | 'street' = 'street';
           let newTileName = 'Unknown';
-
           if (tileSet === 'indoor') newTileType = 'room';
           else if (tileSet === 'outdoor') newTileType = 'street';
           else newTileType = Math.random() > 0.5 ? 'room' : 'street';
-
           const pool = newTileType === 'room' ? INDOOR_LOCATIONS : OUTDOOR_LOCATIONS;
           newTileName = pool[Math.floor(Math.random() * pool.length)];
-
           let objectType: TileObjectType | undefined = undefined;
           let isBlocking = false;
           let difficulty = 0;
           let reqSkill: 'strength' | 'insight' | 'agility' | undefined = undefined;
-
           const rng = Math.random();
           if (newTileType === 'room') {
                if (rng > 0.6) {
@@ -531,16 +622,13 @@ const App: React.FC = () => {
                    }
                }
           }
-
           const isGate = Math.random() > 0.9;
           const newTile: Tile = { 
             id: `tile-${state.board.length}`, q, r, name: newTileName, type: newTileType, explored: true, searchable: true, searched: false, isGate, 
             object: objectType ? { type: objectType, searched: false, blocking: isBlocking, difficulty, reqSkill } : undefined 
           };
-          
           const eventTrigger = Math.random() > 0.85;
           const event = eventTrigger ? EVENTS[Math.floor(Math.random() * EVENTS.length)] : null;
-          
           setState(prev => ({ 
             ...prev, 
             board: [...prev.board, newTile], 
@@ -557,20 +645,16 @@ const App: React.FC = () => {
       case 'interact':
           const selectedTile = state.board.find(t => t.id === state.selectedTileId);
           if (!selectedTile || !selectedTile.object?.blocking) return;
-
           playStinger('roll');
-          // Apply Hysteria Penalty
           const baseDice = 2 + (activePlayer.id === 'veteran' && selectedTile.object.reqSkill === 'strength' ? 1 : 0);
           const diceCount = getDiceCount(baseDice);
           const skillRoll = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
-
           const successes = skillRoll.filter(v => v >= 4).length;
-
           setState(prev => ({ ...prev, lastDiceRoll: skillRoll }));
-
           if (successes >= 1) {
               playStinger('click');
               addToLog(`Suksess! ${activePlayer.name} fjernet ${selectedTile.object.type}.`);
+              triggerFloatingText(selectedTile.q, selectedTile.r, "CLEARED!", 'text-green-500');
               setState(prev => ({
                   ...prev,
                   board: prev.board.map(t => t.id === selectedTile.id ? { ...t, object: undefined } : t),
@@ -579,6 +663,7 @@ const App: React.FC = () => {
               }));
           } else {
               addToLog(`Mislyktes. ${selectedTile.object.type} står fortsatt.`);
+              triggerFloatingText(selectedTile.q, selectedTile.r, "FAILED", 'text-red-500');
               setState(prev => ({
                   ...prev,
                   players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p)
@@ -594,30 +679,49 @@ const App: React.FC = () => {
 
         if (!enemyOnTile) { addToLog("Ingenting å angripe her..."); return; }
         playStinger('combat');
-        
         const atkDice = getDiceCount(2 + (activePlayer.id === 'veteran' ? 1 : 0));
         const roll = Array.from({ length: atkDice }, () => Math.floor(Math.random() * 6) + 1);
         const hits = roll.filter(v => v >= 4).length;
-        
-        setState(prev => ({ 
-          ...prev, 
-          lastDiceRoll: roll, 
-          enemies: prev.enemies.map(e => e.id === enemyOnTile.id ? { ...e, hp: e.hp - hits } : e).filter(e => e.hp > 0), 
-          players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
-          selectedEnemyId: hits >= enemyOnTile.hp ? null : prev.selectedEnemyId
-        }));
-        if (hits > 0) addToLog(`Du påførte ${hits} skade på ${enemyOnTile.name}!`); else addToLog(`Bom!`);
+        if (hits > 0) {
+            addToLog(`Du påførte ${hits} skade på ${enemyOnTile.name}!`);
+            triggerFloatingText(enemyOnTile.position.q, enemyOnTile.position.r, `-${hits} HP`, 'text-red-500');
+        } else {
+            addToLog(`Bom!`);
+            triggerFloatingText(enemyOnTile.position.q, enemyOnTile.position.r, `MISS`, 'text-slate-400');
+        }
+        setState(prev => {
+            const updatedEnemies = prev.enemies.map(e => {
+                if (e.id === enemyOnTile.id) {
+                    const remaining = e.hp - hits;
+                    if (remaining <= 0) {
+                        setTimeout(() => {
+                           setState(curr => ({ ...curr, enemies: curr.enemies.filter(en => en.id !== e.id) }));
+                           addToLog(`${enemyOnTile.name} ble bekjempet.`);
+                           triggerFloatingText(enemyOnTile.position.q, enemyOnTile.position.r, `DEAD`, 'text-red-700 font-bold');
+                        }, 800);
+                        return { ...e, hp: 0, isDying: true };
+                    }
+                    return { ...e, hp: remaining };
+                }
+                return e;
+            });
+            return { 
+                ...prev, 
+                lastDiceRoll: roll, 
+                enemies: updatedEnemies,
+                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
+                selectedEnemyId: (hits >= enemyOnTile.hp) ? null : prev.selectedEnemyId
+            };
+        });
         break;
         
       case 'investigate':
         const currentTile = state.board.find(t => t.q === activePlayer.position.q && t.r === activePlayer.position.r);
         playStinger('roll');
-        
         const invDice = getDiceCount(2 + (activePlayer.id === 'detective' ? 1 : 0));
         const iRoll = Array.from({ length: invDice }, () => Math.floor(Math.random() * 6) + 1);
         const searchSuccesses = iRoll.filter(v => v >= 4).length;
         setState(prev => ({ ...prev, lastDiceRoll: iRoll }));
-
         if (currentTile?.object && !currentTile.object.blocking && !currentTile.object.searched) {
              if (searchSuccesses > 0) {
                  playStinger('search');
@@ -630,6 +734,7 @@ const App: React.FC = () => {
                          players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, inventory: [...p.inventory, item], actions: p.actions - 1 } : p) 
                      }));
                      addToLog(`Du ransaket ${currentTile.object.type} og fant: ${item.name}!`);
+                     triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `FOUND ${item.name}`, 'text-amber-400');
                  } else {
                      setState(prev => ({ 
                          ...prev, 
@@ -638,9 +743,11 @@ const App: React.FC = () => {
                          players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) 
                      }));
                      addToLog(`Du fant et viktig spor gjemt i ${currentTile.object.type}!`);
+                     triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `CLUE FOUND!`, 'text-green-400');
                  }
              } else {
                  addToLog(`Du fant ingenting av verdi i ${currentTile.object.type}.`);
+                 triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `NOTHING`, 'text-slate-500');
                  setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
              }
         } else {
@@ -648,16 +755,19 @@ const App: React.FC = () => {
                 if (Math.random() > 0.8) {
                     setState(prev => ({ ...prev, cluesFound: prev.cluesFound + 1, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
                     addToLog("Et spor!");
+                    triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `CLUE!`, 'text-green-400');
                 } else if (Math.random() > 0.85) {
                     const item = ITEMS[Math.floor(Math.random() * ITEMS.length)];
                     setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, inventory: [...p.inventory, item], actions: p.actions - 1 } : p) }));
                     addToLog(`Du fant ${item.name} på gulvet!`);
+                    triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `ITEM!`, 'text-amber-400');
                 } else {
                     addToLog("Ingenting her.");
                     setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
                 }
             } else {
                 addToLog("Du overså noe.");
+                triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `...`, 'text-slate-600');
                 setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
             }
         }
@@ -667,17 +777,17 @@ const App: React.FC = () => {
         if (madness === 'm2') { // Paranoia
             playStinger('horror');
             addToLog(`${activePlayer.name} er for paranoid til å hvile!`);
+            triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `PARANOID!`, 'text-purple-500');
             return; 
         }
-
         setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, hp: Math.min(p.maxHp, p.hp + 1), sanity: Math.min(p.maxSanity, p.sanity + 1), actions: p.actions - 1 } : p) }));
         addToLog(`${activePlayer.name} hviler.`);
+        triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `RESTED`, 'text-blue-300');
         break;
 
       case 'item':
         const medKit = activePlayer.inventory.find(i => i.id === 'med');
         const book = activePlayer.inventory.find(i => i.id === 'book');
-        
         if (medKit) {
           playStinger('heal');
           setState(prev => ({
@@ -690,6 +800,7 @@ const App: React.FC = () => {
             } : p)
           }));
           addToLog("Du brukte et medisinsk skrin.");
+          triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `+2 HP`, 'text-green-500');
         } else if (book) {
            setState(prev => {
                const active = prev.players[prev.activePlayerIndex];
@@ -698,19 +809,55 @@ const App: React.FC = () => {
                newP.insight += 3;
                newP.inventory = newP.inventory.filter(i => i !== book);
                newP.actions -= 1;
-               
                if (sanResult.log) addToLog(sanResult.log);
                if (sanResult.sound) playStinger('madness');
                addToLog("Du leste Necronomicon. Kunnskapen brenner...");
-               
-               return {
-                   ...prev,
-                   players: prev.players.map((p, i) => i === prev.activePlayerIndex ? newP : p)
-               };
+               return { ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? newP : p) };
            });
         } else {
           addToLog("Ingen brukbare gjenstander akkurat nå.");
         }
+        break;
+
+      // --- NEW ACTIONS ---
+      case 'drop':
+        const { item: itemToDrop } = payload;
+        playStinger('click');
+        setState(prev => ({
+            ...prev,
+            players: prev.players.map((p, i) => i === prev.activePlayerIndex ? {
+                ...p,
+                inventory: p.inventory.filter(i => i !== itemToDrop)
+            } : p)
+        }));
+        addToLog(`${activePlayer.name} kastet ${itemToDrop.name}.`);
+        break;
+
+      case 'trade':
+        const { item: itemToTrade, targetPlayerId } = payload;
+        playStinger('click');
+        
+        setState(prev => {
+            // Find target player instance or ID
+            const targetIndex = prev.players.findIndex(p => p.instanceId === targetPlayerId || p.id === targetPlayerId);
+            if (targetIndex === -1) return prev;
+            const targetName = prev.players[targetIndex].name;
+
+            const newPlayers = [...prev.players];
+            // Remove from source
+            newPlayers[prev.activePlayerIndex] = {
+                ...newPlayers[prev.activePlayerIndex],
+                inventory: newPlayers[prev.activePlayerIndex].inventory.filter(i => i !== itemToTrade)
+            };
+            // Add to target
+            newPlayers[targetIndex] = {
+                ...newPlayers[targetIndex],
+                inventory: [...newPlayers[targetIndex].inventory, itemToTrade]
+            };
+
+            addToLog(`${activePlayer.name} ga ${itemToTrade.name} til ${targetName}.`);
+            return { ...prev, players: newPlayers };
+        });
         break;
     }
   };
@@ -763,11 +910,12 @@ const App: React.FC = () => {
 
   // Active Madness Visuals
   const activeMadnessClass = activePlayer?.activeMadness?.visualClass || '';
+  const shakeClass = state.screenShake ? 'animate-shake' : '';
   
   // --- SCREENS ---
 
   if (state.phase === GamePhase.SETUP) {
-    if (!state.activeScenario) {
+      if (!state.activeScenario) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#05050a] relative overflow-hidden">
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-paper.png')] opacity-20"></div>
@@ -857,7 +1005,7 @@ const App: React.FC = () => {
                 })
             ) : (
                 // VETERANS
-                roster.length === 0 ? (
+                (roster.length === 0 ? (
                     <div className="col-span-3 flex flex-col items-center justify-center text-slate-600 italic h-60 border-2 border-dashed border-slate-800 rounded">
                         <Star size={48} className="mb-4 opacity-20" />
                         <p>No survivors in the archive yet.</p>
@@ -899,7 +1047,7 @@ const App: React.FC = () => {
                             </button>
                         );
                     })
-                )
+                ))
             )}
           </div>
           <button disabled={state.players.length === 0} onClick={startGame} className={`px-20 py-6 rounded-none font-display text-3xl italic tracking-[0.3em] transition-all uppercase border-2 ${state.players.length > 0 ? 'bg-[#e94560] border-white text-white hover:scale-105 shadow-[0_0_40px_rgba(233,69,96,0.5)]' : 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed'}`}>BEGIN INVESTIGATION</button>
@@ -909,7 +1057,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative transition-all duration-1000 ${activeMadnessClass}`}>
+    <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative transition-all duration-1000 ${activeMadnessClass} ${shakeClass}`}>
       <div className="absolute inset-0 pointer-events-none z-50 shadow-[inset_0_0_200px_rgba(0,0,0,0.9)] opacity-60"></div>
       <div className="absolute inset-0 pointer-events-none z-50 bg-[url('https://www.transparenttextures.com/patterns/pinstriped-suit.png')] mix-blend-overlay opacity-10"></div>
 
@@ -922,6 +1070,7 @@ const App: React.FC = () => {
         onEnemyClick={(id) => handleEnemyInteraction(id, 'click')}
         onEnemyHover={(id) => handleEnemyInteraction(id, 'hover')}
         enemySightMap={enemySightMap}
+        floatingTexts={state.floatingTexts}
       />
 
       <header className="fixed top-4 left-1/2 -translate-x-1/2 flex items-center gap-6 bg-[#16213e]/80 backdrop-blur-xl border-2 border-[#e94560]/30 px-8 py-3 rounded-full shadow-2xl z-40">
@@ -947,26 +1096,14 @@ const App: React.FC = () => {
           </button>
           {!leftPanelCollapsed && (
             <div className="flex-1 flex flex-col overflow-hidden">
-               <CharacterPanel player={activePlayer} />
+               <CharacterPanel 
+                    player={activePlayer} 
+                    allPlayers={state.players}
+                    onTrade={(item, targetId) => handleAction('trade', { item, targetPlayerId: targetId })}
+                    onDrop={(item) => handleAction('drop', { item })}
+               />
                <div className="p-6 border-t border-slate-800 overflow-y-auto">
-                <h3 className="text-[10px] font-bold text-slate-500 uppercase mb-4 tracking-[0.2em] font-sans flex items-center gap-2">
-                  <Sword size={12} className="text-[#e94560]" /> UTSTYR
-                </h3>
-                <div className="space-y-3">
-                  {activePlayer.inventory.length === 0 ? (
-                    <p className="text-[10px] italic text-slate-600 text-center py-4 border border-dashed border-slate-800">Lommene er tomme...</p>
-                  ) : (
-                    activePlayer.inventory.map((item, idx) => (
-                      <div key={idx} className="p-3 bg-white/5 border border-slate-800 rounded group hover:border-[#e94560]/40 transition-all">
-                        <div className="font-bold text-slate-200 text-xs flex justify-between uppercase">
-                          {item.name}
-                          <span className="text-[8px] text-[#e94560]">{item.type}</span>
-                        </div>
-                        <div className="text-[10px] text-slate-500 mt-1 italic leading-tight">"{item.effect}"</div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                 {/* Inventory now in CharacterPanel, maybe use this space for something else? Keeping generic for now */}
                </div>
             </div>
           )}

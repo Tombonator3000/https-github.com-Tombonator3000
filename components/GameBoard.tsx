@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Tile, Player, Enemy } from '../types';
+import { Tile, Player, Enemy, FloatingText } from '../types';
 import { 
   User, Skull, DoorOpen, EyeOff, Target, Eye, Lock, Flame, Hammer, Ban,
   BookOpen, Trees, Anchor, Church, Building2, BedDouble, TestTube, Box, Ghost,
@@ -16,6 +16,7 @@ interface GameBoardProps {
   onEnemyClick?: (id: string) => void;
   onEnemyHover?: (id: string | null) => void;
   enemySightMap?: Set<string>;
+  floatingTexts?: FloatingText[];
 }
 
 const HEX_SIZE = 95;
@@ -138,7 +139,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
   onTileClick, 
   onEnemyClick,
   onEnemyHover,
-  enemySightMap
+  enemySightMap,
+  floatingTexts = []
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -350,7 +352,10 @@ const GameBoard: React.FC<GameBoardProps> = ({
           return (
             <div 
               key={enemy.id} 
-              className="absolute -translate-x-1/2 -translate-y-1/2 z-20 cursor-crosshair group"
+              className={`
+                 absolute -translate-x-1/2 -translate-y-1/2 z-20 cursor-crosshair group 
+                 ${enemy.isDying ? 'death-dissolve pointer-events-none' : ''}
+              `}
               style={{ left: x, top: y + 25 }}
               onClick={(e) => { e.stopPropagation(); onEnemyClick?.(enemy.id); }}
               onMouseEnter={() => onEnemyHover?.(enemy.id)}
@@ -359,18 +364,20 @@ const GameBoard: React.FC<GameBoardProps> = ({
                <div className={`
                  w-14 h-14 bg-black/90 rounded-full flex items-center justify-center border-2 transition-all duration-300
                  ${isSelected ? 'border-purple-400 scale-125 shadow-[0_0_30px_rgba(168,85,247,0.8)]' : 'border-purple-600/60 shadow-[0_0_20px_rgba(168,85,247,0.4)] group-hover:scale-110 group-hover:border-purple-400'}
-                 animate-spooky-pulse
+                 ${!enemy.isDying && 'animate-spooky-pulse'}
                `}>
                   <Skull size={24} className={`${isSelected ? 'text-purple-300' : 'text-purple-500'}`} />
-                  {isSelected && (
+                  {isSelected && !enemy.isDying && (
                     <div className="absolute -top-1 -right-1 bg-purple-500 rounded-full p-1 border border-white shadow-lg animate-bounce">
                       <Target size={12} className="text-white" />
                     </div>
                   )}
                </div>
-               <div className={`absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1 bg-black/80 border border-purple-500/30 rounded text-[9px] uppercase tracking-widest text-purple-300 font-bold transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                 {enemy.name}
-               </div>
+               {!enemy.isDying && (
+                <div className={`absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1 bg-black/80 border border-purple-500/30 rounded text-[9px] uppercase tracking-widest text-purple-300 font-bold transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    {enemy.name}
+                </div>
+               )}
             </div>
           );
         })}
@@ -398,6 +405,25 @@ const GameBoard: React.FC<GameBoardProps> = ({
               </div>
             </div>
           );
+        })}
+
+        {/* FLOATING TEXTS */}
+        {floatingTexts.map(ft => {
+            const { x, y } = hexToPixel(ft.q, ft.r);
+            return (
+                <div 
+                    key={ft.id} 
+                    className="absolute z-50 pointer-events-none animate-float-up"
+                    style={{ 
+                        left: x + (ft.randomOffset?.x || 0), 
+                        top: y + (ft.randomOffset?.y || 0) 
+                    }}
+                >
+                    <div className={`text-3xl font-bold ${ft.colorClass} drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] font-display stroke-black text-stroke-sm`}>
+                        {ft.content}
+                    </div>
+                </div>
+            );
         })}
       </div>
     </div>
