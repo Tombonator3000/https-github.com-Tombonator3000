@@ -82,20 +82,14 @@ const EnemyPanel: React.FC<EnemyPanelProps> = ({ enemy, onClose }) => {
             {enemy.type === 'cultist' && "En hjernevasket tjener av de ytre gudene."}
             {enemy.type === 'sniper' && "En kultist bevæpnet med rifle, trener siktet fra skyggene."}
             {enemy.type === 'priest' && "En mørk prest som kaster forbannelser for å fremskynde undergangen."}
-            {enemy.type === 'ghoul' && "En kjøttetende skikkelse som trives i mørket og graver opp lik."}
-            {enemy.type === 'deepone' && "En hybrid fiskekreatur fra havets dyp, tilbeder av Dagon."}
-            {enemy.type === 'shoggoth' && "En formløs masse av boblende proto-kjøtt og glitrende øyne."}
+            {enemy.type === 'ghoul' && "En kjøttetende skikkelse som trives i mørket."}
+            {enemy.type === 'deepone' && "En vederstyggelighet fra dypet."}
+            {enemy.type === 'shoggoth' && "En formløs masse av boblende kjøtt og øyne."}
             {enemy.type === 'boss' && "En eldgammel kraft hinsides menneskelig fatteevne."}
             {enemy.type === 'mi-go' && "En bevinget sopp-skapning fra Yuggoth med merkelig teknologi."}
-            {enemy.type === 'nightgaunt' && "En ansiktsløs, gummiaktig flyger som beveger seg lydløst gjennom natten."}
+            {enemy.type === 'nightgaunt' && "En ansiktsløs flyger som beveger seg lydløst gjennom natten."}
             {enemy.type === 'hound' && "En jeger fra Tindalos som beveger seg gjennom vinkler i tid og rom."}
             {enemy.type === 'dark_young' && "Et enormt avkom av Shub-Niggurath, en masse av tentakler og hover."}
-            {enemy.type === 'byakhee' && "En bevinget tjener av Hastur som kan reise gjennom stjernene."}
-            {enemy.type === 'shantak' && "Et gigantisk, flaggermuslignende dyr med skjellaktig hud og heslig skrik."}
-            {enemy.type === 'star_spawn' && "En kolossal tjener av Cthulhu, fryktinngytende og udødelig."}
-            {enemy.type === 'moon_beast' && "En hvit, paddelignende skapning fra månens mørke side."}
-            {enemy.type === 'formless_spawn' && "En protoplasmatisk avkom av Tsathoggua, evig sultent."}
-            {enemy.type === 'elder_thing' && "Et eldgammelt, vitenskapelig vesen med tønneformet kropp og vinger."}
           </p>
         </div>
       </div>

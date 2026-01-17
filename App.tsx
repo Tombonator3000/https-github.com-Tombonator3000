@@ -29,10 +29,34 @@ import EnemyPanel from './components/EnemyPanel';
 import ActionBar from './components/ActionBar';
 import DiceRoller from './components/DiceRoller';
 import EventModal from './components/EventModal';
+import MainMenu from './components/MainMenu';
+import OptionsMenu from './components/OptionsMenu';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const APP_VERSION = "2.8";
+
+// --- DEFAULT STATE CONSTANT ---
+const DEFAULT_STATE: GameState = {
+    phase: GamePhase.SETUP,
+    doom: 12,
+    round: 1,
+    players: [],
+    activePlayerIndex: 0,
+    board: [START_TILE],
+    enemies: [],
+    cluesFound: 0,
+    log: [],
+    lastDiceRoll: null,
+    activeEvent: null,
+    activeCombat: null,
+    selectedEnemyId: null,
+    selectedTileId: null,
+    activeScenario: null,
+    floatingTexts: [],
+    screenShake: false
+};
 
 // --- HEX MATH HELPERS ---
 const hexDistance = (a: {q: number, r: number}, b: {q: number, r: number}) => {
@@ -105,6 +129,9 @@ const hasLineOfSight = (start: {q: number, r: number}, end: {q: number, r: numbe
 
 const App: React.FC = () => {
   // --- STATE ---
+  const [isMainMenuOpen, setIsMainMenuOpen] = useState(true);
+  const [showOptions, setShowOptions] = useState(false);
+
   const [state, setState] = useState<GameState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -120,25 +147,7 @@ const App: React.FC = () => {
         console.error("Failed to load save", e);
       }
     }
-    return {
-      phase: GamePhase.SETUP,
-      doom: 12,
-      round: 1,
-      players: [],
-      activePlayerIndex: 0,
-      board: [START_TILE],
-      enemies: [],
-      cluesFound: 0,
-      log: [],
-      lastDiceRoll: null,
-      activeEvent: null,
-      activeCombat: null,
-      selectedEnemyId: null,
-      selectedTileId: null,
-      activeScenario: null,
-      floatingTexts: [],
-      screenShake: false
-    };
+    return DEFAULT_STATE;
   });
 
   const [roster, setRoster] = useState<SavedInvestigator[]>(() => {
@@ -409,7 +418,6 @@ const App: React.FC = () => {
 
   const startGame = () => {
     if (state.players.length === 0 || !state.activeScenario) return;
-    initAudio();
     const scenario = state.activeScenario;
     const startTile: Tile = { ...START_TILE, name: scenario.startLocation };
     
@@ -475,6 +483,24 @@ const App: React.FC = () => {
         selectedTileId: null
       };
     });
+  };
+
+  // --- MENU ACTIONS ---
+  const handleStartNewGame = () => {
+      setState(DEFAULT_STATE);
+      setIsMainMenuOpen(false);
+      initAudio();
+  };
+
+  const handleContinueGame = () => {
+      setIsMainMenuOpen(false);
+      initAudio();
+  };
+
+  const handleResetData = () => {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(ROSTER_KEY);
+      window.location.reload();
   };
 
   // --- ACTIONS ---
@@ -621,46 +647,19 @@ const App: React.FC = () => {
             const spawnRoll = Math.random();
             let newEnemy: Enemy;
             const base = { id: `enemy-${Date.now()}`, position: { q: spawnGate.q, r: spawnGate.r }, visionRange: 3 };
-
-            // Very Rare Spawns (0-2%)
-            if (spawnRoll > 0.985) {
-                 newEnemy = { ...base, name: 'Shantak', type: 'shantak', hp: 7, maxHp: 7, damage: 3, horror: 3, speed: 3, attackRange: 1, attackType: 'melee' };
-            } else if (spawnRoll > 0.97) {
-                 newEnemy = { ...base, name: 'Star Spawn', type: 'star_spawn', hp: 8, maxHp: 8, damage: 3, horror: 4, speed: 1, attackRange: 1, attackType: 'melee' };
-            } else if (spawnRoll > 0.955) {
-                 newEnemy = { ...base, name: 'Shoggoth', type: 'shoggoth', hp: 7, maxHp: 7, damage: 2, horror: 3, speed: 1, attackRange: 1, attackType: 'melee' };
-            } else if (spawnRoll > 0.94) {
+            
+            if (spawnRoll > 0.9) {
                  newEnemy = { ...base, name: 'Dark Young', type: 'dark_young', hp: 6, maxHp: 6, damage: 2, horror: 3, speed: 1, attackRange: 1, attackType: 'melee' };
-
-            // Rare Spawns (2-10%)
-            } else if (spawnRoll > 0.92) {
-                 newEnemy = { ...base, name: 'Elder Thing', type: 'elder_thing', hp: 5, maxHp: 5, damage: 2, horror: 1, speed: 1, attackRange: 2, attackType: 'ranged' };
-            } else if (spawnRoll > 0.90) {
-                 newEnemy = { ...base, name: 'Formless Spawn', type: 'formless_spawn', hp: 5, maxHp: 5, damage: 2, horror: 2, speed: 1, attackRange: 1, attackType: 'melee' };
-            } else if (spawnRoll > 0.88) {
-                 newEnemy = { ...base, name: 'Moon-Beast', type: 'moon_beast', hp: 4, maxHp: 4, damage: 1, horror: 2, speed: 1, attackRange: 1, attackType: 'sanity' };
-            } else if (spawnRoll > 0.86) {
+            } else if (spawnRoll > 0.8) {
                  newEnemy = { ...base, name: 'Hound of Tindalos', type: 'hound', hp: 4, maxHp: 4, damage: 2, horror: 2, speed: 2, attackRange: 1, attackType: 'melee' };
-
-            // Uncommon Spawns (10-30%)
-            } else if (spawnRoll > 0.81) {
-                 newEnemy = { ...base, name: 'Byakhee', type: 'byakhee', hp: 3, maxHp: 3, damage: 1, horror: 2, speed: 2, attackRange: 1, attackType: 'melee' };
-            } else if (spawnRoll > 0.76) {
-                 newEnemy = { ...base, name: 'Dark Priest', type: 'priest', hp: 3, maxHp: 3, damage: 0, horror: 2, speed: 1, attackRange: 2, attackType: 'doom' };
-            } else if (spawnRoll > 0.71) {
-                 newEnemy = { ...base, name: 'Nightgaunt', type: 'nightgaunt', hp: 3, maxHp: 3, damage: 1, horror: 1, speed: 2, attackRange: 1, attackType: 'melee' };
-            } else if (spawnRoll > 0.66) {
+            } else if (spawnRoll > 0.7) {
+                 newEnemy = { ...base, name: 'Nightgaunt', type: 'nightgaunt', hp: 3, maxHp: 3, damage: 1, horror: 0, speed: 2, attackRange: 1, attackType: 'melee' };
+            } else if (spawnRoll > 0.6) {
                  newEnemy = { ...base, name: 'Mi-Go', type: 'mi-go', hp: 3, maxHp: 3, damage: 1, horror: 1, speed: 1, attackRange: 3, attackType: 'ranged' };
-
-            // Common Spawns (30-60%)
-            } else if (spawnRoll > 0.56) {
-                 newEnemy = { ...base, name: 'Deep One', type: 'deepone', hp: 3, maxHp: 3, damage: 1, horror: 2, speed: 1, attackRange: 1, attackType: 'melee' };
-            } else if (spawnRoll > 0.46) {
-                 newEnemy = { ...base, name: 'Ghoul', type: 'ghoul', hp: 2, maxHp: 2, damage: 1, horror: 1, speed: 1, attackRange: 1, attackType: 'melee' };
-            } else if (spawnRoll > 0.36) {
+            } else if (spawnRoll > 0.5) {
+                newEnemy = { ...base, name: 'Dark Priest', type: 'priest', hp: 3, maxHp: 3, damage: 0, horror: 2, speed: 1, attackRange: 2, attackType: 'doom' };
+            } else if (spawnRoll > 0.4) {
                  newEnemy = { ...base, name: 'Sniper', type: 'sniper', hp: 2, maxHp: 2, damage: 1, horror: 0, speed: 1, attackRange: 3, attackType: 'ranged' };
-
-            // Most Common (0-36%)
             } else {
                 newEnemy = { ...base, name: 'Kultist', type: 'cultist', hp: 2, maxHp: 2, damage: 1, horror: 1, speed: 1, attackRange: 1, attackType: 'melee' };
             }
@@ -1011,7 +1010,7 @@ const App: React.FC = () => {
     }
   };
 
-  const resetGame = () => { localStorage.removeItem(STORAGE_KEY); window.location.reload(); };
+  const handleResetGame = () => { setIsMainMenuOpen(true); };
 
   // --- RENDERING HELPERS ---
   const displayEnemyId = state.selectedEnemyId || hoveredEnemyId;
@@ -1051,8 +1050,31 @@ const App: React.FC = () => {
   // Active Madness Visuals
   const activeMadnessClass = activePlayer?.activeMadness?.visualClass || '';
   const shakeClass = state.screenShake ? 'animate-shake' : '';
+
+  // Can we continue?
+  const canContinue = state.phase !== GamePhase.SETUP && state.phase !== GamePhase.GAME_OVER && state.players.length > 0;
   
   // --- SCREENS ---
+
+  if (isMainMenuOpen) {
+      return (
+        <>
+            <MainMenu 
+                onNewGame={handleStartNewGame} 
+                onContinue={handleContinueGame}
+                onOptions={() => setShowOptions(true)}
+                canContinue={canContinue}
+                version={APP_VERSION}
+            />
+            {showOptions && (
+                <OptionsMenu 
+                    onClose={() => setShowOptions(false)} 
+                    onResetData={handleResetData}
+                />
+            )}
+        </>
+      );
+  }
 
   if (state.phase === GamePhase.SETUP) {
       if (!state.activeScenario) {
@@ -1061,7 +1083,14 @@ const App: React.FC = () => {
             <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#05050a] relative overflow-hidden">
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-paper.png')] opacity-20"></div>
                 <div className="bg-[#16213e]/95 p-12 rounded border-2 border-[#e94560] shadow-[0_0_80px_rgba(233,69,96,0.3)] max-w-5xl w-full backdrop-blur-md relative z-10 animate-in fade-in zoom-in duration-1000">
-                    <h1 className="text-6xl text-[#e94560] mb-8 font-display italic tracking-tighter uppercase text-center">Case Files</h1>
+                    <div className="flex justify-between items-center mb-8">
+                        <button onClick={handleResetGame} className="text-slate-500 hover:text-white transition-colors flex items-center gap-2">
+                             <ArrowLeft size={16} /> MAIN MENU
+                        </button>
+                        <h1 className="text-6xl text-[#e94560] font-display italic tracking-tighter uppercase text-center absolute left-1/2 -translate-x-1/2">Case Files</h1>
+                        <div className="w-20"></div>
+                    </div>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {SCENARIOS.map(scenario => (
                             <div key={scenario.id} className="relative group cursor-pointer" onClick={() => selectScenario(scenario)}>
@@ -1237,7 +1266,7 @@ const App: React.FC = () => {
               ))}
             </div>
           </div>
-          <button onClick={resetGame} className="text-slate-500 hover:text-[#e94560] transition-colors"><RotateCcw size={18}/></button>
+          <button onClick={handleResetGame} className="text-slate-500 hover:text-[#e94560] transition-colors"><RotateCcw size={18}/></button>
       </header>
 
       <div className={`fixed left-4 top-20 bottom-24 transition-all duration-500 z-40 ${leftPanelCollapsed ? 'w-12 overflow-hidden' : 'w-80'}`}>
@@ -1348,7 +1377,7 @@ const App: React.FC = () => {
                  </div>
              )}
 
-             <button onClick={resetGame} className="px-16 py-5 border-2 border-[#e94560] text-[#e94560] font-bold hover:bg-[#e94560] hover:text-white transition-all text-sm uppercase tracking-[0.4em]">AVSLUTT</button>
+             <button onClick={handleResetGame} className="px-16 py-5 border-2 border-[#e94560] text-[#e94560] font-bold hover:bg-[#e94560] hover:text-white transition-all text-sm uppercase tracking-[0.4em]">AVSLUTT</button>
            </div>
         </div>
       )}
