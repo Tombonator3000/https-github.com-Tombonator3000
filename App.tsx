@@ -84,7 +84,22 @@ const hasLineOfSight = (start: {q: number, r: number}, end: {q: number, r: numbe
   if (dist > range) return false;
   
   const line = getHexLine(start, end);
-  return line.every(point => board.some(t => t.q === point.q && t.r === point.r));
+  
+  // Check path for obstacles
+  for (let i = 0; i < line.length; i++) {
+    const p = line[i];
+    const tile = board.find(t => t.q === p.q && t.r === p.r);
+    
+    // 1. Tile must exist (cannot see over void)
+    if (!tile) return false;
+
+    // 2. If it's an intermediate tile (not start, not end), it must not block
+    if (i > 0 && i < line.length - 1) {
+        if (tile.object?.blocking) return false;
+    }
+  }
+  
+  return true;
 };
 // ------------------------
 

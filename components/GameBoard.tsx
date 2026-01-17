@@ -277,12 +277,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
               <div 
                 className={`
                   w-full h-full flex flex-col items-center justify-center p-6 text-center border-4 relative overflow-hidden
-                  ${isThreatened ? 'border-red-500 shadow-[inset_0_0_50px_rgba(220,38,38,0.4)] z-10' : visuals.borderColor}
+                  ${isThreatened ? 'border-red-500 z-10' : visuals.borderColor}
                   ${visuals.bg}
                   transition-all duration-300
                 `}
                 style={{
-                    ...(isThreatened ? {} : visuals.style),
+                    ...visuals.style,
                     ...(tile.imageUrl ? { 
                         backgroundImage: `url(${tile.imageUrl})`, 
                         backgroundSize: 'cover', 
@@ -291,6 +291,14 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     } : {})
                 }}
               >
+                 {/* Vision Cone Red Overlay */}
+                 {isThreatened && (
+                     <div className="absolute inset-0 bg-red-900/30 pointer-events-none animate-pulse z-0 mix-blend-overlay"></div>
+                 )}
+                 {isThreatened && (
+                     <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(220,38,38,0.6)] pointer-events-none z-0"></div>
+                 )}
+
                  {/* Background Watermark Icon - ONLY if no image */}
                  {!tile.imageUrl && (
                      <visuals.Icon 
@@ -429,7 +437,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
           );
         })}
 
-        {/* FLOATING TEXTS */}
         {floatingTexts.map(ft => {
             const { x, y } = hexToPixel(ft.q, ft.r);
             return (
