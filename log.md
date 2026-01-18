@@ -158,3 +158,8 @@ Track all major milestones, feature additions, and bug fixes here.
 *   **Dice Modifiers:** Weapons increase Combat dice, Tools increase Investigation dice, and Agility items help with Fleeing.
 *   **Damage Mitigation:** Added logic to check inventory for Armor (reduces physical damage) and Relics (reduces sanity damage).
 *   **New Loot:** Added Tommy Gun (+3 Combat), Heavy Coat (Armor), Lucky Coin (Agility), and more.
+
+## [v3.7 Update - Dynamic Enemy AI & Escalation]
+*   **Smart Movement:** Enemies now have two behavior states: "Wander" and "Hunt". They will only move directly towards players if they have Line of Sight. Otherwise, they patrol randomly.
+*   **Escalation Protocol:** The spawn rate of enemies now increases as the Doom clock ticks down.
+*   **Critical Doom:** When Doom drops below 4, there is a chance for two enemies to spawn at once from active gates.

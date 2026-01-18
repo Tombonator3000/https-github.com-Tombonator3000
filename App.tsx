@@ -806,8 +806,29 @@ const App: React.FC = () => {
             }
 
             const alivePlayers = prev.players.filter(p => !p.isDead);
-            if (alivePlayers.length === 0) return enemy;
+            // If no players, wander randomly (AI Improvement)
+            if (alivePlayers.length === 0) {
+                 const neighbors = [
+                    {q: enemy.position.q + 1, r: enemy.position.r}, 
+                    {q: enemy.position.q - 1, r: enemy.position.r}, 
+                    {q: enemy.position.q, r: enemy.position.r + 1}, 
+                    {q: enemy.position.q, r: enemy.position.r - 1}, 
+                    {q: enemy.position.q + 1, r: enemy.position.r - 1}, 
+                    {q: enemy.position.q - 1, r: enemy.position.r + 1}
+                 ];
+                 const validNeighbors = neighbors.filter(n => {
+                    const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
+                    if (!tile) return false;
+                    if (tile.object?.blocking && !enemy.traits?.includes('flying')) return false;
+                    return true;
+                 });
+                 if (validNeighbors.length > 0) {
+                     return { ...enemy, position: validNeighbors[Math.floor(Math.random() * validNeighbors.length)] };
+                 }
+                 return enemy;
+            }
             
+            // Find closest player
             let targetPlayer: Player | null = null;
             let minDist = Infinity;
             
@@ -819,62 +840,53 @@ const App: React.FC = () => {
               }
             });
 
-            const canSee = targetPlayer && hasLineOfSight(enemy.position, targetPlayer.position, prev.board, enemy.visionRange);
-            const inRange = minDist <= enemy.attackRange;
+            // Check Visibility
+            const hasLOS = targetPlayer && hasLineOfSight(enemy.position, targetPlayer.position, prev.board, enemy.visionRange);
+            const inAttackRange = minDist <= enemy.attackRange;
 
-            if (targetPlayer && canSee && inRange) {
+            // Combat Priority: If has LOS and in range, stay to attack
+            if (hasLOS && inAttackRange) {
                 return enemy; 
             }
 
+            // Movement Logic
             let bestMove = enemy.position;
-            if (targetPlayer) {
-                const neighbors = [
-                    {q: enemy.position.q + 1, r: enemy.position.r},
-                    {q: enemy.position.q - 1, r: enemy.position.r},
-                    {q: enemy.position.q, r: enemy.position.r + 1},
-                    {q: enemy.position.q, r: enemy.position.r - 1},
-                    {q: enemy.position.q + 1, r: enemy.position.r - 1},
-                    {q: enemy.position.q - 1, r: enemy.position.r + 1}
-                ];
-
-                const validMoves = neighbors.filter(n => {
-                   const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
-                   // TRAIT: Flying (ignore blockers)
-                   const ignoresBlockers = enemy.traits?.includes('flying');
-                   if (!tile) return false;
-                   if (tile.object?.blocking && !ignoresBlockers) return false;
-                   return true;
-                });
-
-                if (validMoves.length > 0) {
-                   validMoves.sort((a, b) => {
-                      const distA = hexDistance(a, targetPlayer!.position);
-                      const distB = hexDistance(b, targetPlayer!.position);
-                      return distA - distB;
-                   });
-                   bestMove = validMoves[0];
-                }
-            } else {
-              const neighbors = [
+            
+            // Get valid neighbors
+            const neighbors = [
                 {q: enemy.position.q + 1, r: enemy.position.r}, 
                 {q: enemy.position.q - 1, r: enemy.position.r}, 
                 {q: enemy.position.q, r: enemy.position.r + 1}, 
                 {q: enemy.position.q, r: enemy.position.r - 1}, 
                 {q: enemy.position.q + 1, r: enemy.position.r - 1}, 
                 {q: enemy.position.q - 1, r: enemy.position.r + 1}
-              ];
-              const validNeighbors = neighbors.filter(n => {
-                  const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
-                  if (!tile) return false;
-                  // TRAIT: Flying (ignore blockers)
-                  if (tile.object?.blocking && !enemy.traits?.includes('flying')) return false;
-                  return true;
-              });
-              
-              if (validNeighbors.length > 0) {
-                  bestMove = validNeighbors[Math.floor(Math.random() * validNeighbors.length)];
-              }
+            ];
+
+            const validNeighbors = neighbors.filter(n => {
+                const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
+                if (!tile) return false;
+                if (tile.object?.blocking && !enemy.traits?.includes('flying')) return false;
+                // Avoid sharing tile with another enemy to prevent stacking? 
+                // The game allows stacking, but maybe prevent perfect overlap for visuals? 
+                // Keeping simple for now.
+                return true;
+            });
+
+            if (validNeighbors.length > 0) {
+                if (hasLOS && targetPlayer) {
+                    // HUNT: Move to neighbor closest to target
+                    validNeighbors.sort((a, b) => {
+                        const distA = hexDistance(a, targetPlayer.position);
+                        const distB = hexDistance(b, targetPlayer.position);
+                        return distA - distB;
+                    });
+                    bestMove = validNeighbors[0];
+                } else {
+                    // WANDER: Move randomly if no target is seen
+                    bestMove = validNeighbors[Math.floor(Math.random() * validNeighbors.length)];
+                }
             }
+
             return { ...enemy, position: bestMove };
           });
 
@@ -913,43 +925,55 @@ const App: React.FC = () => {
           const gateTiles = prev.board.filter(t => t.isGate);
           let newEncountered = [...prev.encounteredEnemies];
           
-          if (gateTiles.length > 0 && Math.random() > 0.6) {
-            const spawnGate = gateTiles[Math.floor(Math.random() * gateTiles.length)];
-            const spawnRoll = Math.random();
-            let template: typeof BESTIARY[keyof typeof BESTIARY];
-
-            // WEIGHTED SPAWN TABLE
-            if (spawnRoll > 0.95) template = BESTIARY['star_spawn'];
-            else if (spawnRoll > 0.9) template = BESTIARY['dark_young'];
-            else if (spawnRoll > 0.85) template = BESTIARY['shoggoth'];
-            else if (spawnRoll > 0.80) template = BESTIARY['hunting_horror'];
-            else if (spawnRoll > 0.75) template = BESTIARY['formless_spawn'];
-            else if (spawnRoll > 0.70) template = BESTIARY['hound'];
-            else if (spawnRoll > 0.65) template = BESTIARY['byakhee'];
-            else if (spawnRoll > 0.60) template = BESTIARY['mi-go'];
-            else if (spawnRoll > 0.55) template = BESTIARY['nightgaunt'];
-            else if (spawnRoll > 0.50) template = BESTIARY['moon_beast'];
-            else if (spawnRoll > 0.45) template = BESTIARY['deepone'];
-            else if (spawnRoll > 0.40) template = BESTIARY['ghoul'];
-            else if (spawnRoll > 0.35) template = BESTIARY['priest'];
-            else if (spawnRoll > 0.30) template = BESTIARY['sniper'];
-            else template = BESTIARY['cultist'];
-
-            const newEnemy: Enemy = { 
-                id: `enemy-${Date.now()}`, 
-                position: { q: spawnGate.q, r: spawnGate.r }, 
-                visionRange: 3,
-                attackRange: 1, 
-                attackType: 'melee',
-                maxHp: template.hp,
-                speed: 2,
-                ...template
-            };
-
-            updatedEnemies.push(newEnemy);
-            addToLog(`En ${newEnemy.name} stiger ut av portalen ved ${spawnGate.name}!`);
+          if (gateTiles.length > 0) {
+            // DYNAMIC SPAWN RATE (Escalates as Doom drops)
+            // Base 20% + 5% per missing Doom point (approx)
+            // Doom 12 = 20% | Doom 6 = 50% | Doom 0 = 80%
+            const spawnChance = 0.2 + (Math.max(0, 12 - newDoom) * 0.05);
             
-            if (!newEncountered.includes(template.type)) newEncountered.push(template.type);
+            // CRITICAL SPAWN: If Doom < 4, chance to spawn 2 enemies
+            const spawnCount = (newDoom < 4 && Math.random() > 0.5) ? 2 : 1;
+
+            if (Math.random() < spawnChance) {
+                for (let i = 0; i < spawnCount; i++) {
+                    const spawnGate = gateTiles[Math.floor(Math.random() * gateTiles.length)];
+                    const spawnRoll = Math.random();
+                    let template: typeof BESTIARY[keyof typeof BESTIARY];
+
+                    // WEIGHTED SPAWN TABLE
+                    if (spawnRoll > 0.95) template = BESTIARY['star_spawn'];
+                    else if (spawnRoll > 0.9) template = BESTIARY['dark_young'];
+                    else if (spawnRoll > 0.85) template = BESTIARY['shoggoth'];
+                    else if (spawnRoll > 0.80) template = BESTIARY['hunting_horror'];
+                    else if (spawnRoll > 0.75) template = BESTIARY['formless_spawn'];
+                    else if (spawnRoll > 0.70) template = BESTIARY['hound'];
+                    else if (spawnRoll > 0.65) template = BESTIARY['byakhee'];
+                    else if (spawnRoll > 0.60) template = BESTIARY['mi-go'];
+                    else if (spawnRoll > 0.55) template = BESTIARY['nightgaunt'];
+                    else if (spawnRoll > 0.50) template = BESTIARY['moon_beast'];
+                    else if (spawnRoll > 0.45) template = BESTIARY['deepone'];
+                    else if (spawnRoll > 0.40) template = BESTIARY['ghoul'];
+                    else if (spawnRoll > 0.35) template = BESTIARY['priest'];
+                    else if (spawnRoll > 0.30) template = BESTIARY['sniper'];
+                    else template = BESTIARY['cultist'];
+
+                    const newEnemy: Enemy = { 
+                        id: `enemy-${Date.now()}-${i}`, 
+                        position: { q: spawnGate.q, r: spawnGate.r }, 
+                        visionRange: 3,
+                        attackRange: 1, 
+                        attackType: 'melee',
+                        maxHp: template.hp,
+                        speed: 2,
+                        ...template
+                    };
+
+                    updatedEnemies.push(newEnemy);
+                    addToLog(`En ${newEnemy.name} stiger ut av portalen ved ${spawnGate.name}!`);
+                    
+                    if (!newEncountered.includes(template.type)) newEncountered.push(template.type);
+                }
+            }
           }
 
           const allDead = updatedPlayers.every(p => p.isDead);
