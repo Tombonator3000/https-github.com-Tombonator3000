@@ -22,7 +22,7 @@ import {
   User,
   Save,
 } from 'lucide-react';
-import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, ContextAction, SavedInvestigator, Item, Spell, Trait, GameSettings } from './types';
+import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, ContextAction, SavedInvestigator, Item, Spell, Trait, GameSettings, VictoryType, ScenarioStep, DoomEvent } from './types';
 import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS, BESTIARY, INDOOR_CONNECTORS, OUTDOOR_CONNECTORS, SCENARIO_MODIFIERS, TRAIT_POOL } from './constants';
 import GameBoard from './components/GameBoard';
 import CharacterPanel from './components/CharacterPanel';
@@ -64,7 +64,7 @@ const DEFAULT_STATE: GameState = {
     activePlayerIndex: 0,
     board: [START_TILE],
     enemies: [],
-    encounteredEnemies: [], 
+    encounteredEnemies: [],
     cluesFound: 0,
     log: [],
     lastDiceRoll: null,
@@ -77,7 +77,10 @@ const DEFAULT_STATE: GameState = {
     activeModifiers: [],
     floatingTexts: [],
     screenShake: false,
-    activeSpell: null
+    activeSpell: null,
+    currentStep: 0,
+    collectedItems: [],
+    triggeredDoomEvents: []
 };
 
 // --- LOG PARSER ---
@@ -504,16 +507,103 @@ const App: React.FC = () => {
       if (!currentName || currentName.trim() === '') updatePlayerName(identifier, defaultName, isVeteran);
   };
 
+  // Generate randomized scenario
+  const generateRandomScenario = (baseScenario: Scenario): Scenario => {
+      const victoryTypes: VictoryType[] = ['escape', 'assassination', 'collection', 'survival'];
+      const randomVictory = victoryTypes[Math.floor(Math.random() * victoryTypes.length)];
+
+      let steps: ScenarioStep[] = [];
+      let goal = '';
+      let doomEvents: DoomEvent[] = [];
+
+      // Generate based on victory type
+      if (randomVictory === 'escape') {
+          goal = 'Find the Exit Key and escape alive.';
+          steps = [
+              { id: 1, description: 'Find the Exit Key', completed: false, trigger: 'investigate_success', targetItem: 'exit_key' },
+              { id: 2, description: 'Reach the Exit Door', completed: false, trigger: 'move_to_tile', targetTileName: 'Exit Door' },
+              { id: 3, description: 'Escape through the door', completed: false, trigger: 'interact' }
+          ];
+          doomEvents = [
+              { doomThreshold: 8, description: 'Cultists awaken!', effect: 'spawn_enemies', value: 2, enemyType: 'cultist' },
+              { doomThreshold: 4, description: 'The guardian rises!', effect: 'spawn_boss', enemyType: 'ghoul' }
+          ];
+      } else if (randomVictory === 'assassination') {
+          goal = 'Hunt and kill the Dark Priest.';
+          steps = [
+              { id: 1, description: 'Kill the Dark Priest', completed: false, trigger: 'kill_enemy', targetEnemy: 'priest' }
+          ];
+          doomEvents = [
+              { doomThreshold: 7, description: 'Reinforcements arrive!', effect: 'spawn_enemies', value: 3, enemyType: 'cultist' },
+              { doomThreshold: 3, description: 'Boss enters!', effect: 'spawn_boss', enemyType: 'shoggoth' }
+          ];
+      } else if (randomVictory === 'collection') {
+          goal = 'Collect 3 Ritual Components.';
+          steps = [
+              { id: 1, description: 'Find Component Alpha', completed: false, trigger: 'investigate_success', targetItem: 'component_1' },
+              { id: 2, description: 'Find Component Beta', completed: false, trigger: 'investigate_success', targetItem: 'component_2' },
+              { id: 3, description: 'Find Component Gamma', completed: false, trigger: 'investigate_success', targetItem: 'component_3' }
+          ];
+          doomEvents = [
+              { doomThreshold: 6, description: 'Hounds smell your scent!', effect: 'spawn_enemies', value: 1, enemyType: 'hound' }
+          ];
+      } else { // survival
+          goal = 'Survive 8 rounds.';
+          steps = [
+              { id: 1, description: 'Survive until Round 8', completed: false, trigger: 'survive_rounds', roundsToSurvive: 8 }
+          ];
+          doomEvents = [
+              { doomThreshold: 10, description: 'Wave 1!', effect: 'spawn_enemies', value: 2, enemyType: 'cultist' },
+              { doomThreshold: 6, description: 'Wave 2!', effect: 'spawn_enemies', value: 2, enemyType: 'ghoul' }
+          ];
+      }
+
+      return {
+          ...baseScenario,
+          victoryType: randomVictory,
+          goal,
+          steps,
+          doomEvents
+      };
+  };
+
   const startGame = () => {
     if (state.players.length === 0 || !state.activeScenario) return;
     const invalidPlayer = state.players.find(p => !p.name || p.name.trim() === '');
     if (invalidPlayer) { playStinger('block'); alert("All investigators must have a name!"); return; }
     initAudio();
-    const scenario = state.activeScenario;
+
+    // Generate random scenario if victoryType is 'random'
+    let scenario = state.activeScenario;
+    if (scenario.victoryType === 'random') {
+        scenario = generateRandomScenario(scenario);
+        addToLog(`TILFELDIG OPPDRAG GENERERT: ${scenario.goal}`);
+    }
+
     const startTile: Tile = { ...START_TILE, name: scenario.startLocation };
     generateTileVisual(startTile);
     const randomModifier = SCENARIO_MODIFIERS[Math.floor(Math.random() * SCENARIO_MODIFIERS.length)];
-    setState(prev => ({ ...prev, phase: GamePhase.INVESTIGATOR, activePlayerIndex: 0, doom: scenario.startDoom, board: [startTile], cluesFound: 0, activeModifiers: [randomModifier], log: [`SAKSFIL: ${scenario.title}`, `GLOBAL EFFEKT: ${randomModifier.name} - ${randomModifier.description}`, ...prev.log] }));
+
+    setState(prev => ({
+        ...prev,
+        phase: GamePhase.INVESTIGATOR,
+        activePlayerIndex: 0,
+        doom: scenario.startDoom,
+        board: [startTile],
+        cluesFound: 0,
+        activeModifiers: [randomModifier],
+        activeScenario: scenario, // Update with potentially randomized scenario
+        currentStep: 0,
+        collectedItems: [],
+        triggeredDoomEvents: [],
+        log: [
+            `🎯 OPPDRAG: ${scenario.goal}`,
+            `📋 MÅL: ${scenario.steps[0]?.description || 'Ukjent'}`,
+            `⚠️ GLOBAL EFFEKT: ${randomModifier.name} - ${randomModifier.description}`,
+            `SAKSFIL: ${scenario.title}`,
+            ...prev.log
+        ]
+    }));
     addToLog("Etterforskningen starter. Mørket senker seg over byen.");
   };
 
@@ -521,6 +611,83 @@ const App: React.FC = () => {
     if (!state.players || state.players.length === 0) return null;
     return state.players[state.activePlayerIndex] ?? state.players[0] ?? null;
   }, [state.players, state.activePlayerIndex]);
+
+  // Check and update scenario step progression
+  const checkStepProgression = (trigger: string, payload?: any) => {
+      if (!state.activeScenario || state.currentStep >= state.activeScenario.steps.length) return;
+
+      const currentStepData = state.activeScenario.steps[state.currentStep];
+      if (!currentStepData || currentStepData.completed) return;
+
+      let stepCompleted = false;
+
+      // Check if current trigger matches step trigger
+      if (currentStepData.trigger === trigger) {
+          if (trigger === 'investigate_success' && payload?.item === currentStepData.targetItem) {
+              stepCompleted = true;
+          } else if (trigger === 'kill_enemy' && payload?.enemyType === currentStepData.targetEnemy) {
+              stepCompleted = true;
+          } else if (trigger === 'move_to_tile' && payload?.tileName === currentStepData.targetTileName) {
+              stepCompleted = true;
+          } else if (trigger === 'interact') {
+              stepCompleted = true;
+          } else if (trigger === 'survive_rounds' && state.round >= (currentStepData.roundsToSurvive || 0)) {
+              stepCompleted = true;
+          }
+      }
+
+      if (stepCompleted) {
+          playStinger('unlock');
+          triggerFloatingText(0, 0, "OBJECTIVE COMPLETE!", 'text-green-400 font-black text-2xl');
+          addToLog(`✅ MÅL FULLFØRT: ${currentStepData.description}`);
+
+          setState(prev => {
+              const nextStep = prev.currentStep + 1;
+              const scenario = prev.activeScenario!;
+
+              // Spawn special tiles if needed (e.g., Exit Door after finding key)
+              let updatedBoard = [...prev.board];
+              if (nextStep < scenario.steps.length) {
+                  const nextStepData = scenario.steps[nextStep];
+                  if (nextStepData.trigger === 'move_to_tile' && nextStepData.targetTileName) {
+                      // Spawn the target tile nearby
+                      const randomDir = [
+                          { q: 1, r: 0 }, { q: -1, r: 0 },
+                          { q: 0, r: 1 }, { q: 0, r: -1 },
+                          { q: 1, r: -1 }, { q: -1, r: 1 }
+                      ];
+                      const dir = randomDir[Math.floor(Math.random() * randomDir.length)];
+                      const spawnPos = { q: dir.q * 2, r: dir.r * 2 };
+
+                      const specialTile: Tile = {
+                          id: `special-${Date.now()}`,
+                          q: spawnPos.q,
+                          r: spawnPos.r,
+                          name: nextStepData.targetTileName,
+                          type: 'room',
+                          category: 'location',
+                          explored: true,
+                          searchable: false,
+                          searched: true
+                      };
+                      updatedBoard.push(specialTile);
+                      generateTileVisual(specialTile);
+                      addToLog(`🚪 ${nextStepData.targetTileName} har materialisert seg!`);
+                  }
+              }
+
+              // Check if all steps complete = victory
+              if (nextStep >= scenario.steps.length) {
+                  addToLog(`🎉 SCENARIO FULLFØRT! ${scenario.title} er løst!`);
+                  playStinger('unlock');
+                  return { ...prev, phase: GamePhase.GAME_OVER, currentStep: nextStep, board: updatedBoard };
+              } else {
+                  addToLog(`📋 NYTT MÅL: ${scenario.steps[nextStep].description}`);
+                  return { ...prev, currentStep: nextStep, board: updatedBoard };
+              }
+          });
+      }
+  };
 
   const handleAction = (actionType: string, payload?: any) => {
     if (!activePlayer || activePlayer.actions <= 0 || activePlayer.isDead || state.phase !== GamePhase.INVESTIGATOR) return;
@@ -646,12 +813,48 @@ const App: React.FC = () => {
         } else {
           setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p), selectedTileId: null }));
           if (targetTile && !targetTile.imageUrl) generateTileVisual(targetTile);
+
+          // Check for move_to_tile objective (e.g., reaching Exit Door)
+          if (targetTile) {
+              checkStepProgression('move_to_tile', { tileName: targetTile.name });
+          }
         }
         break;
       
       case 'interact':
           const selTile = state.board.find(t => t.id === state.selectedTileId);
           if (!selTile) return;
+
+          // Check for special tiles (Exit Door, Altar, etc.)
+          if (selTile.name === 'Exit Door') {
+              // Check if player has collected required items
+              const hasKey = state.collectedItems.includes('exit_key');
+              if (hasKey) {
+                  addToLog(`🚪 Du bruker nøkkelen og flykter!`);
+                  checkStepProgression('interact');
+                  return;
+              } else {
+                  addToLog(`🔒 Døren er låst. Du må finne nøkkelen først.`);
+                  playStinger('block');
+                  return;
+              }
+          } else if (selTile.object?.type === 'altar') {
+              // Check if player has all required candles for collection scenarios
+              const hasAllCandles = state.collectedItems.includes('white_candle') &&
+                                    state.collectedItems.includes('red_candle') &&
+                                    state.collectedItems.includes('black_candle');
+              if (hasAllCandles) {
+                  addToLog(`🕯️ Du plasserer alle lysene på alteret! Ritualet er fullført!`);
+                  checkStepProgression('interact');
+                  return;
+              } else {
+                  addToLog(`Du må finne alle 3 lysene før du kan fullføre ritualet.`);
+                  playStinger('block');
+                  return;
+              }
+          }
+
+          // Normal blocking object handling
           if (selTile.object?.blocking) {
              if (Math.random() > 0.5 && (selTile.object.type === 'locked_door' || selTile.object.type === 'fog_wall')) {
                  setState(prev => ({ ...prev, activePuzzle: { type: 'sequence', difficulty: selTile.object!.difficulty || 3, targetTileId: selTile.id } }));
@@ -711,7 +914,33 @@ const App: React.FC = () => {
 
           if (success >= 1) {
               playStinger('search');
-              // Loot logic
+              // Check for QUEST ITEMS first
+              const currentStep = state.activeScenario?.steps[state.currentStep];
+              let questItemFound: string | null = null;
+
+              if (currentStep && currentStep.trigger === 'investigate_success' && currentStep.targetItem) {
+                  // 30% chance to find quest item on successful investigate
+                  if (Math.random() > 0.7) {
+                      questItemFound = currentStep.targetItem;
+                      triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `FOUND: ${questItemFound}!`, "text-yellow-400 font-black text-xl");
+                      addToLog(`🔑 Du fant et viktig gjenstand: ${questItemFound}!`);
+                      playStinger('unlock');
+
+                      // Add to collected items
+                      setState(prev => ({
+                          ...prev,
+                          collectedItems: [...prev.collectedItems, questItemFound!],
+                          board: prev.board.map(t => t.id === currentTile.id ? { ...t, searched: true } : t),
+                          players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p)
+                      }));
+
+                      // Check step progression
+                      checkStepProgression('investigate_success', { item: questItemFound });
+                      return;
+                  }
+              }
+
+              // Normal loot logic
               let lootMsg = "";
               let foundItem: Item | null = null;
               let cluesFound = 0;
@@ -727,19 +956,38 @@ const App: React.FC = () => {
                   cluesFound = 1;
                   lootMsg = `Fant viktige spor! (+1 Insight)`;
                   triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "+1 CLUE", "text-cyan-400 font-bold");
+
+                  // Check for Lens of the Void curse (lose sanity when finding clues)
+                  const hasVoidLens = activePlayer.inventory.some(i => i.id === 'voidlens');
+                  if (hasVoidLens && cluesFound > 0) {
+                      addToLog(`💀 CURSE: The Void Lens shows you terrible truths! -1 Sanity`);
+                      const sanityResult = applySanityDamage(activePlayer, 1);
+                      setState(prev => ({
+                          ...prev,
+                          cluesFound: prev.cluesFound + cluesFound,
+                          board: prev.board.map(t => t.id === currentTile.id ? { ...t, searched: true } : t),
+                          players: prev.players.map((p, i) => i === prev.activePlayerIndex ? {
+                              ...sanityResult.player,
+                              actions: sanityResult.player.actions - 1,
+                              insight: sanityResult.player.insight + cluesFound
+                          } : p)
+                      }));
+                      if (sanityResult.sound) playStinger('madness');
+                      return;
+                  }
               }
-              
+
               addToLog(`Suksess! ${lootMsg}`);
 
               setState(prev => ({
                   ...prev,
                   cluesFound: prev.cluesFound + cluesFound,
                   board: prev.board.map(t => t.id === currentTile.id ? { ...t, searched: true } : t),
-                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { 
-                      ...p, 
-                      actions: p.actions - 1, 
+                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? {
+                      ...p,
+                      actions: p.actions - 1,
                       insight: p.insight + cluesFound,
-                      inventory: foundItem ? [...p.inventory, foundItem] : p.inventory 
+                      inventory: foundItem ? [...p.inventory, foundItem] : p.inventory
                   } : p)
               }));
           } else {
@@ -760,6 +1008,14 @@ const App: React.FC = () => {
               return;
           }
 
+          // Check for Living Armor curse
+          const hasLivingArmor = activePlayer.inventory.some(i => i.id === 'hungryarmor');
+          if (hasLivingArmor) {
+              addToLog("💀 CURSE: The Living Armor hungers and will not let you rest!");
+              playStinger('block');
+              return;
+          }
+
           const nearbyEnemies = state.enemies.filter(e => hexDistance(activePlayer.position, e.position) <= 1);
           if (nearbyEnemies.length > 0) {
               addToLog("Kan ikke hvile med fiender i nærheten!");
@@ -768,9 +1024,17 @@ const App: React.FC = () => {
           }
 
           playStinger('heal');
-          const newHp = Math.min(activePlayer.maxHp, activePlayer.hp + 1);
+
+          // Check for Cursed Bone Amulet (cannot heal above 4 HP)
+          const hasCursedAmulet = activePlayer.inventory.some(i => i.id === 'cursedamulet');
+          const maxHealableHp = hasCursedAmulet ? 4 : activePlayer.maxHp;
+          const newHp = Math.min(maxHealableHp, activePlayer.hp + 1);
           const newSanity = Math.min(activePlayer.maxSanity, activePlayer.sanity + 1);
-          
+
+          if (hasCursedAmulet && activePlayer.hp >= 4) {
+              addToLog(`💀 CURSE: The Bone Amulet prevents further healing!`);
+          }
+
           addToLog(`${activePlayer.name} tar en pause. (+1 HP, +1 Sanity)`);
           triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "RESTED", "text-green-400 font-bold");
 
@@ -897,12 +1161,30 @@ const App: React.FC = () => {
               if (newHp <= 0) {
                   addToLog(`Kritisk treff! ${target.name} er beseiret.`);
                   playStinger('horror');
-                  setState(prev => ({
-                      ...prev,
-                      enemies: prev.enemies.map(e => e.id === targetId ? { ...e, hp: 0, isDying: true } : e),
-                      players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
-                      selectedEnemyId: null
-                  }));
+
+                  // Check for assassination objective
+                  checkStepProgression('kill_enemy', { enemyType: target.type });
+
+                  // Check for cursed items (Bloodthirsty Dagger)
+                  const hasCursedWeapon = activePlayer.inventory.some(i => i.id === 'bloodknife');
+                  if (hasCursedWeapon) {
+                      addToLog(`💀 CURSE: Bloodthirsty Dagger drains your life! -1 HP`);
+                      const dmgResult = applyPhysicalDamage(activePlayer, 1);
+                      setState(prev => ({
+                          ...prev,
+                          enemies: prev.enemies.map(e => e.id === targetId ? { ...e, hp: 0, isDying: true } : e),
+                          players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...dmgResult.player, actions: p.actions - 1 } : p),
+                          selectedEnemyId: null
+                      }));
+                  } else {
+                      setState(prev => ({
+                          ...prev,
+                          enemies: prev.enemies.map(e => e.id === targetId ? { ...e, hp: 0, isDying: true } : e),
+                          players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
+                          selectedEnemyId: null
+                      }));
+                  }
+
                   setTimeout(() => {
                       setState(prev => ({ ...prev, enemies: prev.enemies.filter(e => e.id !== targetId) }));
                   }, 1000);
@@ -1155,15 +1437,84 @@ const App: React.FC = () => {
               actions: p.activeMadness?.id === 'm4' ? 1 : 2
           }));
 
-          return { 
-              ...prev, 
-              doom: newDoom, 
-              round: prev.round + 1, 
-              enemies: updatedEnemies, 
+          // DOOM EVENTS SYSTEM - Check for threshold triggers
+          const doomEventsToTrigger = prev.activeScenario?.doomEvents.filter(
+              de => newDoom <= de.doomThreshold && !prev.triggeredDoomEvents.includes(de.doomThreshold)
+          ) || [];
+
+          const newTriggeredEvents = [...prev.triggeredDoomEvents];
+          for (const doomEvent of doomEventsToTrigger) {
+              newTriggeredEvents.push(doomEvent.doomThreshold);
+              logMessages.push(`⚠️ DOOM EVENT: ${doomEvent.description}`);
+              playStinger('horror');
+
+              if (doomEvent.effect === 'spawn_enemies' && doomEvent.enemyType && doomEvent.value) {
+                  for (let i = 0; i < doomEvent.value; i++) {
+                      const template = BESTIARY[doomEvent.enemyType];
+                      const randomPlayer = nextRoundPlayers[Math.floor(Math.random() * nextRoundPlayers.length)];
+                      if (template && randomPlayer) {
+                          const newEnemy: Enemy = {
+                              id: `doomenemy-${Date.now()}-${i}`,
+                              position: { ...randomPlayer.position },
+                              visionRange: 3,
+                              attackRange: 1,
+                              attackType: 'melee',
+                              maxHp: template.hp,
+                              speed: 2,
+                              ...template
+                          };
+                          updatedEnemies.push(newEnemy);
+                          generateEnemyVisual(newEnemy);
+                      }
+                  }
+              } else if (doomEvent.effect === 'spawn_boss' && doomEvent.enemyType) {
+                  const template = BESTIARY[doomEvent.enemyType];
+                  const randomPlayer = nextRoundPlayers[Math.floor(Math.random() * nextRoundPlayers.length)];
+                  if (template && randomPlayer) {
+                      const boss: Enemy = {
+                          id: `boss-${Date.now()}`,
+                          position: { ...randomPlayer.position },
+                          visionRange: 5,
+                          attackRange: 2,
+                          attackType: template.attackType || 'melee',
+                          maxHp: template.hp,
+                          speed: template.speed || 2,
+                          ...template
+                      };
+                      updatedEnemies.push(boss);
+                      logMessages.push(`💀 BOSS SPAWNED: ${template.name}!`);
+                      generateEnemyVisual(boss);
+                  }
+              } else if (doomEvent.effect === 'buff_enemies' && doomEvent.value) {
+                  updatedEnemies.forEach(e => {
+                      e.maxHp += doomEvent.value!;
+                      e.hp += doomEvent.value!;
+                  });
+                  logMessages.push(`All enemies gain +${doomEvent.value} HP!`);
+              }
+          }
+
+          // Check for survival victory
+          const newRound = prev.round + 1;
+          const survivalStep = prev.activeScenario?.steps.find(s => s.trigger === 'survive_rounds');
+          let nextPhase: GamePhase = (newDoom <= 0) ? GamePhase.GAME_OVER : GamePhase.INVESTIGATOR;
+
+          if (survivalStep && newRound >= (survivalStep.roundsToSurvive || 0)) {
+              logMessages.push(`🎉 SURVIVED ${newRound} ROUNDS! VICTORY!`);
+              playStinger('unlock');
+              nextPhase = GamePhase.GAME_OVER;
+          }
+
+          return {
+              ...prev,
+              doom: newDoom,
+              round: newRound,
+              enemies: updatedEnemies,
               players: nextRoundPlayers,
               log: [...logMessages, ...prev.log],
-              phase: (newDoom <= 0) ? GamePhase.GAME_OVER : GamePhase.INVESTIGATOR, 
-              activePlayerIndex: 0 
+              phase: nextPhase,
+              activePlayerIndex: 0,
+              triggeredDoomEvents: newTriggeredEvents
           };
         });
       }, 2000);

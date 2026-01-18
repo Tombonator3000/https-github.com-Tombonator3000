@@ -124,7 +124,62 @@ export const ITEMS: Item[] = [
 
   { id: 'coat', name: 'Heavy Coat', type: 'armor', effect: '-1 Physical Dmg Taken', bonus: 1, cost: 5, statModifier: 'physical_defense' },
   { id: 'amulet', name: 'Elder Sign', type: 'relic', effect: '-1 Sanity Dmg Taken', bonus: 1, cost: 6, statModifier: 'mental_defense' },
-  { id: 'book', name: 'Necronomicon', type: 'relic', effect: '+3 Insight, -1 Sanity', bonus: 3, cost: 8 }
+  { id: 'book', name: 'Necronomicon', type: 'relic', effect: '+3 Insight, -1 Sanity', bonus: 3, cost: 8 },
+
+  // CURSED ITEMS - High risk, high reward
+  {
+    id: 'bloodknife',
+    name: 'Bloodthirsty Dagger',
+    type: 'weapon',
+    effect: '+3 Combat Dice',
+    bonus: 3,
+    cost: 4,
+    statModifier: 'combat',
+    cursed: true,
+    curseEffect: 'Lose 1 HP after each kill'
+  },
+  {
+    id: 'cursedamulet',
+    name: 'Cursed Bone Amulet',
+    type: 'relic',
+    effect: '+2 Max HP',
+    bonus: 2,
+    cost: 3,
+    cursed: true,
+    curseEffect: 'Cannot heal above 4 HP'
+  },
+  {
+    id: 'madtome',
+    name: 'Mad Prophet\'s Tome',
+    type: 'relic',
+    effect: 'Start with +3 Insight',
+    bonus: 3,
+    cost: 2,
+    cursed: true,
+    curseEffect: 'Permanently start with Hallucinations (visual distortion)'
+  },
+  {
+    id: 'voidlens',
+    name: 'Lens of the Void',
+    type: 'tool',
+    effect: '+2 Investigation Dice',
+    bonus: 2,
+    cost: 3,
+    statModifier: 'investigation',
+    cursed: true,
+    curseEffect: 'Lose 1 Sanity when finding clues'
+  },
+  {
+    id: 'hungryarmor',
+    name: 'Living Armor',
+    type: 'armor',
+    effect: '-2 Physical Dmg Taken',
+    bonus: 2,
+    cost: 4,
+    statModifier: 'physical_defense',
+    cursed: true,
+    curseEffect: 'Cannot use Rest action (armor hungers)'
+  }
 ];
 
 export const EVENTS: EventCard[] = [
@@ -258,52 +313,231 @@ export const START_TILE: Tile = {
 };
 
 export const SCENARIOS: Scenario[] = [
+  // SCENARIO 1: ESCAPE - Find key and escape the manor
   {
     id: 's1',
-    title: 'The Gathering Dark',
-    description: 'Strange disappearances have plagued Arkham. The police are baffled, but you know better. The stars are aligning, and something is trying to break through.',
+    title: 'Escape from Blackwood Manor',
+    description: 'The doors have locked behind you. You hear chanting from below. Find the Exit Key and escape before the ritual completes.',
     startDoom: 12,
-    goal: 'Find 3 Clues to seal the gate before Doom reaches 0.',
-    cluesRequired: 3,
-    startLocation: 'Train Station',
-    specialRule: 'Standard Rules. Enemies spawn from Gates.',
+    goal: 'Find the Exit Key, locate the Exit Door, and escape alive.',
+    victoryType: 'escape',
+    steps: [
+      {
+        id: 1,
+        description: 'Search rooms to find the Brass Exit Key',
+        completed: false,
+        trigger: 'investigate_success',
+        targetItem: 'exit_key'
+      },
+      {
+        id: 2,
+        description: 'Locate the Exit Door (appears after finding key)',
+        completed: false,
+        trigger: 'move_to_tile',
+        targetTileName: 'Exit Door'
+      },
+      {
+        id: 3,
+        description: 'Reach the Exit Door and escape',
+        completed: false,
+        trigger: 'interact'
+      }
+    ],
+    doomEvents: [
+      {
+        doomThreshold: 8,
+        description: 'The ritual intensifies. Cultists are alerted!',
+        effect: 'spawn_enemies',
+        value: 2,
+        enemyType: 'cultist'
+      },
+      {
+        doomThreshold: 5,
+        description: 'Reality weakens. The walls bleed.',
+        effect: 'spawn_enemies',
+        value: 1,
+        enemyType: 'ghoul'
+      },
+      {
+        doomThreshold: 2,
+        description: 'THE GUARDIAN AWAKENS!',
+        effect: 'spawn_boss',
+        enemyType: 'shoggoth'
+      }
+    ],
+    cluesRequired: 0, // Legacy field
+    startLocation: 'Grand Hall',
+    specialRule: 'Exit Door spawns after finding key. Must reach exit to win.',
     difficulty: 'Normal',
-    tileSet: 'mixed'
+    tileSet: 'indoor'
   },
+
+  // SCENARIO 2: ASSASSINATION - Kill the High Priest
   {
     id: 's2',
-    title: 'Rise of the Deep Ones',
-    description: 'The fog rolling off the Miskatonic River smells of brine and decay. The Order of Dagon has begun their ritual. You have very little time.',
+    title: 'Assassination of the High Priest',
+    description: 'The Dark Priest must die before the summoning completes. Hunt him down in the misty streets of Innsmouth.',
     startDoom: 10,
-    goal: 'Find 4 Clues to banish the Ancient One.',
-    cluesRequired: 4,
+    goal: 'Find and kill the Dark Priest before Doom reaches 0.',
+    victoryType: 'assassination',
+    steps: [
+      {
+        id: 1,
+        description: 'Hunt down the Dark Priest',
+        completed: false,
+        trigger: 'kill_enemy',
+        targetEnemy: 'priest'
+      }
+    ],
+    doomEvents: [
+      {
+        doomThreshold: 7,
+        description: 'Deep Ones emerge from the harbor!',
+        effect: 'spawn_enemies',
+        value: 2,
+        enemyType: 'deepone'
+      },
+      {
+        doomThreshold: 4,
+        description: 'The Priest begins the final incantation!',
+        effect: 'buff_enemies',
+        value: 1 // +1 HP to all enemies
+      },
+      {
+        doomThreshold: 2,
+        description: 'SHOGGOTH GUARDIAN SUMMONED!',
+        effect: 'spawn_boss',
+        enemyType: 'shoggoth'
+      }
+    ],
+    cluesRequired: 0,
     startLocation: 'Misty Docks',
-    specialRule: 'Doom starts lower. Enemies are more aggressive.',
+    specialRule: 'Dark Priest spawns after 3 rounds. Kill him to win.',
     difficulty: 'Hard',
     tileSet: 'outdoor'
   },
+
+  // SCENARIO 3: COLLECTION - Gather 3 Sacred Candles
   {
     id: 's3',
-    title: 'The Whispering Manor',
-    description: 'You have been invited to the Blackwood Estate for the reading of a will, but the doors have locked behind you. The house itself seems alive.',
-    startDoom: 8,
-    goal: 'Find 3 Clues to unlock the main door.',
-    cluesRequired: 3,
-    startLocation: 'Grand Hall',
-    specialRule: 'Tight corridors. All tiles are indoors.',
-    difficulty: 'Nightmare',
-    tileSet: 'indoor'
+    title: 'The Ritual of Binding',
+    description: 'To seal the gate, you must find the three Sacred Candles and place them on the Ancient Altars.',
+    startDoom: 11,
+    goal: 'Find all 3 Sacred Candles and place them on Altars.',
+    victoryType: 'collection',
+    steps: [
+      {
+        id: 1,
+        description: 'Find the White Candle',
+        completed: false,
+        trigger: 'investigate_success',
+        targetItem: 'white_candle'
+      },
+      {
+        id: 2,
+        description: 'Find the Red Candle',
+        completed: false,
+        trigger: 'investigate_success',
+        targetItem: 'red_candle'
+      },
+      {
+        id: 3,
+        description: 'Find the Black Candle',
+        completed: false,
+        trigger: 'investigate_success',
+        targetItem: 'black_candle'
+      },
+      {
+        id: 4,
+        description: 'Place all candles on Altars to complete the ritual',
+        completed: false,
+        trigger: 'interact'
+      }
+    ],
+    doomEvents: [
+      {
+        doomThreshold: 7,
+        description: 'The Hounds smell your scent...',
+        effect: 'spawn_enemies',
+        value: 1,
+        enemyType: 'hound'
+      },
+      {
+        doomThreshold: 4,
+        description: 'Nightgaunts descend from above!',
+        effect: 'spawn_enemies',
+        value: 2,
+        enemyType: 'nightgaunt'
+      }
+    ],
+    cluesRequired: 0,
+    startLocation: 'Old Church',
+    specialRule: 'Sacred Candles spawn randomly in searchable tiles. Must collect all 3.',
+    difficulty: 'Normal',
+    tileSet: 'mixed'
   },
+
+  // SCENARIO 4: SURVIVAL - Last 10 rounds
   {
     id: 's4',
-    title: 'The Silent City',
-    description: 'A supernatural silence has fallen. Supplies are scarce, and the shadows hide lethal snipers. You must move quietly.',
-    startDoom: 9,
-    goal: 'Survive and find 3 Clues.',
-    cluesRequired: 3,
+    title: 'The Siege of Arkham',
+    description: 'The town is overrun. Barricade yourself and survive until dawn. Hold out for 10 rounds.',
+    startDoom: 15,
+    goal: 'Survive for 10 rounds against endless waves.',
+    victoryType: 'survival',
+    steps: [
+      {
+        id: 1,
+        description: 'Survive until Round 10',
+        completed: false,
+        trigger: 'survive_rounds',
+        roundsToSurvive: 10
+      }
+    ],
+    doomEvents: [
+      {
+        doomThreshold: 10,
+        description: 'First wave: Cultists attack!',
+        effect: 'spawn_enemies',
+        value: 3,
+        enemyType: 'cultist'
+      },
+      {
+        doomThreshold: 7,
+        description: 'Second wave: Ghouls break through!',
+        effect: 'spawn_enemies',
+        value: 2,
+        enemyType: 'ghoul'
+      },
+      {
+        doomThreshold: 4,
+        description: 'Final wave: HORROR UNLEASHED!',
+        effect: 'spawn_enemies',
+        value: 1,
+        enemyType: 'hunting_horror'
+      }
+    ],
+    cluesRequired: 0,
     startLocation: 'Town Square',
-    specialRule: 'Reduced Vision Range. Items are rare.',
+    specialRule: 'Enemy waves spawn at specific Doom thresholds. Survive 10 rounds to win.',
     difficulty: 'Hard',
+    tileSet: 'outdoor'
+  },
+
+  // SCENARIO 5: RANDOM - Generated at runtime
+  {
+    id: 's5',
+    title: 'The Unknown Horror',
+    description: 'Something stirs in the darkness. Your mission will be revealed when you arrive...',
+    startDoom: 12,
+    goal: 'Mission objectives will be generated upon arrival.',
+    victoryType: 'random',
+    steps: [], // Will be populated at runtime
+    doomEvents: [], // Will be populated at runtime
+    cluesRequired: 0,
+    startLocation: 'Train Station',
+    specialRule: 'RANDOMIZED SCENARIO - Goal and steps generated when game starts.',
+    difficulty: 'Normal',
     tileSet: 'mixed'
   }
 ];
