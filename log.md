@@ -272,3 +272,106 @@ Track all major milestones, feature additions, and bug fixes here.
 4. Playtest and iterate
 
 ---
+
+## [v3.10.0 IMPLEMENTATION - Step-Based Scenarios & Cursed Items - 2026-01-18]
+*   **Major Gameplay Overhaul:** Implemented concrete, step-by-step objectives for single-player roguelite experience
+*   **Type System Expansion:**
+    *   Added `VictoryType` enum: 'escape', 'assassination', 'collection', 'survival', 'random'
+    *   Added `ScenarioStep` interface with trigger-based completion tracking
+    *   Added `DoomEvent` interface for threshold-based dynamic events
+    *   Extended `Item` interface with cursed properties
+    *   Extended `GameState` with `currentStep`, `collectedItems`, `triggeredDoomEvents`
+
+### 🎯 Redesigned Scenarios (Hero Quest Style)
+1. **Escape from Blackwood Manor** (Escape)
+   - Step 1: Find Exit Key through investigation
+   - Step 2: Locate Exit Door (spawns after key found)
+   - Step 3: Use key and escape alive
+   - Doom events: Cultists (8), Ghouls (5), Shoggoth Boss (2)
+
+2. **Assassination of the High Priest** (Assassination)
+   - Step 1: Hunt and kill the Dark Priest
+   - Doom events: Deep Ones (7), Enemy buff (4), Shoggoth (2)
+
+3. **The Ritual of Binding** (Collection)
+   - Steps: Find White Candle, Red Candle, Black Candle
+   - Final step: Place all candles on Altars
+   - Doom events: Hounds (7), Nightgaunts (4)
+
+4. **The Siege of Arkham** (Survival)
+   - Step 1: Survive 10 rounds
+   - Doom events: Wave 1 Cultists (10), Wave 2 Ghouls (7), Wave 3 Horror (4)
+
+5. **The Unknown Horror** (Randomized)
+   - Victory type generated at game start
+   - Steps and doom events created dynamically
+   - High replayability
+
+### 💀 Cursed Items (Risk/Reward)
+1. **Bloodthirsty Dagger** - +3 Combat dice, lose 1 HP after each kill
+2. **Cursed Bone Amulet** - +2 Max HP, cannot heal above 4 HP
+3. **Mad Prophet's Tome** - +3 Insight, causes Hallucinations
+4. **Lens of the Void** - +2 Investigation dice, lose 1 Sanity when finding clues
+5. **Living Armor** - -2 Physical damage taken, cannot Rest
+
+### 🎮 Core Systems Implemented
+*   **Step Progression System:**
+    *   `checkStepProgression()` validates trigger conditions
+    *   Quest items spawn with 30% chance on investigate
+    *   Special tiles spawn dynamically (Exit Door, Altars)
+    *   Victory triggered on final step completion
+    *   Clear UI feedback with emojis (✅, 🔑, 🚪, 🕯️)
+
+*   **Doom Events System:**
+    *   Events trigger at specific Doom thresholds
+    *   No duplicate triggers (tracked in `triggeredDoomEvents`)
+    *   Effects: spawn_enemies, spawn_boss, buff_enemies
+    *   Logged with ⚠️ warnings for visibility
+
+*   **Cursed Item Effects:**
+    *   Bloodthirsty Dagger: HP penalty in attack action
+    *   Living Armor: Blocks Rest action entirely
+    *   Cursed Bone Amulet: Caps healing at 4 HP
+    *   Lens of the Void: Sanity loss in investigate action
+
+*   **Randomized Scenario Generator:**
+    *   `generateRandomScenario()` creates unique objectives
+    *   Supports all victory types
+    *   Generates appropriate steps and doom events
+    *   Ensures no two runs are identical
+
+### 📋 Player Experience Improvements
+*   Clear objective display at game start
+*   Step-by-step progress tracking
+*   Visual feedback for quest items (🔑, 🕯️)
+*   Emoji-based log entries for quick scanning
+*   Curse effects clearly marked with 💀
+*   Victory conditions are concrete and understandable
+
+### 🔄 Technical Changes
+*   **Files Modified:**
+    *   `types.ts`: Added VictoryType, ScenarioStep, DoomEvent interfaces
+    *   `constants.ts`: Redesigned SCENARIOS array, added 5 cursed ITEMS
+    *   `App.tsx`: Implemented step checking, doom events, cursed effects
+
+*   **Game Loop Integration:**
+    *   Step progression checked in: investigate, attack, move, interact actions
+    *   Doom events triggered in MYTHOS phase
+    *   Cursed effects applied during relevant actions
+    *   Survival victory checked on round increment
+
+### 🎉 Impact
+*   ✅ Concrete, understandable objectives (Hero Quest style)
+*   ✅ 5 distinct victory types for gameplay variety
+*   ✅ Roguelite risk/reward with cursed items
+*   ✅ Dynamic pressure through doom events
+*   ✅ High replayability with random scenario
+*   ✅ Clear progression tracking
+
+**Next Priorities:**
+1. Playtest all 5 scenarios
+2. Balance cursed item risks
+3. Add more doom event variety
+4. Consider UI improvements for step display
+
+---
