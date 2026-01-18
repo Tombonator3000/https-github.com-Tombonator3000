@@ -98,8 +98,6 @@ Track all major milestones, feature additions, and bug fixes here.
 *   **Options Menu:** Created an `OptionsMenu` modal to handle fullscreen toggling and a "Hard Reset" (Clear Data) feature.
 *   **Game Flow:** Refactored state initialization in `App.tsx` to launch into the menu system before loading game assets.
 
-## [v2.8.1 Bug Fixes]
-*   **Hex Grid Movement:** Fixed a critical bug in enemy pathfinding. Enemies previously used cartesian movement logic on a hexagonal grid, leading to illegal diagonal jumps. Implemented correct axial neighbor checking and distance minimization.
-*   **Game Over UX:** The "AVSLUTT" button on the Game Over screen no longer forces a hard browser reload. It now correctly returns the player to the Main Menu.
-*   **Loot Probability:** Refined the random number generation logic for the 'Investigate' action to ensure clearer distinction between finding Clues vs Items.
-*   **Audio Stability:** Added robust audio context initialization checks on game start.
+## [v2.8.2 Crash Fix]
+*   **Turn Transition Guard:** Fixed a critical "Black Screen" crash in `handleEndTurn`. The logic previously accessed player properties at an out-of-bounds index during dead-player skipping. 
+*   **Render Safety:** Implemented `useMemo` for `activePlayer` calculation and added null-checks in the JSX to ensure UI elements don't attempt to render undefined character data.
