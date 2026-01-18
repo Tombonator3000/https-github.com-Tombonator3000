@@ -103,6 +103,7 @@ export interface BestiaryEntry {
     damage: number;
     horror: number;
     traits?: string[];
+    defeatFlavor?: string; // New field for flavor text upon defeat
 }
 
 export type TileObjectType = 'altar' | 'bookshelf' | 'crate' | 'chest' | 'cabinet' | 'gate' | 'barricade' | 'locked_door' | 'rubble' | 'fire' | 'trap';

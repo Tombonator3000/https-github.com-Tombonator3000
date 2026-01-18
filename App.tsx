@@ -1234,9 +1234,10 @@ const App: React.FC = () => {
                 if (e.id === enemyOnTile.id) {
                     const remaining = e.hp - hits;
                     if (remaining <= 0) {
+                        const flavor = BESTIARY[e.type]?.defeatFlavor || `${e.name} ble bekjempet.`;
                         setTimeout(() => {
                            setState(curr => ({ ...curr, enemies: curr.enemies.filter(en => en.id !== e.id) }));
-                           addToLog(`${enemyOnTile.name} ble bekjempet.`);
+                           addToLog(flavor);
                            triggerFloatingText(enemyOnTile.position.q, enemyOnTile.position.r, `DEAD`, 'text-red-700 font-bold');
                         }, 800);
                         return { ...e, hp: 0, isDying: true };
