@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import * as Tone from 'tone';
 import { GoogleGenAI } from "@google/genai";
-import { 
-  Skull, 
+import {
+  Skull,
   ChevronRight,
   RotateCcw,
   Sword,
@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator, FloatingText, Item, Spell } from './types';
 import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS } from './constants';
+import { getApiKey, detectEnvironment, getEnvironmentInfo } from './env';
 import GameBoard from './components/GameBoard';
 import CharacterPanel from './components/CharacterPanel';
 import EnemyPanel from './components/EnemyPanel';
@@ -37,8 +38,21 @@ import MerchantShop from './components/MerchantShop';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const APP_VERSION = "3.1.0";
+
+// Initialize AI client with environment-aware API key
+let ai: GoogleGenAI | null = null;
+const initializeAI = () => {
+  if (ai) return ai;
+  const apiKey = getApiKey();
+  if (apiKey) {
+    ai = new GoogleGenAI({ apiKey });
+    console.log(getEnvironmentInfo());
+  } else {
+    console.warn('No API key available. AI features disabled.');
+  }
+  return ai;
+};
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -238,16 +252,17 @@ const App: React.FC = () => {
 
   // --- AI IMAGE GENERATION (NANO BANANA) ---
   const generateImage = async (prompt: string): Promise<string | null> => {
-    if (!process.env.API_KEY) return null;
+    const aiClient = initializeAI();
+    if (!aiClient) return null;
     try {
-        const response = await ai.models.generateContent({
+        const response = await aiClient.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
             config: {
                 imageConfig: { aspectRatio: "1:1" }
             }
         });
-        
+
         const candidates = response.candidates;
         if (candidates && candidates[0] && candidates[0].content && candidates[0].content.parts) {
             for (const part of candidates[0].content.parts) {
@@ -358,11 +373,12 @@ const App: React.FC = () => {
   };
 
   const generateNarrative = async (tile: Tile) => {
-    if (!process.env.API_KEY) return;
+    const aiClient = initializeAI();
+    if (!aiClient) return;
     generateTileVisual(tile);
     try {
       const prompt = `Skriv en kort, atmosfærisk beskrivelse (maks 2 setninger) på norsk for en etterforsker som går inn i "${tile.name}" i et Lovecraft-inspirert spill. Rommet inneholder: ${tile.object ? tile.object.type : 'ingenting spesielt'}. Doom-nivået er ${state.doom}.`;
-      const response = await ai.models.generateContent({
+      const response = await aiClient.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
       });
