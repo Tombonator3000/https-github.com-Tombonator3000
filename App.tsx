@@ -43,8 +43,17 @@ import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const SETUP_CONFIG_KEY = 'shadows_1920s_setup_config_v1';
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const APP_VERSION = "3.9.19";
+
+// Lazy AI initialization - only create when API key is available
+let aiInstance: GoogleGenAI | null = null;
+const getAI = (): GoogleGenAI | null => {
+  if (!process.env.API_KEY) return null;
+  if (!aiInstance) {
+    aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  }
+  return aiInstance;
+};
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -442,7 +451,8 @@ const App: React.FC = () => {
   };
 
   const generateNarrative = async (tile: Tile) => {
-    if (!process.env.API_KEY) return;
+    const ai = getAI();
+    if (!ai) return;
     generateTileVisual(tile);
     try {
       const prompt = `Skriv en kort, atmosfærisk beskrivelse (maks 2 setninger) på norsk for en etterforsker som går inn i "${tile.name}" i et Lovecraft-inspirert spill. Rommet inneholder: ${tile.object ? tile.object.type : 'ingenting spesielt'}. Doom-nivået er ${state.doom}.`;
