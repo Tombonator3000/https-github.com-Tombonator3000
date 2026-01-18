@@ -125,3 +125,18 @@ Track all major milestones, feature additions, and bug fixes here.
     *   *Shop UI:* Created `MerchantShop.tsx`, an immersive "Fence" interface for purchasing gear.
     *   *Continuity:* Saving to the Roster now happens *after* the shopping phase, ensuring veterans start their next case fully equipped.
 *   **Item Costs:** Updated the item database with Insight costs to support the economy.
+
+## [v3.2 Update - Multi-Platform Support]
+*   **Environment Detection:** Created `env.ts` utility to automatically detect deployment platform (AI Studio, GitHub Pages, or Local).
+*   **Flexible API Key Handling:**
+    *   *AI Studio:* Automatically detects and uses platform-provided API keys (window.GOOGLE_API_KEY).
+    *   *GitHub Pages:* Uses build-time injected API keys from environment variables.
+    *   *Local Development:* Uses .env file configuration.
+    *   *Graceful Degradation:* AI features are disabled if no key is available, allowing the game to run without errors.
+*   **Build System Improvements:**
+    *   *Relative Paths:* Configured Vite to use relative base paths (`./`) for universal compatibility.
+    *   *Flexible Base Path:* Added support for custom base paths via `BASE_PATH` environment variable.
+    *   *Code Splitting:* Implemented intelligent chunking for better performance (react-vendor, game-logic, ui-components).
+    *   *Entry Point Fix:* Fixed index.html to properly include the app entry point for Vite builds.
+*   **Deployment Documentation:** Created comprehensive `DEPLOYMENT.md` with platform-specific instructions, troubleshooting, and best practices.
+*   **Cross-Platform Testing:** Verified build works for both GitHub Pages and AI Studio deployment scenarios.
