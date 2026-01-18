@@ -5,8 +5,8 @@ export enum GamePhase {
   MYTHOS = 'mythos',
   COMBAT = 'combat',
   GAME_OVER = 'gameOver',
-  MERCHANT = 'merchant', // New phase
-  INVEST_LOGIC_BRIDGE = 'investLogicBridge'
+  MERCHANT = 'merchant',
+  VICTORY = 'victory' // New Phase
 }
 
 export type CharacterType = 'detective' | 'professor' | 'journalist' | 'veteran' | 'occultist' | 'doctor';
@@ -14,7 +14,7 @@ export type CharacterType = 'detective' | 'professor' | 'journalist' | 'veteran'
 export interface Spell {
   id: string;
   name: string;
-  cost: number; // Insight cost
+  cost: number;
   description: string;
   effectType: 'damage' | 'heal' | 'reveal' | 'banish';
   value: number;
@@ -30,7 +30,7 @@ export interface Character {
   maxSanity: number;
   insight: number;
   special: string;
-  imageUrl?: string; // New: Base64 image data
+  imageUrl?: string;
 }
 
 export interface Madness {
@@ -38,7 +38,7 @@ export interface Madness {
   name: string;
   description: string;
   effect: string;
-  visualClass: string; // CSS class for visual distortion
+  visualClass: string;
 }
 
 export interface Trait {
@@ -52,16 +52,15 @@ export interface Trait {
 export interface Player extends Character {
   position: { q: number; r: number };
   inventory: Item[];
-  spells: Spell[]; // New: Active magic
+  spells: Spell[];
   actions: number;
   isDead: boolean;
-  madness: string[]; // Deprecated, keeping for safety
+  madness: string[];
   activeMadness: Madness | null;
-  instanceId?: string; // Unique ID for veterans to distinguish multiple of same class
-  traits: Trait[]; // New: Permanent traits from previous runs
+  instanceId?: string;
+  traits: Trait[];
 }
 
-// Data structure for a saved character in the roster
 export interface SavedInvestigator extends Player {
     saveDate: number;
     scenariosSurvived: number;
@@ -74,10 +73,10 @@ export interface Item {
   type: 'weapon' | 'tool' | 'relic' | 'armor' | 'consumable';
   effect: string;
   bonus?: number;
-  cost?: number; // New: Price in Insight
+  cost?: number;
   statModifier?: 'combat' | 'investigation' | 'agility' | 'physical_defense' | 'mental_defense';
-  cursed?: boolean; // Roguelite: Cursed items
-  curseEffect?: string; // Description of curse penalty
+  curse?: string; // New: Description of the curse
+  curseEffect?: 'drain_hp_on_kill' | 'cap_hp' | 'hallucinations' | 'sanity_cost_clue' | 'no_rest'; // New: Functional curse ID
 }
 
 export type EnemyAttackType = 'melee' | 'ranged' | 'sanity' | 'doom';
@@ -101,9 +100,9 @@ export interface Enemy {
   visionRange: number;
   attackRange: number;
   attackType: EnemyAttackType;
-  traits?: string[]; // New: 'flying', 'regenerate', 'massive', etc.
-  isDying?: boolean; // For death animation
-  imageUrl?: string; // New: Base64 image data
+  traits?: string[];
+  isDying?: boolean;
+  imageUrl?: string;
 }
 
 export interface BestiaryEntry {
@@ -111,27 +110,27 @@ export interface BestiaryEntry {
     type: EnemyType;
     description: string;
     lore: string;
-    visualPrompt: string; // New: Specific prompt for AI generation
+    visualPrompt: string;
     hp: number;
     damage: number;
     horror: number;
     traits?: string[];
-    defeatFlavor?: string; // New field for flavor text upon defeat
+    defeatFlavor?: string;
 }
 
 export type TileObjectType = 
   | 'altar' | 'bookshelf' | 'crate' | 'chest' | 'cabinet' 
   | 'gate' | 'barricade' | 'locked_door' | 'rubble' | 'fire' | 'trap'
-  | 'mirror' | 'radio' | 'switch' | 'statue' | 'fog_wall'; // Expanded interactables
+  | 'mirror' | 'radio' | 'switch' | 'statue' | 'fog_wall' | 'exit_door';
 
 export interface TileObject {
   type: TileObjectType;
-  searched: boolean; // For searchables
-  blocking?: boolean; // If true, cannot enter tile until cleared
-  health?: number; // For breakable obstacles
-  difficulty?: number; // Target number for skill check
+  searched: boolean;
+  blocking?: boolean;
+  health?: number;
+  difficulty?: number;
   reqSkill?: 'strength' | 'insight' | 'agility';
-  puzzleType?: 'sequence' | 'dial'; // New: Determines if interaction triggers a mini-game
+  puzzleType?: 'sequence' | 'dial';
 }
 
 export interface Tile {
@@ -140,35 +139,36 @@ export interface Tile {
   r: number;
   name: string;
   type: 'building' | 'room' | 'street';
-  category?: 'connector' | 'location'; // New: helps procedural generation flow
+  category?: 'connector' | 'location';
   explored: boolean;
   hasWater?: boolean;
   searchable: boolean;
   searched: boolean;
   object?: TileObject;
   isGate?: boolean;
-  imageUrl?: string; // New: Base64 image data
+  imageUrl?: string;
 }
 
-export type VictoryType = 'investigation' | 'escape' | 'assassination' | 'collection' | 'survival' | 'random';
+// --- NEW SCENARIO TYPES (v3.10.0) ---
+
+export type VictoryType = 'escape' | 'assassination' | 'collection' | 'survival';
 
 export interface ScenarioStep {
-  id: number;
-  description: string;
-  completed: boolean;
-  trigger?: 'investigate_success' | 'move_to_tile' | 'kill_enemy' | 'survive_rounds' | 'interact';
-  targetItem?: string; // For collection quests
-  targetEnemy?: EnemyType; // For assassination
-  targetTileName?: string; // For escape/movement
-  roundsToSurvive?: number; // For survival
+    id: string;
+    description: string;
+    type: 'find_item' | 'find_tile' | 'kill_enemy' | 'survive' | 'interact';
+    targetId?: string; // Item ID (e.g. 'exit_key'), Enemy Type, or Tile Name
+    amount?: number; // Target amount (e.g. 10 rounds, 3 candles)
+    completed: boolean;
 }
 
 export interface DoomEvent {
-  doomThreshold: number;
-  description: string;
-  effect: 'spawn_enemies' | 'spawn_boss' | 'buff_enemies' | 'debuff_players' | 'corrupt_tiles';
-  value?: number; // Number of enemies, amount of buff, etc
-  enemyType?: EnemyType;
+    threshold: number; // Triggers when Doom <= this number
+    triggered: boolean;
+    type: 'spawn_enemy' | 'buff_enemies' | 'sanity_hit' | 'spawn_boss';
+    targetId?: string; // Enemy type or Boss ID
+    amount?: number;
+    message: string;
 }
 
 export interface Scenario {
@@ -176,15 +176,16 @@ export interface Scenario {
   title: string;
   description: string;
   startDoom: number;
-  goal: string;
-  victoryType: VictoryType; // New: Type of victory condition
-  steps: ScenarioStep[]; // New: Step-by-step objectives
-  doomEvents: DoomEvent[]; // New: Events triggered at Doom thresholds
-  cluesRequired: number; // Deprecated but keeping for compatibility
   startLocation: string;
   specialRule: string;
   difficulty: 'Normal' | 'Hard' | 'Nightmare';
   tileSet: 'indoor' | 'outdoor' | 'mixed';
+  
+  // New Fields
+  goal: string;
+  victoryType: VictoryType;
+  steps: ScenarioStep[];
+  doomEvents: DoomEvent[];
 }
 
 export interface ContextAction {
@@ -200,7 +201,7 @@ export interface FloatingText {
     r: number;
     content: string;
     colorClass: string;
-    randomOffset: { x: number; y: number }; // Visual jitter
+    randomOffset: { x: number; y: number };
 }
 
 export interface ActivePuzzle {
@@ -218,9 +219,9 @@ export interface ScenarioModifier {
 
 export interface GameSettings {
   audio: {
-    masterVolume: number; // 0-100
-    musicVolume: number; // 0-100
-    sfxVolume: number; // 0-100
+    masterVolume: number;
+    musicVolume: number;
+    sfxVolume: number;
     muted: boolean;
   };
   graphics: {
@@ -242,23 +243,24 @@ export interface GameState {
   activePlayerIndex: number;
   board: Tile[];
   enemies: Enemy[];
-  encounteredEnemies: string[]; // List of EnemyTypes seen
+  encounteredEnemies: string[];
   cluesFound: number;
   log: string[];
   lastDiceRoll: number[] | null;
   activeEvent: EventCard | null;
   activeCombat: { enemyId: string; playerId: string } | null;
-  activePuzzle: ActivePuzzle | null; // New: Current mini-game
+  activePuzzle: ActivePuzzle | null;
   selectedEnemyId: string | null;
-  selectedTileId: string | null; // New: For selecting tiles to interact with
+  selectedTileId: string | null;
   activeScenario: Scenario | null;
-  activeModifiers: ScenarioModifier[]; // New: Roguelite run modifiers
+  activeModifiers: ScenarioModifier[];
   floatingTexts: FloatingText[];
   screenShake: boolean;
-  activeSpell: Spell | null; // New: Currently selected spell waiting for target
-  currentStep: number; // New: Current step index in scenario
-  collectedItems: string[]; // New: Quest items collected (for collection scenarios)
-  triggeredDoomEvents: number[]; // New: Track which doom thresholds have fired
+  activeSpell: Spell | null;
+  
+  // New State for v3.10.0
+  currentStepIndex: number;
+  questItemsCollected: string[]; // IDs of quest items found (e.g. 'candle_red')
 }
 
 export interface EventCard {

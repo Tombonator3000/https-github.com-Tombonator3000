@@ -57,8 +57,7 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
   };
 
   const handleGenerateAssets = async () => {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey || typeof apiKey !== 'string' || apiKey === 'null' || apiKey === 'undefined') {
+      if (!process.env.API_KEY) {
           alert("API Key missing. Cannot generate assets.");
           return;
       }
