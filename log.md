@@ -102,3 +102,13 @@ Track all major milestones, feature additions, and bug fixes here.
     *   Fallback behavior explanation
 *   **Git Integration:** Added `.gitkeep` files to ensure empty folders are tracked by Git.
 *   **Status:** Folder structure is ready for manual asset placement. AssetLibrary.ts is fully functional and will prioritize manual files over AI generation.
+
+## [v3.9.23 Hotfix - GitHub Blue Screen Fix - 2026-01-18]
+*   **Critical Bug Fix:** Fixed "blue screen" issue when launching game from GitHub Pages/deployed environments
+*   **Root Cause:** GoogleGenAI was initialized at module top-level with `process.env.API_KEY`, causing initialization failure when API key was undefined
+*   **Solution:** Implemented lazy AI initialization pattern in both `App.tsx` and `utils/AssetLibrary.ts`:
+    *   Created `getAI()` function that only initializes GoogleGenAI when API key exists
+    *   AI instance is now created on-demand rather than at module load time
+    *   Game gracefully falls back to CSS visuals and Tone.js audio when AI is unavailable
+*   **Impact:** Game now starts successfully on GitHub Pages without requiring API key configuration
+*   **Files Modified:** `App.tsx`, `utils/AssetLibrary.ts`
