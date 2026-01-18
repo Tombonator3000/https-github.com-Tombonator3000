@@ -190,6 +190,24 @@ export interface ScenarioModifier {
     effect: 'reduced_vision' | 'extra_doom' | 'strong_enemies' | 'less_items';
 }
 
+export interface GameSettings {
+  audio: {
+    masterVolume: number; // 0-100
+    musicVolume: number; // 0-100
+    sfxVolume: number; // 0-100
+    muted: boolean;
+  };
+  graphics: {
+    highContrast: boolean;
+    reduceMotion: boolean;
+    particles: boolean;
+  };
+  gameplay: {
+    showGrid: boolean;
+    fastMode: boolean;
+  };
+}
+
 export interface GameState {
   phase: GamePhase;
   doom: number;

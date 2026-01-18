@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { INDOOR_LOCATIONS, OUTDOOR_LOCATIONS } from '../constants';
 
@@ -8,11 +9,26 @@ export interface AssetLibrary {
     [locationName: string]: string; // Maps location name to Base64 image string
 }
 
-// Load library from local storage
+// Try to load static assets (This will be empty initially, but user can populate it)
+let STATIC_ASSETS: AssetLibrary = {};
+try {
+    // In a real build step, we might import a JSON file.
+    // For this prototype, we will rely on the user pasting data or loading it via a mechanism if we had fs access.
+    // We will simulate "checking" for it.
+    // import assets from '../game_assets.json'; 
+    // STATIC_ASSETS = assets;
+} catch (e) {
+    // No static assets found
+}
+
+// Load library from local storage OR static file
 export const loadAssetLibrary = (): AssetLibrary => {
     try {
         const saved = localStorage.getItem(ASSET_KEY);
-        return saved ? JSON.parse(saved) : {};
+        const localLib = saved ? JSON.parse(saved) : {};
+        
+        // Merge: Local storage overrides static (dev mode), but static fills gaps
+        return { ...STATIC_ASSETS, ...localLib };
     } catch (e) {
         console.error("Failed to load asset library", e);
         return {};
@@ -64,7 +80,18 @@ export const generateLocationAsset = async (locationName: string, type: 'room' |
 };
 
 // Helper to get list of all missing assets
-export const getMissingAssets = (currentLib: AssetLibrary): string[] => {
-    const allLocations = [...INDOOR_LOCATIONS, ...OUTDOOR_LOCATIONS, 'Train Station'];
+export const getMissingAssets = (currentLib: AssetLibrary, allLocations: string[]): string[] => {
     return allLocations.filter(loc => !currentLib[loc]);
+};
+
+// DOWNLOAD FUNCTION
+export const downloadAssetsAsJSON = () => {
+    const lib = loadAssetLibrary();
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(lib));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "game_assets.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
 };

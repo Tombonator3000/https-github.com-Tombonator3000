@@ -214,6 +214,15 @@ export const OUTDOOR_LOCATIONS = [
 
 export const LOCATION_NAMES = [...INDOOR_LOCATIONS, ...OUTDOOR_LOCATIONS, ...INDOOR_CONNECTORS, ...OUTDOOR_CONNECTORS];
 
+// Combined list for Asset Generation
+export const ALL_LOCATIONS_FULL = [
+    'Train Station',
+    ...INDOOR_LOCATIONS, 
+    ...OUTDOOR_LOCATIONS, 
+    ...INDOOR_CONNECTORS, 
+    ...OUTDOOR_CONNECTORS
+];
+
 export const START_TILE: Tile = {
   id: 'start',
   q: 0,
