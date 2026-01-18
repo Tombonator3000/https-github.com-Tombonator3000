@@ -35,7 +35,7 @@ import OptionsMenu from './components/OptionsMenu';
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "2.8.2";
+const APP_VERSION = "2.8.3";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -448,22 +448,26 @@ const App: React.FC = () => {
   const handleEndTurn = () => {
     playStinger('click');
     setState(prev => {
-      const isLastPlayer = prev.activePlayerIndex === prev.players.length - 1;
-      let nextIndex = isLastPlayer ? 0 : prev.activePlayerIndex + 1;
-      let nextPhase = isLastPlayer ? GamePhase.MYTHOS : GamePhase.INVESTIGATOR;
+      // Find the next living player starting from next index
+      let nextIndex = prev.activePlayerIndex + 1;
+      let nextPhase = GamePhase.INVESTIGATOR;
+      let foundPlayer = false;
 
-      if (nextPhase === GamePhase.INVESTIGATOR) {
-           // CRITICAL BUG FIX: Ensure nextIndex is within bounds BEFORE checking .isDead
-           while (nextIndex < prev.players.length && prev.players[nextIndex].isDead) {
-               nextIndex++;
-               if (nextIndex >= prev.players.length) {
-                   nextIndex = 0;
-                   nextPhase = GamePhase.MYTHOS;
-                   break;
-               }
-           }
+      // Scan through the rest of the array
+      while (nextIndex < prev.players.length) {
+        if (!prev.players[nextIndex].isDead) {
+          foundPlayer = true;
+          break;
+        }
+        nextIndex++;
       }
-      
+
+      // If no living player found in the remainder of the list, it's Mythos time
+      if (!foundPlayer) {
+        nextPhase = GamePhase.MYTHOS;
+        nextIndex = 0; // Reset for safety, though Mythos phase usually ignores this until update
+      }
+
       return { 
         ...prev, 
         activePlayerIndex: nextIndex, 
@@ -669,13 +673,16 @@ const App: React.FC = () => {
               return { ...p, actions: baseActions };
           });
 
+          // START NEW ROUND ON FIRST LIVING PLAYER
+          const firstLivingIndex = finalPlayers.findIndex(p => !p.isDead);
+
           return { 
             ...prev, 
             doom: newDoom, 
             round: prev.round + 1, 
             enemies: updatedEnemies, 
             players: finalPlayers, 
-            activePlayerIndex: 0,
+            activePlayerIndex: firstLivingIndex === -1 ? 0 : firstLivingIndex,
             phase: (newDoom <= 0 || allDead) ? GamePhase.GAME_OVER : GamePhase.INVESTIGATOR 
           };
         });

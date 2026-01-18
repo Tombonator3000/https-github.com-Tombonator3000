@@ -99,5 +99,5 @@ Track all major milestones, feature additions, and bug fixes here.
 *   **Game Flow:** Refactored state initialization in `App.tsx` to launch into the menu system before loading game assets.
 
 ## [v2.8.2 Crash Fix]
-*   **Turn Transition Guard:** Fixed a critical "Black Screen" crash in `handleEndTurn`. The logic previously accessed player properties at an out-of-bounds index during dead-player skipping. 
-*   **Render Safety:** Implemented `useMemo` for `activePlayer` calculation and added null-checks in the JSX to ensure UI elements don't attempt to render undefined character data.
+*   **Turn Transition Guard:** Fixed a critical "Black Screen" crash in `handleEndTurn` by completely rewriting the player cycling logic. It now safely scans ahead for the next living player.
+*   **Round Start Logic:** The Mythos phase now sets the `activePlayerIndex` to the first *living* player of the new round, preventing the UI from attempting to render actions for a deceased character.
