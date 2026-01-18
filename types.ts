@@ -76,6 +76,8 @@ export interface Item {
   bonus?: number;
   cost?: number; // New: Price in Insight
   statModifier?: 'combat' | 'investigation' | 'agility' | 'physical_defense' | 'mental_defense';
+  cursed?: boolean; // Roguelite: Cursed items
+  curseEffect?: string; // Description of curse penalty
 }
 
 export type EnemyAttackType = 'melee' | 'ranged' | 'sanity' | 'doom';
@@ -148,13 +150,37 @@ export interface Tile {
   imageUrl?: string; // New: Base64 image data
 }
 
+export type VictoryType = 'investigation' | 'escape' | 'assassination' | 'collection' | 'survival' | 'random';
+
+export interface ScenarioStep {
+  id: number;
+  description: string;
+  completed: boolean;
+  trigger?: 'investigate_success' | 'move_to_tile' | 'kill_enemy' | 'survive_rounds' | 'interact';
+  targetItem?: string; // For collection quests
+  targetEnemy?: EnemyType; // For assassination
+  targetTileName?: string; // For escape/movement
+  roundsToSurvive?: number; // For survival
+}
+
+export interface DoomEvent {
+  doomThreshold: number;
+  description: string;
+  effect: 'spawn_enemies' | 'spawn_boss' | 'buff_enemies' | 'debuff_players' | 'corrupt_tiles';
+  value?: number; // Number of enemies, amount of buff, etc
+  enemyType?: EnemyType;
+}
+
 export interface Scenario {
   id: string;
   title: string;
   description: string;
   startDoom: number;
   goal: string;
-  cluesRequired: number;
+  victoryType: VictoryType; // New: Type of victory condition
+  steps: ScenarioStep[]; // New: Step-by-step objectives
+  doomEvents: DoomEvent[]; // New: Events triggered at Doom thresholds
+  cluesRequired: number; // Deprecated but keeping for compatibility
   startLocation: string;
   specialRule: string;
   difficulty: 'Normal' | 'Hard' | 'Nightmare';
@@ -230,6 +256,9 @@ export interface GameState {
   floatingTexts: FloatingText[];
   screenShake: boolean;
   activeSpell: Spell | null; // New: Currently selected spell waiting for target
+  currentStep: number; // New: Current step index in scenario
+  collectedItems: string[]; // New: Quest items collected (for collection scenarios)
+  triggeredDoomEvents: number[]; // New: Track which doom thresholds have fired
 }
 
 export interface EventCard {
