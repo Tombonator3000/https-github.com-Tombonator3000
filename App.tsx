@@ -391,8 +391,12 @@ const App: React.FC = () => {
 
   const generateEnemyVisual = async (enemy: Enemy) => {
       if (enemy.imageUrl) return;
-      const prompt = `A terrifying, nightmarish illustration of a ${enemy.name} (${enemy.type}) from Cthulhu mythos. Dark fantasy art, creature design, horror, menacing, detailed, isolated on dark background.`;
-      const img = await generateImage(prompt);
+      
+      // Use the new, high-fidelity visual prompt from BESTIARY
+      const bestiaryEntry = BESTIARY[enemy.type];
+      const specificPrompt = bestiaryEntry?.visualPrompt || `A terrifying, nightmarish illustration of a ${enemy.name} (${enemy.type}) from Cthulhu mythos. Dark fantasy art, creature design, horror, menacing, detailed, isolated on dark background.`;
+      
+      const img = await generateImage(specificPrompt);
       if (img) {
           setState(prev => ({
               ...prev,
@@ -677,7 +681,6 @@ const App: React.FC = () => {
       setRoster(prev => prev.filter(p => p.instanceId !== instanceId));
   };
 
-  // ... (rest of App component methods: handleEndTurn, handlePuzzleComplete, handleAction, etc.) ...
   const handleEndTurn = () => {
     playStinger('click');
     setState(prev => {
@@ -774,7 +777,7 @@ const App: React.FC = () => {
       window.location.reload();
   };
 
-  // ... (handleResolveEvent, Mythos Phase Effect, handleAction, etc. remain unchanged) ...
+  // --- ACTIONS ---
   
   const handleResolveEvent = useCallback(() => {
     if (!state.activeEvent) return;
@@ -1376,33 +1379,61 @@ const App: React.FC = () => {
           break;
 
       case 'attack':
-        const tEnemy = state.enemies.find(e => e.id === state.selectedEnemyId);
-        const enemyOnTile = tEnemy && tEnemy.position.q === activePlayer.position.q && tEnemy.position.r === activePlayer.position.r 
-          ? tEnemy 
-          : state.enemies.find(e => e.position.q === activePlayer.position.q && e.position.r === activePlayer.position.r);
+        // Determine weapon range
+        const maxWeaponRange = activePlayer.inventory
+            .filter(i => i.type === 'weapon')
+            .reduce((max, w) => {
+                // Heuristic mapping: specific items have implicit range logic
+                if (w.id === 'rev') return Math.max(max, 3);
+                if (w.id === 'shot') return Math.max(max, 2);
+                if (w.id === 'tommy') return Math.max(max, 4);
+                return max;
+            }, 1); // Default melee range 1
 
-        if (!enemyOnTile) { addToLog("Ingenting å angripe her..."); return; }
+        const tEnemy = state.enemies.find(e => e.id === state.selectedEnemyId);
+        
+        let enemyToAttack: Enemy | undefined;
+
+        // Logic 1: Attacking selected enemy if in range/LOS
+        if (tEnemy) {
+            const dist = hexDistance(activePlayer.position, tEnemy.position);
+            const los = hasLineOfSight(activePlayer.position, tEnemy.position, state.board, maxWeaponRange);
+            if (dist <= maxWeaponRange && los) {
+                enemyToAttack = tEnemy;
+            }
+        }
+
+        // Logic 2: If no valid selected target, attack anything on same tile
+        if (!enemyToAttack) {
+            enemyToAttack = state.enemies.find(e => e.position.q === activePlayer.position.q && e.position.r === activePlayer.position.r);
+        }
+
+        if (!enemyToAttack) { 
+            addToLog("Ingen gyldige mål innen rekkevidde."); 
+            return; 
+        }
+
         playStinger('combat');
         const atkDice = getDiceCount(2 + (activePlayer.id === 'veteran' ? 1 : 0), 'combat');
         const aRoll = Array.from({ length: atkDice }, () => Math.floor(Math.random() * 6) + 1);
         const hits = aRoll.filter(v => v >= 4).length;
         if (hits > 0) {
-            addToLog(`Du påførte ${hits} skade på ${enemyOnTile.name}!`);
-            triggerFloatingText(enemyOnTile.position.q, enemyOnTile.position.r, `-${hits} HP`, 'text-red-500');
+            addToLog(`Du traff ${enemyToAttack.name} for ${hits} skade!`);
+            triggerFloatingText(enemyToAttack.position.q, enemyToAttack.position.r, `-${hits} HP`, 'text-red-500');
         } else {
             addToLog(`Bom!`);
-            triggerFloatingText(enemyOnTile.position.q, enemyOnTile.position.r, `MISS`, 'text-slate-400');
+            triggerFloatingText(enemyToAttack.position.q, enemyToAttack.position.r, `MISS`, 'text-slate-400');
         }
         setState(prev => {
             const updatedEnemies = prev.enemies.map(e => {
-                if (e.id === enemyOnTile.id) {
+                if (e.id === enemyToAttack!.id) {
                     const remaining = e.hp - hits;
                     if (remaining <= 0) {
                         const flavor = BESTIARY[e.type]?.defeatFlavor || `${e.name} ble bekjempet.`;
                         setTimeout(() => {
                            setState(curr => ({ ...curr, enemies: curr.enemies.filter(en => en.id !== e.id) }));
                            addToLog(flavor);
-                           triggerFloatingText(enemyOnTile.position.q, enemyOnTile.position.r, `DEAD`, 'text-red-700 font-bold');
+                           triggerFloatingText(enemyToAttack!.position.q, enemyToAttack!.position.r, `DEAD`, 'text-red-700 font-bold');
                         }, 800);
                         return { ...e, hp: 0, isDying: true };
                     }
@@ -1415,7 +1446,7 @@ const App: React.FC = () => {
                 lastDiceRoll: aRoll, 
                 enemies: updatedEnemies,
                 players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
-                selectedEnemyId: (hits >= enemyOnTile.hp) ? null : prev.selectedEnemyId
+                selectedEnemyId: (hits >= enemyToAttack!.hp) ? null : prev.selectedEnemyId
             };
         });
         break;

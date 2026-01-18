@@ -255,6 +255,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'cultist',
     hp: 2, damage: 1, horror: 1,
     description: 'A brainwashed servant of the Outer Gods.',
+    visualPrompt: 'A cloaked cultist in dark robes with a hood obscuring their face, holding a jagged dagger. Dark, gritty, 1920s noir style.',
     lore: 'Often recruited from the desperate and the mad, these individuals have traded their humanity for forbidden knowledge.',
     defeatFlavor: 'The cultist collapses, clutching a dark amulet.'
   },
@@ -263,6 +264,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'sniper',
     hp: 2, damage: 1, horror: 0,
     description: 'An assassin striking from the shadows.',
+    visualPrompt: 'A menacing figure in a trench coat and fedora, holding a long rifle, hiding in the shadows of a brick building. Film noir aesthetic.',
     lore: 'Armed with stolen military rifles, they guard the ritual sites from a distance, prioritizing targets who know too much.',
     defeatFlavor: 'The sniper falls, their rifle clattering to the ground.'
   },
@@ -271,6 +273,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'priest',
     hp: 3, damage: 0, horror: 2,
     description: 'A chanter of doom.',
+    visualPrompt: 'An insane priest in tattered ceremonial vestments, eyes glowing with madness, chanting from a forbidden tome. Eldritch energy around them.',
     lore: 'Their very voice warps reality. They do not fight with weapons, but with words that accelerate the coming of the end.',
     defeatFlavor: 'The chanting stops abruptly as the priest exhales their last breath.'
   },
@@ -279,6 +282,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'ghoul',
     hp: 3, damage: 2, horror: 2,
     description: 'A flesh-eating subterranean dweller.',
+    visualPrompt: 'A hunched, canine-like humanoid with rubbery skin, hoof-like feet, and a face like a dog, crouching in a graveyard. Lovecraftian horror art.',
     lore: 'Canine-like humanoids that dwell in crypts and tunnels beneath the city. They are strangely intelligent and bargain with terrible secrets.',
     defeatFlavor: 'It collapses into a pile of dust and grave-dirt!'
   },
@@ -287,6 +291,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'deepone',
     hp: 3, damage: 2, horror: 2,
     description: 'An immortal amphibious humanoid.',
+    visualPrompt: 'A fish-frog hybrid humanoid with glistening gray-green scales, a white belly, bulging unblinking eyes, and gills on the neck. Wet and slimy atmosphere.',
     lore: 'Servants of Dagon who dwell in underwater cities. They seek to breed with humans to extend their lineage onto land.',
     defeatFlavor: 'The creature dissolves into a foul-smelling puddle of brine.'
   },
@@ -295,6 +300,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'shoggoth',
     hp: 6, damage: 3, horror: 4,
     description: 'A protoplasmic mass of eyes and mouths.',
+    visualPrompt: 'A massive, shapeless monstrosity of iridescent black slime, covered in thousands of forming and unforming eyes and mouths. Protoplasmic horror.',
     lore: 'Created as slave labor by the Elder Things eons ago. They are shifting, amorphous mountains of slime that crush everything in their path.',
     traits: ['massive'],
     defeatFlavor: 'The massive form loses cohesion, becoming a lifeless pool of slime.'
@@ -304,6 +310,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'mi-go',
     hp: 3, damage: 1, horror: 1,
     description: 'A fungoid crustacean from Yuggoth.',
+    visualPrompt: 'A pinkish, fungoid, crustacean-like alien creature with large membranous wings and an ellipsoid head covered in antennae. Cosmic horror sci-fi style.',
     lore: 'They fly through the ether of space on membranous wings. Their technology is far beyond human comprehension, often involving brain extraction.',
     traits: ['flying'],
     defeatFlavor: 'The fungoid body disintegrates, vibrating out of existence.'
@@ -313,6 +320,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'nightgaunt',
     hp: 3, damage: 1, horror: 1,
     description: 'A faceless, horned flyer.',
+    visualPrompt: 'A sleek, oily black humanoid creature with no face, large curved horns, and bat-like wings. Silent and menacing.',
     lore: 'Silent servants of Nodens. They do not speak, but tickle their victims into submission before carrying them off to the Dreamlands.',
     traits: ['flying'],
     defeatFlavor: 'It vanishes into the night sky without a sound.'
@@ -322,6 +330,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'hound',
     hp: 4, damage: 2, horror: 3,
     description: 'A predator from the angles of time.',
+    visualPrompt: 'A lean, emaciated beast emerging from a sharp angle in the room. It looks made of smoke and blue ichor, with a long tongue. Non-euclidean horror.',
     lore: 'They enter our reality through sharp angles in a room. Once they catch a scent, they pursue their prey across time itself.',
     traits: ['fast'],
     defeatFlavor: 'The beast recedes back into the angles of reality.'
@@ -331,6 +340,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'dark_young',
     hp: 6, damage: 2, horror: 3,
     description: 'Offspring of Shub-Niggurath.',
+    visualPrompt: 'A terrifying mass of ropy black tentacles and hooves, resembling a twisted, leafless tree that walks. Smelling of grave mold.',
     lore: 'Enormous, tree-like monstrosities with hoofed legs and ropy tentacles smelling of grave mold.',
     traits: ['massive'],
     defeatFlavor: 'The monstrosity withers, resembling a dead tree.'
@@ -340,6 +350,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'byakhee',
     hp: 3, damage: 2, horror: 1,
     description: 'An interstellar steed.',
+    visualPrompt: 'A hybrid monster partly crow, partly mole, partly ant, and partly decomposing human corpse. It has wings and can fly through space.',
     lore: 'composed of crow, mole, buzzard, ant, and decomposed human being. They can fly through space and carry riders to the court of Azathoth.',
     traits: ['flying', 'fast'],
     defeatFlavor: 'It screeches one last time before dissolving into cosmic dust.'
@@ -349,6 +360,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'star_spawn',
     hp: 8, damage: 3, horror: 5,
     description: 'A colossal kin of Cthulhu.',
+    visualPrompt: 'A gigantic, green, gelatinous monster with an octopus-like head, dragon wings, and claws. A smaller version of Cthulhu.',
     lore: 'Smaller versions of the Great Dreamer himself. Their psychic presence alone can shatter the minds of the strongest investigators.',
     traits: ['massive'],
     defeatFlavor: 'The ground shakes as the colossal entity falls.'
@@ -358,6 +370,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'formless_spawn',
     hp: 5, damage: 2, horror: 2,
     description: 'Black ooze of Tsathoggua.',
+    visualPrompt: 'A pitch-black, liquid shapeshifter changing forms rapidly. An oily toad-like shape emerging from the ooze.',
     lore: 'A malleable black substance that can change shape instantly. It heals rapidly from physical wounds.',
     traits: ['regenerate'],
     defeatFlavor: 'The black ooze evaporates, leaving a stain on reality.'
@@ -367,6 +380,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'hunting_horror',
     hp: 4, damage: 3, horror: 3,
     description: 'A viper of the void.',
+    visualPrompt: 'A colossal, serpentine creature flying through the air, resembling a dragon without wings, with a single distorted face.',
     lore: 'A massive, serpentine entity resembling a dragon without wings. It serves Nyarlathotep and hunts those who pry too deep.',
     traits: ['fast', 'flying'],
     defeatFlavor: 'It coils in on itself and vanishes in a flash of light.'
@@ -376,6 +390,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'moon_beast',
     hp: 4, damage: 1, horror: 2,
     description: 'Sadistic torturers from the moon.',
+    visualPrompt: 'A pale, toad-like abomination with no eyes and a mass of short, pink tentacles vibrating on its snout. Squat and loathsome.',
     lore: 'Pale, toad-like abominations with no eyes and a mass of pink tentacles on their snout. They enslave other races.',
     traits: ['ranged'],
     defeatFlavor: 'The pale abomination falls silent.'
@@ -385,6 +400,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'boss',
     hp: 10, damage: 4, horror: 6,
     description: 'An avatar of cosmic destruction.',
+    visualPrompt: 'A cosmic entity of impossible geometry, surrounded by madness and void. An avatar of Nyarlathotep or Cthulhu.',
     lore: 'You should not be seeing this. If you are, the end is already here.',
     traits: ['massive'],
     defeatFlavor: 'The avatar is banished, screaming as it is pulled back into the void.'

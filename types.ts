@@ -99,6 +99,7 @@ export interface BestiaryEntry {
     type: EnemyType;
     description: string;
     lore: string;
+    visualPrompt: string; // New: Specific prompt for AI generation
     hp: number;
     damage: number;
     horror: number;
