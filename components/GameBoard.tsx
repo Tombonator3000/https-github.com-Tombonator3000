@@ -3,8 +3,8 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Tile, Player, Enemy, FloatingText } from '../types';
 import { 
   User, Skull, DoorOpen, EyeOff, Target, Eye, Lock, Flame, Hammer, Ban,
-  BookOpen, Trees, Anchor, Church, Building2, BedDouble, TestTube, Box, Ghost,
-  Library, Archive, FileText
+  BookOpen, Trees, Anchor, Church, Building2, Box, Ghost,
+  Library, Archive, FileText, Radio, Zap, Gem, CloudFog, Milestone
 } from 'lucide-react';
 
 interface GameBoardProps {
@@ -27,8 +27,32 @@ const VISIBILITY_RANGE = 2;
 const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
   const n = name.toLowerCase();
   
+  // 0. CONNECTORS (Hallways/Alleys)
+  if (n.includes('hallway') || n.includes('corridor') || n.includes('passage') || n.includes('shaft')) {
+      return {
+          bg: 'bg-[#15100e]',
+          style: {
+              backgroundImage: 'linear-gradient(90deg, #000 0%, transparent 20%, transparent 80%, #000 100%), repeating-linear-gradient(0deg, #1f1510 0, #1f1510 5px, #15100e 5px, #15100e 10px)'
+          },
+          borderColor: 'border-stone-800',
+          Icon: DoorOpen,
+          iconColor: 'text-stone-700'
+      };
+  }
+  if (n.includes('alley') || n.includes('path') || n.includes('tunnel') || n.includes('trail')) {
+      return {
+          bg: 'bg-[#0f1115]',
+          style: {
+              backgroundImage: 'radial-gradient(circle, transparent 20%, #000 90%), repeating-radial-gradient(circle at 50% 100%, #1e293b 0, #0f1115 5px)'
+          },
+          borderColor: 'border-slate-800',
+          Icon: Milestone,
+          iconColor: 'text-slate-800'
+      };
+  }
+
   // 1. WOOD FLOOR (Manors, Libraries, Old Houses)
-  if (n.includes('library') || n.includes('study') || n.includes('manor') || n.includes('hall') || n.includes('attic') || n.includes('servant') || n.includes('ballroom') || n.includes('billiard') || n.includes('bedroom') || n.includes('nursery') || n.includes('trophy')) {
+  if (n.includes('library') || n.includes('study') || n.includes('manor') || n.includes('hall') || n.includes('attic') || n.includes('servant') || n.includes('ballroom') || n.includes('billiard') || n.includes('bedroom') || n.includes('nursery') || n.includes('trophy') || n.includes('staircase')) {
     return {
       bg: 'bg-[#2a1d18]',
       style: {
@@ -51,7 +75,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
         filter: 'brightness(0.6) sepia(0.2)'
       },
       borderColor: 'border-slate-400',
-      Icon: TestTube,
+      Icon: Archive,
       iconColor: 'text-slate-400'
     };
   }
@@ -383,8 +407,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
                             {tile.object.type === 'rubble' && <Hammer size={20} className="text-stone-400 mb-1 drop-shadow-md" />}
                             {tile.object.type === 'fire' && <Flame size={20} className="text-orange-500 mb-1 animate-pulse drop-shadow-md" />}
                             {tile.object.type === 'barricade' && <Ban size={20} className="text-amber-700 mb-1 drop-shadow-md" />}
+                            {tile.object.type === 'fog_wall' && <CloudFog size={20} className="text-purple-300 mb-1 animate-pulse drop-shadow-md" />}
                             <span className="text-[8px] uppercase font-bold text-white bg-red-900/80 px-2 py-0.5 rounded shadow-sm border border-red-700">
-                                {tile.object.type === 'locked_door' ? 'LÅST' : tile.object.type === 'rubble' ? 'RUBBEL' : 'HINDER'}
+                                {tile.object.type === 'fog_wall' ? 'GÅTE' : 'LÅST'}
                             </span>
                           </>
                         )}
@@ -396,6 +421,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
                              {tile.object.type === 'chest' && <Archive size={24} className="text-yellow-400 mb-1 drop-shadow-md" />}
                              {tile.object.type === 'crate' && <Box size={24} className="text-amber-600 mb-1 drop-shadow-md" />}
                              {tile.object.type === 'cabinet' && <FileText size={24} className="text-stone-300 mb-1 drop-shadow-md" />}
+                             
+                             {/* NEW INTERACTABLES */}
+                             {tile.object.type === 'radio' && <Radio size={24} className="text-emerald-400 mb-1 drop-shadow-md animate-pulse" />}
+                             {tile.object.type === 'switch' && <Zap size={24} className="text-yellow-300 mb-1 drop-shadow-md" />}
+                             {tile.object.type === 'mirror' && <Gem size={24} className="text-cyan-300 mb-1 drop-shadow-md opacity-80" />}
+
                              {!tile.object.searched && (
                                <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-ping"></div>
                              )}

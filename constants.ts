@@ -153,6 +153,12 @@ export const MADNESS_CONDITIONS: Madness[] = [
   }
 ];
 
+export const INDOOR_CONNECTORS = [
+    'Narrow Hallway', 'Dark Corridor', 'Grand Staircase', 
+    'Servant Passage', 'Dusty Landing', 'Maintenance Shaft',
+    'Basement Tunnel', 'Service Elevator', 'Covered Walkway'
+];
+
 export const INDOOR_LOCATIONS = [
   'Abandoned Manor', 'Dark Cellar', 'The Library', 
   'Secret Crypt', 'Old Church', 'Police Station', 
@@ -170,22 +176,27 @@ export const INDOOR_LOCATIONS = [
   'Speakeasy', 'Bank Vault', 'Pawn Shop', 'Antique Store', 'Hotel Lobby', 'Radio Station'
 ];
 
-export const OUTDOOR_LOCATIONS = [
-  'Misty Docks', 'Town Square', 'Back Alley', 
-  'Old Lighthouse', 'Blackwood Forest', 'Graveyard', 
-  'University Campus', 'Bridge', 'Market District', 
-  'River Bank', 'Train Station', 'Swamp', 'City Park',
-  'Merchant Street', 'Dark Pier',
-  'Dead End Alley', 'Crossroads', 'T-Junction', 'Roundabout', 
-  'Collapsed Bridge', 'Overgrown Path', 'Rotting Gazebo', 
-  'Fountain', 'Construction Site',
-  'Fish Market', 'Shipyard', 'Boardwalk', 'Tidal Pool', 'Cliffside Path',
-  'Tenement Row', 'Cobblestone Street', 'Gas Station', 'Tram Stop', 'Theater District', 'Slums',
-  'Cornfield', 'Old Well', 'Stone Circle', 'Ritual Site', 'Cave Entrance',
-  'Narrow Lane', 'Broad Avenue', 'Underpass', 'Railway Crossing', 'Bus Stop'
+export const OUTDOOR_CONNECTORS = [
+    'Narrow Alley', 'Cobblestone Path', 'Foggy Bridge', 
+    'Tram Track', 'Dark Tunnel', 'Stone Steps', 
+    'River Crossing', 'Overpass', 'Dirt Trail'
 ];
 
-export const LOCATION_NAMES = [...INDOOR_LOCATIONS, ...OUTDOOR_LOCATIONS];
+export const OUTDOOR_LOCATIONS = [
+  'Misty Docks', 'Town Square', 'Old Lighthouse', 
+  'Blackwood Forest', 'Graveyard', 'University Campus', 
+  'Market District', 'River Bank', 'Train Station', 
+  'Swamp', 'City Park', 'Merchant Street', 'Dark Pier',
+  'Dead End Alley', 'Crossroads', 'T-Junction', 'Roundabout', 
+  'Collapsed Bridge', 'Rotting Gazebo', 'Fountain', 
+  'Construction Site', 'Fish Market', 'Shipyard', 'Boardwalk', 
+  'Tidal Pool', 'Cliffside Path', 'Tenement Row', 'Gas Station', 
+  'Tram Stop', 'Theater District', 'Slums', 'Cornfield', 'Old Well', 
+  'Stone Circle', 'Ritual Site', 'Cave Entrance',
+  'Broad Avenue', 'Railway Crossing', 'Bus Stop'
+];
+
+export const LOCATION_NAMES = [...INDOOR_LOCATIONS, ...OUTDOOR_LOCATIONS, ...INDOOR_CONNECTORS, ...OUTDOOR_CONNECTORS];
 
 export const START_TILE: Tile = {
   id: 'start',
@@ -193,6 +204,7 @@ export const START_TILE: Tile = {
   r: 0,
   name: 'Train Station',
   type: 'street',
+  category: 'location',
   explored: true,
   searchable: true,
   searched: false

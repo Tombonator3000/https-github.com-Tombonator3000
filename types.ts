@@ -106,7 +106,10 @@ export interface BestiaryEntry {
     defeatFlavor?: string; // New field for flavor text upon defeat
 }
 
-export type TileObjectType = 'altar' | 'bookshelf' | 'crate' | 'chest' | 'cabinet' | 'gate' | 'barricade' | 'locked_door' | 'rubble' | 'fire' | 'trap';
+export type TileObjectType = 
+  | 'altar' | 'bookshelf' | 'crate' | 'chest' | 'cabinet' 
+  | 'gate' | 'barricade' | 'locked_door' | 'rubble' | 'fire' | 'trap'
+  | 'mirror' | 'radio' | 'switch' | 'statue' | 'fog_wall'; // Expanded interactables
 
 export interface TileObject {
   type: TileObjectType;
@@ -124,6 +127,7 @@ export interface Tile {
   r: number;
   name: string;
   type: 'building' | 'room' | 'street';
+  category?: 'connector' | 'location'; // New: helps procedural generation flow
   explored: boolean;
   hasWater?: boolean;
   searchable: boolean;

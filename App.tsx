@@ -24,7 +24,7 @@ import {
   Book
 } from 'lucide-react';
 import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator, FloatingText, Item, Spell, EnemyType } from './types';
-import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS, BESTIARY } from './constants';
+import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS, BESTIARY, INDOOR_CONNECTORS, OUTDOOR_CONNECTORS } from './constants';
 import GameBoard from './components/GameBoard';
 import CharacterPanel from './components/CharacterPanel';
 import EnemyPanel from './components/EnemyPanel';
@@ -799,98 +799,92 @@ const App: React.FC = () => {
         setState(prev => {
           let newDoom = prev.doom - 1;
           
-          const updatedEnemies = prev.enemies.map(enemy => {
+          // SEQUENTIAL ENEMY MOVEMENT (Anti-Stacking)
+          const updatedEnemies: Enemy[] = [];
+          
+          // Helper to check if a tile is occupied by an already processed enemy OR a player
+          const isTileOccupied = (q: number, r: number) => {
+              // Check against enemies already moved in this turn
+              if (updatedEnemies.some(e => e.position.q === q && e.position.r === r)) return true;
+              // Check against enemies yet to move (from prev state) to prevent swapping into each other? 
+              // Simplification: Check against the *new* list being built.
+              // Note: We allow stacking with players (combat), but try to avoid stacking with other enemies.
+              return false;
+          };
+
+          for (const enemy of prev.enemies) {
             // TRAIT: Regeneration
-            if (enemy.traits?.includes('regenerate') && enemy.hp < enemy.maxHp) {
-                enemy.hp = Math.min(enemy.maxHp, enemy.hp + 1);
+            let currentEnemy = { ...enemy };
+            if (currentEnemy.traits?.includes('regenerate') && currentEnemy.hp < currentEnemy.maxHp) {
+                currentEnemy.hp = Math.min(currentEnemy.maxHp, currentEnemy.hp + 1);
             }
 
             const alivePlayers = prev.players.filter(p => !p.isDead);
-            // If no players, wander randomly (AI Improvement)
-            if (alivePlayers.length === 0) {
-                 const neighbors = [
-                    {q: enemy.position.q + 1, r: enemy.position.r}, 
-                    {q: enemy.position.q - 1, r: enemy.position.r}, 
-                    {q: enemy.position.q, r: enemy.position.r + 1}, 
-                    {q: enemy.position.q, r: enemy.position.r - 1}, 
-                    {q: enemy.position.q + 1, r: enemy.position.r - 1}, 
-                    {q: enemy.position.q - 1, r: enemy.position.r + 1}
-                 ];
-                 const validNeighbors = neighbors.filter(n => {
-                    const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
-                    if (!tile) return false;
-                    if (tile.object?.blocking && !enemy.traits?.includes('flying')) return false;
-                    return true;
-                 });
-                 if (validNeighbors.length > 0) {
-                     return { ...enemy, position: validNeighbors[Math.floor(Math.random() * validNeighbors.length)] };
-                 }
-                 return enemy;
-            }
             
-            // Find closest player
+            // 1. Check for valid target
             let targetPlayer: Player | null = null;
             let minDist = Infinity;
             
             alivePlayers.forEach(p => {
-              const dist = hexDistance(enemy.position, p.position);
+              const dist = hexDistance(currentEnemy.position, p.position);
               if (dist < minDist) {
                 minDist = dist;
                 targetPlayer = p;
               }
             });
 
-            // Check Visibility
-            const hasLOS = targetPlayer && hasLineOfSight(enemy.position, targetPlayer.position, prev.board, enemy.visionRange);
-            const inAttackRange = minDist <= enemy.attackRange;
+            // 2. Check Line of Sight & Range
+            const hasLOS = targetPlayer && hasLineOfSight(currentEnemy.position, targetPlayer.position, prev.board, currentEnemy.visionRange);
+            const inAttackRange = minDist <= currentEnemy.attackRange;
 
-            // Combat Priority: If has LOS and in range, stay to attack
+            // 3. COMBAT: If has LOS and in range, STAY and ATTACK (don't move)
             if (hasLOS && inAttackRange) {
-                return enemy; 
+                updatedEnemies.push(currentEnemy);
+                continue; 
             }
 
-            // Movement Logic
-            let bestMove = enemy.position;
-            
-            // Get valid neighbors
-            const neighbors = [
-                {q: enemy.position.q + 1, r: enemy.position.r}, 
-                {q: enemy.position.q - 1, r: enemy.position.r}, 
-                {q: enemy.position.q, r: enemy.position.r + 1}, 
-                {q: enemy.position.q, r: enemy.position.r - 1}, 
-                {q: enemy.position.q + 1, r: enemy.position.r - 1}, 
-                {q: enemy.position.q - 1, r: enemy.position.r + 1}
+            // 4. MOVEMENT LOGIC
+            let bestMove = currentEnemy.position;
+            const neighborCoords = [
+                {q: currentEnemy.position.q + 1, r: currentEnemy.position.r}, 
+                {q: currentEnemy.position.q - 1, r: currentEnemy.position.r}, 
+                {q: currentEnemy.position.q, r: currentEnemy.position.r + 1}, 
+                {q: currentEnemy.position.q, r: currentEnemy.position.r - 1}, 
+                {q: currentEnemy.position.q + 1, r: currentEnemy.position.r - 1}, 
+                {q: currentEnemy.position.q - 1, r: currentEnemy.position.r + 1}
             ];
 
-            const validNeighbors = neighbors.filter(n => {
+            // Filter valid tiles (Exists, Not blocked, Not occupied by other enemy)
+            const validMoves = neighborCoords.filter(n => {
                 const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
                 if (!tile) return false;
-                if (tile.object?.blocking && !enemy.traits?.includes('flying')) return false;
-                // Avoid sharing tile with another enemy to prevent stacking? 
-                // The game allows stacking, but maybe prevent perfect overlap for visuals? 
-                // Keeping simple for now.
+                if (tile.object?.blocking && !currentEnemy.traits?.includes('flying')) return false;
+                if (isTileOccupied(n.q, n.r)) return false; // Prevent stacking
                 return true;
             });
 
-            if (validNeighbors.length > 0) {
+            if (validMoves.length > 0) {
                 if (hasLOS && targetPlayer) {
                     // HUNT: Move to neighbor closest to target
-                    validNeighbors.sort((a, b) => {
-                        const distA = hexDistance(a, targetPlayer.position);
-                        const distB = hexDistance(b, targetPlayer.position);
+                    validMoves.sort((a, b) => {
+                        const distA = hexDistance(a, targetPlayer!.position);
+                        const distB = hexDistance(b, targetPlayer!.position);
                         return distA - distB;
                     });
-                    bestMove = validNeighbors[0];
+                    bestMove = validMoves[0];
                 } else {
                     // WANDER: Move randomly if no target is seen
-                    bestMove = validNeighbors[Math.floor(Math.random() * validNeighbors.length)];
+                    bestMove = validMoves[Math.floor(Math.random() * validMoves.length)];
                 }
             }
 
-            return { ...enemy, position: bestMove };
-          });
+            updatedEnemies.push({ ...currentEnemy, position: bestMove });
+          }
 
+          // 5. ATTACK RESOLUTION (After everyone moved)
           let updatedPlayers = [...prev.players];
+          let attackCount = 0;
+
           updatedEnemies.forEach(e => {
             const victimIdx = updatedPlayers.findIndex(p => {
                 if (p.isDead) return false;
@@ -900,6 +894,7 @@ const App: React.FC = () => {
             });
 
             if (victimIdx !== -1) {
+              attackCount++;
               const victim = updatedPlayers[victimIdx];
               if (e.attackType === 'doom') {
                    newDoom = Math.max(0, newDoom - 1);
@@ -922,19 +917,29 @@ const App: React.FC = () => {
             }
           });
 
+          // Log movement summary if enemies moved but didn't attack
+          if (updatedEnemies.length > 0 && attackCount < updatedEnemies.length) {
+              const movingCount = updatedEnemies.length - attackCount;
+              addToLog(`${movingCount} fiender beveger seg i mørket...`);
+          }
+
+          // 6. SPAWN LOGIC (Escalation)
           const gateTiles = prev.board.filter(t => t.isGate);
           let newEncountered = [...prev.encounteredEnemies];
           
           if (gateTiles.length > 0) {
-            // DYNAMIC SPAWN RATE (Escalates as Doom drops)
-            // Base 20% + 5% per missing Doom point (approx)
-            // Doom 12 = 20% | Doom 6 = 50% | Doom 0 = 80%
-            const spawnChance = 0.2 + (Math.max(0, 12 - newDoom) * 0.05);
-            
-            // CRITICAL SPAWN: If Doom < 4, chance to spawn 2 enemies
-            const spawnCount = (newDoom < 4 && Math.random() > 0.5) ? 2 : 1;
+            // DYNAMIC SPAWN RATE
+            // Doom 12-9: Low (20%)
+            // Doom 8-4: Moderate (40-50%)
+            // Doom 3-0: Critical (80-100%)
+            let spawnChance = 0.2;
+            if (newDoom < 9) spawnChance = 0.4;
+            if (newDoom < 4) spawnChance = 1.0; // Guaranteed spawn at critical doom
 
             if (Math.random() < spawnChance) {
+                // Critical Doom (< 4) has chance for Double Spawn
+                const spawnCount = (newDoom < 4 && Math.random() > 0.5) ? 2 : 1;
+
                 for (let i = 0; i < spawnCount; i++) {
                     const spawnGate = gateTiles[Math.floor(Math.random() * gateTiles.length)];
                     const spawnRoll = Math.random();
@@ -970,6 +975,7 @@ const App: React.FC = () => {
 
                     updatedEnemies.push(newEnemy);
                     addToLog(`En ${newEnemy.name} stiger ut av portalen ved ${spawnGate.name}!`);
+                    triggerFloatingText(spawnGate.q, spawnGate.r, "SPAWN!", "text-red-600");
                     
                     if (!newEncountered.includes(template.type)) newEncountered.push(template.type);
                 }
@@ -1029,6 +1035,7 @@ const App: React.FC = () => {
       case 'move':
         const { q, r } = payload;
         if (q === activePlayer.position.q && r === activePlayer.position.r) return;
+        const currentTile = state.board.find(t => t.q === activePlayer.position.q && t.r === activePlayer.position.r);
         let targetTile = state.board.find(t => t.q === q && t.r === r);
         if (targetTile && targetTile.object?.blocking) {
             playStinger('block');
@@ -1038,40 +1045,80 @@ const App: React.FC = () => {
             return;
         }
         if (!targetTile) {
+          // --- PROCEDURAL GENERATION LOGIC v2 ---
           const tileSet = state.activeScenario?.tileSet || 'mixed';
           let newTileType: 'room' | 'street' = 'street';
-          let newTileName = 'Unknown';
+          let newTileCategory: 'location' | 'connector' = 'location';
+          
+          // Determine Indoor/Outdoor
           if (tileSet === 'indoor') newTileType = 'room';
           else if (tileSet === 'outdoor') newTileType = 'street';
-          else newTileType = Math.random() > 0.5 ? 'room' : 'street';
-          const pool = newTileType === 'room' ? INDOOR_LOCATIONS : OUTDOOR_LOCATIONS;
+          else {
+              // Mixed sets: bias towards current type but allow changing via connector
+              if (currentTile?.type === 'room') newTileType = Math.random() > 0.8 ? 'street' : 'room';
+              else newTileType = Math.random() > 0.8 ? 'room' : 'street';
+          }
+
+          // Determine Category (Connector vs Location)
+          // If coming from a Location, 70% chance next is Connector
+          // If coming from a Connector, 90% chance next is Location
+          const isCurrentConnector = currentTile?.category === 'connector';
+          if (isCurrentConnector) {
+              newTileCategory = Math.random() > 0.1 ? 'location' : 'connector';
+          } else {
+              newTileCategory = Math.random() > 0.3 ? 'connector' : 'location';
+          }
+
+          let newTileName = 'Unknown';
+          const pool = newTileCategory === 'connector' 
+              ? (newTileType === 'room' ? INDOOR_CONNECTORS : OUTDOOR_CONNECTORS)
+              : (newTileType === 'room' ? INDOOR_LOCATIONS : OUTDOOR_LOCATIONS);
+          
           newTileName = pool[Math.floor(Math.random() * pool.length)];
+
           let objectType: TileObjectType | undefined = undefined;
           let isBlocking = false;
           let difficulty = 0;
           let reqSkill: 'strength' | 'insight' | 'agility' | undefined = undefined;
           const rng = Math.random();
-          if (newTileType === 'room') {
-               if (rng > 0.6) {
-                   const obsRng = Math.random();
-                   if (obsRng > 0.6) { objectType = 'locked_door'; isBlocking = true; difficulty = 4; reqSkill = 'strength'; }
-                   else if (obsRng > 0.3) { objectType = 'rubble'; isBlocking = true; difficulty = 3; reqSkill = 'strength'; }
-                   else { objectType = 'barricade'; isBlocking = true; difficulty = 3; reqSkill = 'agility'; }
-               } else {
-                   const lootRng = Math.random();
-                   if (lootRng > 0.7) {
-                        const containers: TileObjectType[] = ['bookshelf', 'crate', 'chest', 'cabinet'];
-                        objectType = containers[Math.floor(Math.random() * containers.length)];
-                        isBlocking = false;
-                   } else if (lootRng < 0.2) {
-                       // 20% Chance for Trap in rooms with no loot
-                       objectType = 'trap';
-                   }
-               }
+
+          // OBJECT SPAWNING LOGIC
+          if (newTileCategory === 'connector') {
+              // Connectors have higher chance of blocking obstacles or special interactables
+              if (rng > 0.6) {
+                  // Obstacle
+                  if (newTileType === 'room') {
+                      objectType = 'locked_door'; isBlocking = true; difficulty = 4; reqSkill = 'strength';
+                  } else {
+                      // Outdoors: "Gåte" logic - Puzzles/Barriers
+                      objectType = Math.random() > 0.5 ? 'rubble' : 'fog_wall'; 
+                      isBlocking = true; 
+                      difficulty = 3; 
+                      reqSkill = objectType === 'fog_wall' ? 'insight' : 'strength';
+                  }
+              } else if (rng < 0.2) {
+                  // Interactables in corridors (Light switch, Mirror)
+                  objectType = Math.random() > 0.5 ? 'mirror' : 'switch';
+              }
+          } else {
+              // Locations have loot or traps
+              if (rng > 0.7) {
+                   const containers: TileObjectType[] = ['bookshelf', 'crate', 'chest', 'cabinet', 'radio'];
+                   objectType = containers[Math.floor(Math.random() * containers.length)];
+                   isBlocking = false;
+              } else if (rng < 0.2) {
+                  objectType = 'trap';
+              }
           }
-          const isGate = Math.random() > 0.9;
+
+          const isGate = newTileCategory === 'location' && Math.random() > 0.85; // Gates mostly in locations
+          
           const newTile: Tile = { 
-            id: `tile-${state.board.length}`, q, r, name: newTileName, type: newTileType, explored: true, searchable: true, searched: false, isGate, 
+            id: `tile-${state.board.length}`, q, r, 
+            name: newTileName, 
+            type: newTileType, 
+            category: newTileCategory,
+            explored: true, searchable: true, searched: false, isGate, 
             object: objectType ? { type: objectType, searched: false, blocking: isBlocking, difficulty, reqSkill } : undefined 
           };
           const event = Math.random() > 0.85 ? EVENTS[Math.floor(Math.random() * EVENTS.length)] : null;
@@ -1085,10 +1132,8 @@ const App: React.FC = () => {
                trapLog = `DU GIKK I EN FELLE! 1 skade.`;
                const dmgResult = applyPhysicalDamage(finalPlayer, 1);
                finalPlayer = dmgResult.player;
-               // Floating text handled by applyPhysicalDamage
           }
 
-          // Use library image if available
           const existingImage = assetLibrary[newTileName];
           if (existingImage) {
               newTile.imageUrl = existingImage;
@@ -1148,7 +1193,6 @@ const App: React.FC = () => {
         setState(prev => ({ ...prev, lastDiceRoll: fleeRoll }));
 
         if (fleeSuccess && safeTiles.length > 0) {
-            // SUCCESS: Move to random safe tile
             const escapeTile = safeTiles[Math.floor(Math.random() * safeTiles.length)];
             playStinger('click');
             addToLog(`Suksess! ${activePlayer.name} unnslapp ${immediateThreat.name}.`);
@@ -1159,14 +1203,12 @@ const App: React.FC = () => {
                 players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: escapeTile, actions: p.actions - 1 } : p)
             }));
         } else {
-            // FAILURE: Stay put, take free hit
             let failMsg = "Mislyktes!";
             if (safeTiles.length === 0) failMsg = "Ingen vei ut!";
             
             addToLog(`${failMsg} ${immediateThreat.name} angriper fritt!`);
             triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "CAUGHT!", "text-red-500");
             
-            // Resolve Free Attack logic
             const physResult = applyPhysicalDamage(activePlayer, immediateThreat.damage);
             const sanityResult = applySanityDamage(physResult.player, immediateThreat.horror);
             
@@ -1189,10 +1231,67 @@ const App: React.FC = () => {
 
       case 'interact':
           const selTile = state.board.find(t => t.id === state.selectedTileId);
-          if (!selTile || !selTile.object?.blocking) return;
+          if (!selTile) return;
+
+          // SPECIAL INTERACTABLES (Non-Blocking but interactable via selection)
+          if (selTile.object && !selTile.object.blocking && !selTile.object.searched) {
+              if (selTile.object.type === 'mirror') {
+                  playStinger('spell');
+                  const outcome = Math.random();
+                  if (outcome > 0.4) {
+                      addToLog("Du ser en hemmelighet i speilet. +2 Insight.");
+                      triggerFloatingText(selTile.q, selTile.r, "+2 INSIGHT", 'text-blue-400');
+                      setState(prev => ({
+                          ...prev,
+                          players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, insight: p.insight + 2, actions: p.actions - 1 } : p),
+                          board: prev.board.map(t => t.id === selTile.id ? { ...t, object: { ...t.object!, searched: true } } : t),
+                          selectedTileId: null
+                      }));
+                  } else {
+                      addToLog("Speilet viser din død. Du skriker.");
+                      const res = applySanityDamage(activePlayer, 2);
+                      setState(prev => ({
+                          ...prev,
+                          players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...res.player, actions: p.actions - 1 } : p),
+                          board: prev.board.map(t => t.id === selTile.id ? { ...t, object: { ...t.object!, searched: true } } : t),
+                          selectedTileId: null
+                      }));
+                      if(res.sound) playStinger('madness');
+                  }
+                  return;
+              }
+              if (selTile.object.type === 'radio') {
+                  playStinger('click');
+                  addToLog("Radioen spraker... en stemme gir deg håp.");
+                  triggerFloatingText(selTile.q, selTile.r, "+1 SAN", 'text-purple-400');
+                  setState(prev => ({
+                      ...prev,
+                      players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, sanity: Math.min(p.maxSanity, p.sanity + 1), actions: p.actions - 1 } : p),
+                      board: prev.board.map(t => t.id === selTile.id ? { ...t, object: { ...t.object!, searched: true } } : t),
+                      selectedTileId: null
+                  }));
+                  return;
+              }
+              if (selTile.object.type === 'switch') {
+                  playStinger('click');
+                  addToLog("Du slår på bryteren. Lyset flimrer.");
+                  // Could reveal fog of war here in future
+                  triggerFloatingText(selTile.q, selTile.r, "CLICK", 'text-white');
+                  setState(prev => ({
+                      ...prev,
+                      players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
+                      board: prev.board.map(t => t.id === selTile.id ? { ...t, object: { ...t.object!, searched: true } } : t),
+                      selectedTileId: null
+                  }));
+                  return;
+              }
+          }
+
+          // BLOCKING OBJECTS
+          if (!selTile.object?.blocking) return;
 
           // PUZZLE CHECK: 50% chance to trigger puzzle instead of dice roll for doors
-          if (Math.random() > 0.5 && selTile.object.type === 'locked_door') {
+          if (Math.random() > 0.5 && (selTile.object.type === 'locked_door' || selTile.object.type === 'fog_wall')) {
               setState(prev => ({
                   ...prev,
                   activePuzzle: {
@@ -1201,7 +1300,7 @@ const App: React.FC = () => {
                       targetTileId: selTile.id
                   }
               }));
-              addToLog("Låsen er kompleks. Du må tyde runene...");
+              addToLog(selTile.object.type === 'fog_wall' ? "Tåken er unaturlig. Du må bruke forstanden..." : "Låsen er kompleks. Du må tyde runene...");
               return;
           }
 
@@ -1520,14 +1619,28 @@ const App: React.FC = () => {
   const getContextAction = (): ContextAction | null => {
       if (!state.selectedTileId || !activePlayer) return null;
       const tile = state.board.find(t => t.id === state.selectedTileId);
-      if (!tile || !tile.object?.blocking) return null;
+      if (!tile) return null;
+      
+      // Interaction range check
       if (hexDistance(activePlayer.position, tile) > 1) return null;
-      const obj = tile.object;
-      let label = 'Interact';
-      if (obj.type === 'locked_door') label = 'Break Down Door';
-      if (obj.type === 'rubble') label = 'Clear Rubble';
-      if (obj.type === 'barricade') label = 'Dismantle';
-      return { id: 'interact-blocker', label, iconType: obj.reqSkill || 'strength', difficulty: obj.difficulty || 3 };
+
+      // Prioritize blocking objects (Doors, Rubble)
+      if (tile.object?.blocking) {
+          const obj = tile.object;
+          let label = 'Interact';
+          if (obj.type === 'locked_door') label = 'Break Down Door';
+          if (obj.type === 'rubble') label = 'Clear Rubble';
+          if (obj.type === 'barricade') label = 'Dismantle';
+          if (obj.type === 'fog_wall') label = 'Dispel Fog';
+          return { id: 'interact-blocker', label, iconType: obj.reqSkill || 'strength', difficulty: obj.difficulty || 3 };
+      }
+
+      // Allow interactions with special non-blocking objects
+      if (tile.object && !tile.object.searched && (['mirror', 'radio', 'switch'].includes(tile.object.type))) {
+          return { id: 'interact-object', label: 'Use Object', iconType: 'interact', difficulty: 0 };
+      }
+
+      return null;
   };
   const currentContextAction = getContextAction();
 
