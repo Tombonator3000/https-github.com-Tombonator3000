@@ -19,3 +19,11 @@ Track all major milestones, feature additions, and bug fixes here.
 *   **Audio Engine Upgrade:** Implemented granular volume controls (Master, Music, SFX) connected to Tone.js.
 *   **Accessibility & Graphics:** Added toggles for "Reduce Motion" (disables screen shake), "High Contrast" (removes vignettes/overlays), and "Show Grid".
 *   **Settings Persistence:** Game settings are now saved to and loaded from localStorage separately from game state.
+
+## [v3.9.10 Fix - Setup Phase Restoration]
+*   **Bug Fix:** Restored the Scenario Selection and Character Selection UI in the Setup Phase, which was temporarily replaced by a placeholder in v3.9.9. The game now correctly transitions from Main Menu to Setup.
+
+## [v3.9.11 Interface & Immersion Update]
+*   **Rich Text Log:** The game log now parses keywords using regex to apply dynamic colors (Red for damage/enemies, Purple for Sanity/Magic, Gold for Items). This makes scanning the log much faster.
+*   **Keyboard Controls:** Implemented hotkeys: 1-5 for Action Bar slots, SPACE to End Turn, C for Character Panel, L for Log/Map toggle.
+*   **New Content:** Added Scenario 4: "The Silent City" (Stealth focus).

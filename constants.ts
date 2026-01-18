@@ -271,6 +271,18 @@ export const SCENARIOS: Scenario[] = [
     specialRule: 'Tight corridors. All tiles are indoors.',
     difficulty: 'Nightmare',
     tileSet: 'indoor'
+  },
+  {
+    id: 's4',
+    title: 'The Silent City',
+    description: 'A supernatural silence has fallen. Supplies are scarce, and the shadows hide lethal snipers. You must move quietly.',
+    startDoom: 9,
+    goal: 'Survive and find 3 Clues.',
+    cluesRequired: 3,
+    startLocation: 'Town Square',
+    specialRule: 'Reduced Vision Range. Items are rare.',
+    difficulty: 'Hard',
+    tileSet: 'mixed'
   }
 ];
 

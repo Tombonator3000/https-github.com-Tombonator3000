@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import * as Tone from 'tone';
 import { GoogleGenAI } from "@google/genai";
@@ -19,6 +20,7 @@ import {
   CloudFog,
   Zap,
   User,
+  Save,
 } from 'lucide-react';
 import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, ContextAction, SavedInvestigator, Item, Spell, Trait, GameSettings } from './types';
 import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS, BESTIARY, INDOOR_CONNECTORS, OUTDOOR_CONNECTORS, SCENARIO_MODIFIERS, TRAIT_POOL } from './constants';
@@ -41,7 +43,7 @@ const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const SETUP_CONFIG_KEY = 'shadows_1920s_setup_config_v1';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.9.9";
+const APP_VERSION = "3.9.11";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -128,6 +130,41 @@ const hasLineOfSight = (start: {q: number, r: number}, end: {q: number, r: numbe
   return true;
 };
 // ------------------------
+
+// --- LOG PARSER ---
+const formatLogEntry = (entry: string) => {
+    // Basic regex for keywords
+    const keywords = [
+        { regex: /(skade|damage)/gi, color: 'text-red-400 font-bold' },
+        { regex: /(død|dead|die)/gi, color: 'text-red-600 font-black uppercase' },
+        { regex: /(sanity|sinnslidelse|madness)/gi, color: 'text-purple-400 font-bold' },
+        { regex: /(insight|clue|hint)/gi, color: 'text-blue-400 font-bold' },
+        { regex: /(heal|hp|liv)/gi, color: 'text-green-400 font-bold' },
+        { regex: /(suksess|success|unlocked|klarte)/gi, color: 'text-green-300 font-bold uppercase' },
+        { regex: /(failed|mislyktes|bommet)/gi, color: 'text-orange-400 font-bold' },
+        { regex: /(item|gjenstand|found)/gi, color: 'text-amber-400 font-bold' },
+        { regex: /(doom|dommedag)/gi, color: 'text-[#e94560] font-black uppercase' },
+        // Enemy names (Generic match for known types from constants could be improved, simplified here)
+        { regex: /(cultist|ghoul|deep one|sniper|priest|shoggoth)/gi, color: 'text-red-300 italic' }
+    ];
+
+    let formatted = entry;
+    // We can't use simple string replace for React components easily without dangerous HTML or parsing.
+    // Simple parser: split by words and checking is robust but complex. 
+    // For this prototype, we'll return a React node array.
+    
+    const parts = entry.split(/(\s+)/); // Split by whitespace but keep delimiters
+    return parts.map((part, i) => {
+        let className = '';
+        for (const kw of keywords) {
+            if (part.match(kw.regex)) {
+                className = kw.color;
+                break;
+            }
+        }
+        return <span key={i} className={className}>{part}</span>;
+    });
+};
 
 const App: React.FC = () => {
   // --- STATE ---
@@ -429,10 +466,6 @@ const App: React.FC = () => {
       setTimeout(() => setState(prev => ({ ...prev, screenShake: false })), 500);
   };
 
-  // --- GAMEPLAY LOGIC OMITTED FOR BREVITY (Unchanged) ---
-  // (Assuming identical logic functions: applySanityDamage, applyPhysicalDamage, handleAction etc. just referencing updated `triggerShake` and `playStinger`)
-  
-  // NOTE: Logic functions are collapsed here to fit response limit, assuming they exist exactly as before.
   const applySanityDamage = (player: Player, amount: number) => {
     if (player.isDead) return { player };
     const mitigation = player.inventory.filter(i => i.statModifier === 'mental_defense').reduce((sum, item) => sum + (item.bonus || 0), 0);
@@ -482,10 +515,6 @@ const App: React.FC = () => {
 
   const selectScenario = (scenario: Scenario) => { playStinger('click'); setState(prev => ({ ...prev, activeScenario: scenario })); };
 
-  // ... (Keeping all other action handlers same as before, just updating where they call playStinger/triggerShake/setState) ...
-  // To save space, I am injecting the critical parts into the existing logic structure.
-  
-  // Refactored Handlers for brevity in XML:
   const toggleCharacterSelection = (type: CharacterType) => {
     if (state.phase !== GamePhase.SETUP) return;
     playStinger('click');
@@ -540,17 +569,11 @@ const App: React.FC = () => {
     addToLog("Etterforskningen starter. Mørket senker seg over byen.");
   };
 
-  // ... (Keeping Action Handlers) ...
-  // Due to file size limits, I am providing the skeleton of action handler with updated playStinger hooks
-  // In a real file write, the full content of `handleAction` from previous step would be included here.
-  // I will include the full `handleAction` for correctness.
-
   const activePlayer = useMemo(() => {
     if (!state.players || state.players.length === 0) return null;
     return state.players[state.activePlayerIndex] ?? state.players[0] ?? null;
   }, [state.players, state.activePlayerIndex]);
 
-  // Updated Action Handler with Settings Logic (e.g. reduceMotion implicitly handled by triggerShake)
   const handleAction = (actionType: string, payload?: any) => {
     if (!activePlayer || activePlayer.actions <= 0 || activePlayer.isDead || state.phase !== GamePhase.INVESTIGATOR) return;
     const madness = activePlayer.activeMadness?.id;
@@ -632,8 +655,7 @@ const App: React.FC = () => {
           if (targetTile && !targetTile.imageUrl) generateTileVisual(targetTile);
         }
         break;
-      // ... (Flee, Interact, Attack, Cast, Investigate, Rest, Item, Drop, Trade handlers omitted for brevity but assumed present)
-      // I am including 'interact' as an example
+      
       case 'interact':
           const selTile = state.board.find(t => t.id === state.selectedTileId);
           if (!selTile) return;
@@ -656,13 +678,10 @@ const App: React.FC = () => {
              } else { addToLog(`Mislyktes.`); triggerFloatingText(selTile.q, selTile.r, "FAILED", 'text-red-500'); setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) })); }
           }
           break;
-        // Default fallthrough to prevent errors in omitted code regions
         default: break;
     }
   };
 
-  // ... (Mythos Phase, Resolve Event, End Turn, Puzzle Complete, Save/Load Roster handlers) ...
-  // Re-implementing critical ones
   const handleResolveEvent = useCallback(() => {
     if (!state.activeEvent) return;
     const event = state.activeEvent;
@@ -684,7 +703,6 @@ const App: React.FC = () => {
     playStinger('click');
   }, [state.activeEvent, state.activePlayerIndex]);
 
-  // Mythos
   useEffect(() => {
     if (state.phase === GamePhase.MYTHOS) {
       const timer = setTimeout(() => {
@@ -693,17 +711,71 @@ const App: React.FC = () => {
         setState(prev => {
           let newDoom = prev.doom - 1;
           const updatedEnemies: Enemy[] = [];
-          for (const enemy of prev.enemies) { /* ... Enemy Logic ... */ updatedEnemies.push(enemy); } // Simplified for XML limit
-          // Actual implementation would copy full AI logic from previous step
-          // Assuming AI logic exists...
+          for (const enemy of prev.enemies) { 
+              let currentEnemy = { ...enemy };
+              if (currentEnemy.traits?.includes('regenerate') && currentEnemy.hp < currentEnemy.maxHp) {
+                  currentEnemy.hp = Math.min(currentEnemy.maxHp, currentEnemy.hp + 1);
+              }
+
+              const alivePlayers = prev.players.filter(p => !p.isDead);
+              let targetPlayer: Player | null = null;
+              let minDist = Infinity;
+              
+              alivePlayers.forEach(p => {
+                const dist = hexDistance(currentEnemy.position, p.position);
+                if (dist < minDist) {
+                  minDist = dist;
+                  targetPlayer = p;
+                }
+              });
+
+              const hasLOS = targetPlayer && hasLineOfSight(currentEnemy.position, targetPlayer.position, prev.board, currentEnemy.visionRange);
+              const inAttackRange = minDist <= currentEnemy.attackRange;
+
+              if (hasLOS && inAttackRange) {
+                  updatedEnemies.push(currentEnemy);
+                  continue; 
+              }
+
+              let bestMove = currentEnemy.position;
+              const neighborCoords = [
+                  {q: currentEnemy.position.q + 1, r: currentEnemy.position.r}, 
+                  {q: currentEnemy.position.q - 1, r: currentEnemy.position.r}, 
+                  {q: currentEnemy.position.q, r: currentEnemy.position.r + 1}, 
+                  {q: currentEnemy.position.q, r: currentEnemy.position.r - 1}, 
+                  {q: currentEnemy.position.q + 1, r: currentEnemy.position.r - 1}, 
+                  {q: currentEnemy.position.q - 1, r: currentEnemy.position.r + 1}
+              ];
+
+              const validMoves = neighborCoords.filter(n => {
+                  const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
+                  if (!tile) return false;
+                  if (tile.object?.blocking && !currentEnemy.traits?.includes('flying')) return false;
+                  if (updatedEnemies.some(e => e.position.q === n.q && e.position.r === n.r)) return false; 
+                  return true;
+              });
+
+              if (validMoves.length > 0) {
+                  if (hasLOS && targetPlayer) {
+                      validMoves.sort((a, b) => {
+                          const distA = hexDistance(a, targetPlayer!.position);
+                          const distB = hexDistance(b, targetPlayer!.position);
+                          return distA - distB;
+                      });
+                      bestMove = validMoves[0];
+                  } else {
+                      bestMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                  }
+              }
+              updatedEnemies.push({ ...currentEnemy, position: bestMove });
+          } 
+          
           return { ...prev, doom: newDoom, round: prev.round + 1, enemies: updatedEnemies, phase: (newDoom <= 0) ? GamePhase.GAME_OVER : GamePhase.INVESTIGATOR, activePlayerIndex: 0 };
         });
       }, 2000);
       return () => clearTimeout(timer);
     }
   }, [state.phase]);
-
-  // ... (Rest of UI rendering) ...
 
   const handleStartNewGame = () => {
     playStinger('click');
@@ -716,7 +788,6 @@ const App: React.FC = () => {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(ROSTER_KEY);
       localStorage.removeItem(SETUP_CONFIG_KEY);
-      // Settings might be kept or cleared depending on preference, I'll clear them too for a "full" reset
       localStorage.removeItem('shadows_1920s_settings_v1');
       window.location.reload();
   };
@@ -725,11 +796,183 @@ const App: React.FC = () => {
       setGameSettings(newSettings);
   };
 
+  const handleResetGame = () => { 
+      setIsMainMenuOpen(true); 
+  };
+
+  const handleEndTurn = () => {
+    playStinger('click');
+    setState(prev => {
+      let nextIndex = prev.activePlayerIndex + 1;
+      let nextPhase = GamePhase.INVESTIGATOR;
+      let foundPlayer = false;
+
+      if (nextIndex >= prev.players.length) {
+          nextIndex = 0;
+          nextPhase = GamePhase.MYTHOS;
+      } else {
+        while (nextIndex < prev.players.length) {
+            if (!prev.players[nextIndex].isDead) {
+                foundPlayer = true;
+                break;
+            }
+            nextIndex++;
+        }
+        if (!foundPlayer) {
+            nextPhase = GamePhase.MYTHOS;
+            nextIndex = 0; 
+        }
+      }
+
+      return { 
+        ...prev, 
+        activePlayerIndex: nextIndex, 
+        phase: nextPhase,
+        selectedEnemyId: null,
+        selectedTileId: null
+      };
+    });
+  };
+
+  const handlePuzzleComplete = (success: boolean) => {
+      const tileId = state.activePuzzle?.targetTileId;
+      if (!tileId) {
+          setState(prev => ({...prev, activePuzzle: null}));
+          return;
+      }
+
+      if (success) {
+          playStinger('unlock');
+          addToLog(`Låsen gir etter! Du løste gåten.`);
+          triggerFloatingText(0, 0, "UNLOCKED!", "text-green-400");
+          setState(prev => ({
+              ...prev,
+              activePuzzle: null,
+              board: prev.board.map(t => t.id === tileId ? { ...t, object: undefined } : t),
+              players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
+              selectedTileId: null
+          }));
+      } else {
+          playStinger('horror');
+          addToLog(`Sinnet ditt svikter. Du klarte ikke å løse gåten.`);
+          const activeP = state.players[state.activePlayerIndex];
+          const result = applySanityDamage(activeP, 1);
+          
+          setState(prev => ({
+              ...prev,
+              activePuzzle: null,
+              players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...result.player, actions: p.actions - 1 } : p)
+          }));
+          if (result.sound) playStinger('madness');
+      }
+  };
+
+  const deleteVeteran = (instanceId: string) => {
+      setRoster(prev => prev.filter(p => p.instanceId !== instanceId));
+  };
+
+  const saveToRoster = (player: Player) => {
+      if (player.isDead) return;
+      playStinger('click');
+      const newVet: SavedInvestigator = {
+          ...player,
+          traits: player.traits || [],
+          instanceId: player.instanceId || `${player.id}-${Date.now()}`,
+          saveDate: Date.now(),
+          scenariosSurvived: (roster.find(v => v.instanceId === player.instanceId)?.scenariosSurvived || 0) + 1
+      };
+
+      setRoster(prev => {
+          const filtered = prev.filter(p => p.instanceId !== newVet.instanceId);
+          return [...filtered, newVet];
+      });
+      addToLog(`${player.name} er lagret i arkivet.`);
+  };
+
+  const goToMerchant = () => {
+      setState(prev => ({ ...prev, phase: GamePhase.MERCHANT }));
+  };
+
+  const saveAllAndExit = () => {
+      const survivors = state.players.filter(p => !p.isDead);
+      setRoster(prev => {
+          const newRoster = [...prev];
+          survivors.forEach(survivor => {
+              const newTrait = TRAIT_POOL[Math.floor(Math.random() * TRAIT_POOL.length)];
+              const existingTraits = survivor.traits || [];
+              const updatedTraits = existingTraits.some(t => t.id === newTrait.id) 
+                ? existingTraits 
+                : [...existingTraits, newTrait];
+
+              const newVet: SavedInvestigator = {
+                  ...survivor,
+                  traits: updatedTraits,
+                  instanceId: survivor.instanceId || `${survivor.id}-${Date.now()}`,
+                  saveDate: Date.now(),
+                  scenariosSurvived: (prev.find(v => v.instanceId === survivor.instanceId)?.scenariosSurvived || 0) + 1
+              };
+              
+              if (!existingTraits.some(t => t.id === newTrait.id)) {
+                  if (newTrait.effect === 'max_hp_down') newVet.maxHp = Math.max(1, newVet.maxHp - 1);
+                  if (newTrait.effect === 'combat_bonus') newVet.maxHp = newVet.maxHp + 1;
+              }
+
+              const existingIdx = newRoster.findIndex(p => p.instanceId === newVet.instanceId);
+              if (existingIdx !== -1) {
+                  newRoster[existingIdx] = newVet;
+              } else {
+                  newRoster.push(newVet);
+              }
+          });
+          return newRoster;
+      });
+      handleStartNewGame();
+  };
+
+  const handleBuyItem = (playerId: string, item: Item) => {
+      setState(prev => {
+          const newPlayers = [...prev.players];
+          const idx = newPlayers.findIndex(p => (p.instanceId || p.id) === playerId);
+          
+          if (idx !== -1 && newPlayers[idx].insight >= (item.cost || 0)) {
+              playStinger('coin');
+              newPlayers[idx] = {
+                  ...newPlayers[idx],
+                  insight: newPlayers[idx].insight - (item.cost || 0),
+                  inventory: [...newPlayers[idx].inventory, item]
+              };
+          }
+          return { ...prev, players: newPlayers };
+      });
+  };
+
+  // --- KEYBOARD LISTENERS ---
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          if (state.phase !== GamePhase.INVESTIGATOR || isMainMenuOpen || showOptions || showJournal || state.activeEvent) return;
+
+          switch(e.key) {
+              case '1': handleAction('investigate'); break;
+              case '2': handleAction('attack'); break;
+              case '3': handleAction('flee'); break;
+              case '4': handleAction('rest'); break;
+              case '5': handleAction('item'); break;
+              case ' ': e.preventDefault(); handleEndTurn(); break;
+              case 'c': setLeftPanelCollapsed(prev => !prev); break;
+              case 'l': setRightPanelCollapsed(prev => !prev); break;
+              case 'm': setRightPanelCollapsed(prev => !prev); break; // Map alias for Log
+              default: break;
+          }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [state.phase, isMainMenuOpen, showOptions, showJournal, state.activeEvent, activePlayer]);
+
   const activeMadnessClass = activePlayer?.activeMadness?.visualClass || '';
   const shakeClass = state.screenShake ? 'animate-shake' : '';
   const canContinue = state.phase !== GamePhase.SETUP && state.phase !== GamePhase.GAME_OVER && state.players.length > 0;
   
-  // High Contrast Override
   const highContrastClass = gameSettings.graphics.highContrast ? 'high-contrast-mode' : '';
 
   if (isMainMenuOpen) {
@@ -741,10 +984,146 @@ const App: React.FC = () => {
       );
   }
 
-  // Setup Phase Render (Omitted for brevity, same as previous)
   if (state.phase === GamePhase.SETUP) {
-      // ... same as before but using handleStartNewGame calls ...
-      return <div className="p-8 text-white">Setup Phase Placeholder (Use code from v3.9.8)</div>; // Keeping it short for the XML limit focus on Options
+      if (!state.activeScenario) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#05050a] relative overflow-hidden">
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-paper.png')] opacity-20"></div>
+                <div className="bg-[#16213e]/95 p-12 rounded border-2 border-[#e94560] shadow-[0_0_80px_rgba(233,69,96,0.3)] max-w-5xl w-full backdrop-blur-md relative z-10 animate-in fade-in zoom-in duration-1000">
+                    <div className="flex justify-between items-center mb-8">
+                        <button onClick={handleResetGame} className="text-slate-500 hover:text-white transition-colors flex items-center gap-2">
+                             <ArrowLeft size={16} /> MAIN MENU
+                        </button>
+                        <h1 className="text-6xl text-[#e94560] font-display italic tracking-tighter uppercase text-center absolute left-1/2 -translate-x-1/2">Case Files</h1>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {SCENARIOS.map(scenario => (
+                            <div key={scenario.id} className="relative group cursor-pointer" onClick={() => selectScenario(scenario)}>
+                                <div className="absolute inset-0 bg-[#e94560] opacity-0 group-hover:opacity-1 rounded-lg transition-opacity duration-300"></div>
+                                <div className="bg-[#0a0a1a] border border-slate-700 p-8 rounded-lg h-full flex flex-col hover:border-[#e94560] hover:shadow-[0_0_30px_rgba(233,69,96,0.2)] transition-all transform hover:-translate-y-1">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <FolderOpen className="text-slate-500 group-hover:text-[#e94560] transition-colors" size={32} />
+                                        <span className={`px-3 py-1 text-xs font-bold uppercase tracking-widest rounded border ${scenario.difficulty === 'Normal' ? 'border-green-800 text-green-500' : scenario.difficulty === 'Hard' ? 'border-amber-800 text-amber-500' : 'border-red-800 text-red-500'}`}>
+                                            {scenario.difficulty}
+                                        </span>
+                                    </div>
+                                    <h2 className="text-3xl font-display text-slate-200 mb-2">{scenario.title}</h2>
+                                    <p className="text-slate-400 italic font-serif text-lg mb-6 flex-grow">"{scenario.description}"</p>
+                                    <div className="space-y-2 border-t border-slate-800 pt-4 text-sm text-slate-500">
+                                        <div className="flex items-center gap-2"><Skull size={14} className="text-[#e94560]" /><span>Starts at <strong className="text-slate-300">{scenario.startDoom} Doom</strong></span></div>
+                                        <div className="flex items-center gap-2"><Target size={14} className="text-purple-500" /><span>Requires <strong className="text-slate-300">{scenario.cluesRequired} Clues</strong></span></div>
+                                        <div className="flex items-center gap-2"><ScrollText size={14} className="text-amber-500" /><span>Start: <strong className="text-slate-300">{scenario.startLocation}</strong></span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        )
+      }
+
+      return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#05050a] relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-paper.png')] opacity-20"></div>
+        <div className="bg-[#16213e]/95 p-12 rounded border-2 border-[#e94560] shadow-[0_0_80px_rgba(233,69,96,0.3)] max-w-4xl w-full text-center backdrop-blur-md relative z-10 animate-in fade-in slide-in-from-right duration-500">
+          <div className="flex items-center justify-between mb-6">
+              <button onClick={() => setState(prev => ({...prev, activeScenario: null, players: []}))} className="flex items-center gap-2 text-slate-500 hover:text-white transition-colors text-xs uppercase tracking-widest">
+                  <ArrowLeft size={16} /> Change Case
+              </button>
+              <div className="text-[#e94560] font-display text-2xl uppercase tracking-widest">{state.activeScenario.title}</div>
+          </div>
+          <div className="flex justify-center gap-6 mb-8 border-b border-slate-700 pb-4">
+              <button onClick={() => setViewingVeterans(false)} className={`flex items-center gap-2 uppercase tracking-widest font-bold pb-2 transition-all ${!viewingVeterans ? 'text-[#e94560] border-b-2 border-[#e94560]' : 'text-slate-500 hover:text-slate-300'}`}><Users size={18} /> New Recruits</button>
+              <button onClick={() => setViewingVeterans(true)} className={`flex items-center gap-2 uppercase tracking-widest font-bold pb-2 transition-all ${viewingVeterans ? 'text-amber-500 border-b-2 border-amber-500' : 'text-slate-500 hover:text-slate-300'}`}><Star size={18} /> Veterans ({roster.length})</button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-12 min-h-[400px]">
+            {!viewingVeterans ? (
+                (Object.keys(CHARACTERS) as CharacterType[]).map(key => {
+                  const selectedPlayer = state.players.find(p => p.id === key && !p.instanceId);
+                  const isSelected = !!selectedPlayer;
+                  return (
+                    <button key={key} onClick={() => toggleCharacterSelection(key)} className={`group p-5 bg-[#0a0a1a] border-2 transition-all text-left relative overflow-hidden ${isSelected ? 'border-[#e94560] shadow-[0_0_20px_rgba(233,69,96,0.2)]' : 'border-slate-800 hover:border-slate-600'}`}>
+                      {isSelected && selectedPlayer.imageUrl && (
+                           <div className="w-full h-32 mb-3 bg-black rounded overflow-hidden border border-slate-700">
+                               <img src={selectedPlayer.imageUrl} alt={selectedPlayer.name} className="w-full h-full object-cover opacity-80" />
+                           </div>
+                      )}
+                      {isSelected ? (
+                        <div className="flex items-center gap-2 mb-1">
+                          <input 
+                            type="text" 
+                            value={selectedPlayer.name} 
+                            onChange={(e) => updatePlayerName(key, e.target.value, false)} 
+                            onBlur={(e) => handleNameBlur(key, e.target.value, CHARACTERS[key].name, false)}
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); }} 
+                            onMouseDown={(e) => { e.stopPropagation(); }}
+                            className="bg-transparent border-b border-[#e94560] text-[#e94560] text-xl font-bold uppercase tracking-tight w-full focus:outline-none placeholder-slate-700 z-50 relative cursor-text" 
+                          />
+                          <Edit2 size={12} className="text-slate-600" />
+                        </div>
+                      ) : (
+                        <div className={`text-xl font-bold uppercase tracking-tight text-slate-100`}>{setupNames[key] || CHARACTERS[key].name}</div>
+                      )}
+                      <div className="text-[9px] text-slate-500 mt-2 uppercase tracking-[0.2em] leading-tight font-sans h-8">{CHARACTERS[key].special}</div>
+                      <div className="flex gap-4 mt-4 text-sm font-bold">
+                        <div className="flex items-center gap-1 text-red-500"><Skull size={12} /> {CHARACTERS[key].hp}</div>
+                        <div className="flex items-center gap-1 text-purple-500"><RotateCcw size={12} /> {CHARACTERS[key].sanity}</div>
+                      </div>
+                      {isSelected && <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-[#e94560] animate-pulse"></div>}
+                    </button>
+                  );
+                })
+            ) : (
+                roster.length === 0 ? (
+                    <div className="col-span-3 flex flex-col items-center justify-center text-slate-600 italic h-60 border-2 border-dashed border-slate-800 rounded">
+                        <Star size={48} className="mb-4 opacity-20" /><p>No survivors in the archive yet.</p>
+                    </div>
+                ) : (
+                    roster.map(vet => {
+                        const selectedPlayer = state.players.find(p => p.instanceId === vet.instanceId);
+                        const isSelected = !!selectedPlayer;
+                        return (
+                            <button key={vet.instanceId} onClick={() => toggleVeteranSelection(vet)} className={`group p-5 bg-[#1a120b] border-2 transition-all text-left relative overflow-hidden ${isSelected ? 'border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.3)]' : 'border-amber-900/50 hover:border-amber-700'}`}>
+                              <div className="flex justify-between items-start">
+                                  {isSelected ? (
+                                    <input 
+                                        type="text" 
+                                        value={selectedPlayer.name} 
+                                        onChange={(e) => updatePlayerName(vet.instanceId!, e.target.value, true)} 
+                                        onBlur={(e) => handleNameBlur(vet.instanceId!, e.target.value, vet.name, true)}
+                                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); }} 
+                                        onMouseDown={(e) => { e.stopPropagation(); }}
+                                        className="bg-transparent border-b border-amber-500 text-amber-400 text-xl font-bold uppercase tracking-tight w-full focus:outline-none placeholder-amber-900/50 mr-2 z-50 relative cursor-text" 
+                                    />
+                                  ) : (
+                                    <div className={`text-xl font-bold uppercase tracking-tight ${isSelected ? 'text-amber-400' : 'text-amber-100/80'}`}>{setupNames[vet.instanceId!] || vet.name}</div>
+                                  )}
+                                  <Trash2 size={14} className="text-slate-600 hover:text-red-500 z-20" onClick={(e) => { e.stopPropagation(); deleteVeteran(vet.instanceId!); }} />
+                              </div>
+                              <div className="flex items-center gap-2 mt-2 text-[10px] text-amber-500 uppercase tracking-widest"><Star size={10} /><span>Survived: {vet.scenariosSurvived}</span></div>
+                              <div className="flex gap-4 border-t border-amber-900/30 mt-4 pt-3 text-sm font-bold">
+                                <div className="flex items-center gap-1 text-red-400"><Skull size={12} /> {vet.hp}</div>
+                                <div className="flex items-center gap-1 text-purple-400"><RotateCcw size={12} /> {vet.sanity}</div>
+                              </div>
+                              {vet.traits && vet.traits.length > 0 && (
+                                  <div className="flex gap-1 mt-2">
+                                      {vet.traits.map(t => (
+                                          <div key={t.id} title={t.name} className={`w-2 h-2 rounded-full ${t.type === 'positive' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                      ))}
+                                  </div>
+                              )}
+                              {isSelected && <div className="absolute top-3 right-8 w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>}
+                            </button>
+                        );
+                    })
+                )
+            )}
+          </div>
+          <button disabled={state.players.length === 0} onClick={startGame} className={`px-20 py-6 font-display text-3xl italic tracking-[0.3em] transition-all uppercase border-2 ${state.players.length > 0 ? 'bg-[#e94560] border-white text-white hover:scale-105 shadow-[0_0_40px_rgba(233,69,96,0.5)]' : 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed'}`}>BEGIN INVESTIGATION</button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -778,18 +1157,174 @@ const App: React.FC = () => {
             <button onClick={() => setShowJournal(true)} className="text-slate-500 hover:text-amber-500 transition-colors" title="Bestiary">
                 <Book size={16} />
             </button>
-            <button onClick={() => setIsMainMenuOpen(true)} className="text-slate-500 hover:text-[#e94560]"><RotateCcw size={16}/></button>
+            <button onClick={handleResetGame} className="text-slate-500 hover:text-[#e94560]"><RotateCcw size={16}/></button>
           </div>
       </header>
 
       {/* Panels (Left/Right/Bottom) - Included via Component Imports in real app */}
-      {/* ... (Panel Logic same as v3.9.8) ... */}
+      
+      {activePlayer && !leftPanelCollapsed && (
+        <div className="fixed inset-0 md:left-4 md:top-20 md:bottom-24 md:w-80 md:inset-auto transition-all duration-500 z-50 animate-in slide-in-from-bottom md:slide-in-from-left">
+          <div className="h-full bg-[#0a0a1a]/95 md:bg-[#0a0a1a]/90 backdrop-blur-2xl border-2 border-[#e94560]/20 md:rounded shadow-2xl flex flex-col relative">
+            <button 
+                onClick={() => setLeftPanelCollapsed(true)} 
+                className="absolute top-4 right-4 md:top-2 md:right-2 text-slate-500 hover:text-white z-50 p-2 md:p-1 bg-black/50 rounded-full"
+                title="Minimize Character Panel"
+            >
+              <Minimize2 size={20}/>
+            </button>
+            <div className="flex-1 flex flex-col overflow-hidden pt-8 md:pt-0">
+                <CharacterPanel player={activePlayer} allPlayers={state.players} onTrade={(item, targetId) => handleAction('trade', { item, targetPlayerId: targetId })} onDrop={(item) => handleAction('drop', { item })} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!rightPanelCollapsed && (
+        <div className="fixed inset-0 md:right-4 md:top-20 md:bottom-24 md:w-80 md:inset-auto transition-all duration-500 z-50 animate-in slide-in-from-bottom md:slide-in-from-right">
+            <div className="h-full flex flex-col gap-4 bg-[#0a0a1a]/95 md:bg-transparent">
+            {state.selectedEnemyId ? (
+                (() => {
+                    const displayEnemy = state.enemies.find(e => e.id === state.selectedEnemyId);
+                    return displayEnemy ? <EnemyPanel enemy={displayEnemy} onClose={() => setState(prev => ({ ...prev, selectedEnemyId: null }))} /> : null;
+                })()
+            ) : hoveredEnemyId ? (
+                (() => {
+                    const displayEnemy = state.enemies.find(e => e.id === hoveredEnemyId);
+                    return displayEnemy ? <EnemyPanel enemy={displayEnemy} /> : null;
+                })()
+            ) : (
+                <div className="flex-1 bg-[#0a0a1a]/90 backdrop-blur-2xl border-2 border-[#e94560]/20 md:rounded shadow-2xl flex flex-col relative overflow-hidden">
+                    <button 
+                        onClick={() => setRightPanelCollapsed(true)} 
+                        className="absolute top-4 left-4 md:top-2 md:left-2 text-slate-500 hover:text-white z-50 p-2 md:p-1 bg-black/50 rounded-full"
+                        title="Minimize Log"
+                    >
+                    <Minimize2 size={20}/>
+                    </button>
+                    <div className="flex-1 flex flex-col pt-12 md:pt-0">
+                    <div className="p-4 border-b border-slate-800 bg-black/40 flex items-center justify-end gap-2">
+                        <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] font-sans">DOKUMENTERTE HENDELSER</h3>
+                        <ScrollText size={14} className="text-[#e94560]"/>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-5 space-y-4 font-serif italic text-[12px] leading-relaxed custom-scrollbar pb-20 md:pb-5">
+                        {state.log.map((entry, idx) => (
+                            <div key={idx} className={`${idx === 0 ? 'text-white border-l-2 border-[#e94560] pl-3 py-1 bg-[#e94560]/5' : 'text-slate-500'} animate-in fade-in duration-500`}>
+                                {formatLogEntry(entry)}
+                            </div>
+                        ))}
+                    </div>
+                    </div>
+                </div>
+            )}
+            </div>
+        </div>
+      )}
+
+      <div className="fixed bottom-24 md:bottom-6 left-0 right-0 pointer-events-none z-40 flex justify-between px-4 md:px-8">
+          <div className="pointer-events-auto">
+              {activePlayer && leftPanelCollapsed && (
+                  <button 
+                    onClick={() => setLeftPanelCollapsed(false)}
+                    className="flex items-center gap-2 md:gap-3 px-3 py-3 md:px-6 md:py-4 bg-[#1a120b] border-2 border-amber-900/50 hover:border-amber-500 text-amber-500 font-bold uppercase text-xs tracking-widest rounded-full md:rounded-xl shadow-lg hover:-translate-y-1 transition-all"
+                  >
+                      <User size={20} /> <span className="hidden md:inline">Character (C)</span>
+                  </button>
+              )}
+          </div>
+
+          <div className="pointer-events-auto">
+              {rightPanelCollapsed && (
+                  <button 
+                    onClick={() => setRightPanelCollapsed(false)}
+                    className="flex items-center gap-2 md:gap-3 px-3 py-3 md:px-6 md:py-4 bg-[#0a0a1a] border-2 border-slate-700 hover:border-[#e94560] text-slate-300 hover:text-[#e94560] font-bold uppercase text-xs tracking-widest rounded-full md:rounded-xl shadow-lg hover:-translate-y-1 transition-all"
+                  >
+                      <span className="hidden md:inline">Log (L)</span> <ScrollText size={20} />
+                  </button>
+              )}
+          </div>
+      </div>
+
+      <footer className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 md:gap-4 z-40 w-[95%] md:w-auto justify-center">
+        <div className="bg-[#16213e]/90 backdrop-blur-xl border-2 border-[#e94560]/40 p-2 md:p-3 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] flex items-center gap-2 md:gap-4 max-w-full">
+          <ActionBar 
+            onAction={handleAction} 
+            actionsRemaining={activePlayer?.isDead ? 0 : (activePlayer?.actions ?? 0)} 
+            isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} 
+            contextAction={(() => {
+                if (!state.selectedTileId || !activePlayer) return null;
+                const tile = state.board.find(t => t.id === state.selectedTileId);
+                if (!tile) return null;
+                if (hexDistance(activePlayer.position, tile) > 1) return null;
+                if (tile.object?.blocking) {
+                    const obj = tile.object;
+                    let label = 'Interact';
+                    if (obj.type === 'locked_door') label = 'Break Down Door';
+                    if (obj.type === 'rubble') label = 'Clear Rubble';
+                    if (obj.type === 'barricade') label = 'Dismantle';
+                    if (obj.type === 'fog_wall') label = 'Dispel Fog';
+                    return { id: 'interact-blocker', label, iconType: obj.reqSkill || 'strength', difficulty: obj.difficulty || 3 };
+                }
+                if (tile.object && !tile.object.searched && (['mirror', 'radio', 'switch'].includes(tile.object.type))) {
+                    return { id: 'interact-object', label: 'Use Object', iconType: 'interact', difficulty: 0 };
+                }
+                return null;
+            })()} 
+            hasSpells={activePlayer?.spells && activePlayer.spells.length > 0} 
+          />
+          <div className="w-px h-8 md:h-12 bg-slate-800 mx-1 md:mx-2 shrink-0"></div>
+          <button onClick={handleEndTurn} className="px-4 py-3 md:px-8 md:py-4 bg-[#e94560] text-white font-bold hover:bg-[#c9354d] transition-all flex items-center gap-2 md:gap-3 uppercase text-[9px] md:text-[10px] tracking-[0.2em] rounded-xl shadow-[0_0_20px_rgba(233,69,96,0.3)] group shrink-0">
+            <span className="hidden md:inline">{state.activePlayerIndex === state.players.length - 1 ? "AVSLUTT RUNDEN (SPC)" : "NESTE TUR (SPC)"}</span>
+            <span className="md:hidden"><ChevronRight size={16} /></span>
+            <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform hidden md:block" />
+          </button>
+        </div>
+      </footer>
       
       {/* Modals */}
       {showOptions && <OptionsMenu onClose={() => setShowOptions(false)} onResetData={handleResetData} onUpdateSettings={handleUpdateSettings} />}
       {state.lastDiceRoll && <div className="fixed inset-0 flex items-center justify-center z-[100] pointer-events-none"><DiceRoller values={state.lastDiceRoll} onComplete={() => setState(prev => ({ ...prev, lastDiceRoll: null }))} /></div>}
       {state.activeEvent && <EventModal event={state.activeEvent} onResolve={handleResolveEvent} />}
-      {/* ... other modals ... */}
+      {state.activePuzzle && <PuzzleModal difficulty={state.activePuzzle.difficulty} onSolve={handlePuzzleComplete} />}
+      {showJournal && <JournalModal unlockedIds={state.encounteredEnemies} onClose={() => setShowJournal(false)} />}
+      
+      {state.phase === GamePhase.GAME_OVER && (
+        <div className="fixed inset-0 bg-black/98 z-[200] flex items-center justify-center p-8 backdrop-blur-3xl">
+           <div className="text-center max-w-2xl">
+             <h2 className="text-6xl md:text-9xl font-display text-[#e94560] italic mb-6 md:mb-10 uppercase tracking-tighter">FINIS</h2>
+             <p className="text-lg md:text-xl text-slate-400 mb-10 md:mb-16 italic font-serif px-4 md:px-10">
+               {state.cluesFound >= (state.activeScenario?.cluesRequired || 3) ? "Portalen er forseglet. Skyggene trekker seg tilbake..." : state.players.every(p => p.isDead) ? "Alle etterforskere er tapt. Mørket har seiret." : "Tiden rant ut. Dommedag er her."}
+             </p>
+             {state.players.some(p => !p.isDead) && (
+                 <div className="mb-10">
+                     <p className="text-sm uppercase tracking-widest text-slate-500 mb-4 font-bold">Overlevende (Klikk for å lagre)</p>
+                     <div className="flex justify-center gap-4 flex-wrap">
+                         {state.cluesFound >= (state.activeScenario?.cluesRequired || 3) && (
+                             <button onClick={goToMerchant} className="flex items-center gap-2 px-6 py-3 border border-amber-600 rounded bg-[#1a120b] hover:bg-amber-900/40 hover:border-amber-400 transition-all text-amber-500 font-bold uppercase text-xs tracking-wider shadow-[0_0_20px_rgba(245,158,11,0.2)] animate-pulse">
+                                 <ShoppingBag size={16} /> Visit Black Market
+                             </button>
+                         )}
+                         {state.players.map(p => {
+                             if (p.isDead) return null;
+                             const isSaved = roster.some(v => v.instanceId === p.instanceId);
+                             return (
+                                 <button key={p.id} onClick={() => saveToRoster(p)} disabled={isSaved} className={`flex items-center gap-2 px-6 py-3 border border-slate-700 rounded bg-[#1a1a2e] hover:border-amber-500 transition-all ${isSaved ? 'opacity-50 cursor-default' : ''}`}>
+                                     <Save size={16} className="text-amber-500" /><span className="text-amber-100 font-bold uppercase text-xs tracking-wider">{p.name}</span>
+                                     {isSaved && <span className="text-[8px] text-green-500 ml-1">(SAVED)</span>}
+                                 </button>
+                             );
+                         })}
+                     </div>
+                 </div>
+             )}
+             <button onClick={handleResetGame} className="px-16 py-5 border-2 border-[#e94560] text-[#e94560] font-bold hover:bg-[#e94560] hover:text-white transition-all text-sm uppercase tracking-[0.4em]">AVSLUTT</button>
+           </div>
+        </div>
+      )}
+
+      {state.phase === GamePhase.MERCHANT && (
+          <MerchantShop players={state.players.filter(p => !p.isDead)} onBuy={handleBuyItem} onFinish={() => saveAllAndExit()} />
+      )}
     </div>
   );
 };
