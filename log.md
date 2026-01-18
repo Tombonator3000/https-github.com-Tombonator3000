@@ -112,3 +112,163 @@ Track all major milestones, feature additions, and bug fixes here.
     *   Game gracefully falls back to CSS visuals and Tone.js audio when AI is unavailable
 *   **Impact:** Game now starts successfully on GitHub Pages without requiring API key configuration
 *   **Files Modified:** `App.tsx`, `utils/AssetLibrary.ts`
+
+---
+
+## [v3.9.24 GAMEPLAY LOOP ANALYSIS - 2026-01-18]
+*   **Design Review:** Comprehensive analysis of current gameplay loop and strategic depth
+*   **Objective:** Identify opportunities to improve player engagement, replayability, and tactical decisions
+
+### 📊 Current Gameplay Loop Structure
+**Turn Flow:**
+1. **Setup Phase** → Scenario selection + Character selection (up to 4 investigators)
+2. **Investigator Phase** → Each player takes 2 actions: Move, Investigate, Attack, Rest, Flee, Consume, Cast Spell
+3. **Mythos Phase** → Enemy AI activates (pathfinding + attacks), Doom decrements, round ends
+4. **Victory/Defeat Check** → Win: Find required clues, Lose: Doom reaches 0 or all players dead
+
+**Current Strengths:**
+- Solid hex-grid tactical foundation with smooth pathfinding
+- Enemy AI is intelligent (BFS pathfinding, traits: flying, ambusher, regenerate)
+- Madness system creates atmospheric pressure and unique debuffs
+- Veteran/Trait progression system rewards long-term play
+- Procedural tile generation with logical obstacle placement
+- Strong thematic atmosphere (1920s Lovecraftian horror)
+
+### ⚠️ Critical Improvement Areas
+
+#### 1. **STRATEGIC DEPTH - Add Momentum System**
+**Problem:** Player decisions are repetitive. Each turn = Move → Investigate → Attack → End Turn loop.
+**Solution:**
+- Introduce **Momentum** resource (0-10) that builds when taking risks
+- Spend Momentum for: Extra actions, dice re-rolls, special abilities
+- Example: "Press Your Luck" - Investigate with +1 die, but lose Sanity on fail
+- Creates risk/reward decision-making every turn
+
+#### 2. **LINEAR OBJECTIVES - Multi-Objective System**
+**Problem:** All scenarios = "find X clues". No variety.
+**Solution:**
+- Add **Secondary Objectives** to each scenario
+  - "Seal 2 Gates" (+2 Doom reward)
+  - "Rescue Civilian" (Escort NPC to exit)
+  - "Recover Artifact" (Hidden rare item with unique power)
+- Introduce diverse **Victory Types**:
+  - Investigation (current)
+  - Survival (last X rounds)
+  - Escape (reach exit alive)
+  - Assassination (kill boss enemy)
+  - Ritual (multi-step quest with defend phases)
+
+#### 3. **PREDICTABLE ENCOUNTERS - Dynamic Threat System**
+**Problem:** Enemy spawns are random but not dynamic. No escalation mechanics.
+**Solution:**
+- Add **Alert Level** (0-5) that increases with combat noise, failed stealth
+- Alert thresholds trigger different spawn patterns:
+  - Level 0-1: No patrols
+  - Level 2-3: Regular enemies spawn
+  - Level 4: Elite enemies appear
+  - Level 5: BOSS RUSH mode (all gates activate)
+- Stealth gameplay becomes viable strategy
+
+#### 4. **LACK OF MEANINGFUL CHOICES - Risk/Reward Systems**
+**Problem:** Most actions are "safe". No hard decisions or trade-offs.
+**Solution:**
+- **Cursed Items**: High-power gear with drawbacks ("Deal +3 damage, lose 1 Sanity per turn")
+- **Blood Pacts**: Trade HP for Insight at Altars (1 HP = 2 Insight)
+- **Desperation Moves**: When HP ≤ 2, unlock powerful risky actions
+- **Corruption Mechanic**: Powerful spells that permanently lower Max Sanity
+
+#### 5. **DOOM CLOCK INTERACTIVITY - Doom as Resource**
+**Problem:** Doom is passive countdown with no player interaction.
+**Solution:**
+- Allow players to manipulate Doom:
+  - Destroy Altars: +2 Doom, gain Powerful Relic
+  - Perform Rituals: -1 Doom, requires sacrificing items/HP
+- **Doom Stage Events**: Trigger special events at specific Doom thresholds
+  - Doom 10: Normal
+  - Doom 7: Blood Moon (Enemies +1 HP)
+  - Doom 4: Reality Tears (Tile corruption)
+  - Doom 2: Boss spawns
+  - Doom 0: Game Over
+
+#### 6. **UNDERDEVELOPED MERCHANT SYSTEM**
+**Problem:** Merchant Phase exists but isn't integrated into core loop.
+**Solution:**
+- Replace dedicated phase with **Random Merchant Spawns** on tiles
+- Add **Black Market** mechanic: High-risk areas with rare items + enemy patrols
+- Merchant **Mood System**: Affects prices (Friendly/Suspicious/Hostile)
+- Trade Insight for items dynamically during exploration
+
+#### 7. **MISSING TEAM SYNERGIES**
+**Problem:** In multiplayer, characters play independently. No combos or coordination.
+**Solution:**
+- **Adjacent Bonuses**:
+  - Doctor + Any ally: Healing costs -1 action
+  - Veteran + Detective: +1 Combat die when adjacent
+- **Coordinated Actions**:
+  - "Coordinated Strike": 2+ players attack same enemy for +1 damage each
+  - "Covering Fire": Spend action to give ally +1 die
+- **Chain Abilities**: Actions that trigger when another player performs specific action
+
+#### 8. **STATIC TILES - Dynamic Tile Evolution**
+**Problem:** Once explored/searched, tiles become irrelevant dead space.
+**Solution:**
+- **Tile Corruption**: As Doom decreases, tiles corrupt and spawn new hazards
+- **Re-Spawning Threats**: Gate tiles periodically spawn new enemies
+- **Environmental Propagation**: Fire spreads to adjacent tiles over rounds
+- **Revisit Events**: "Returning to this location... something has changed"
+- Track `tile.timesSearched` and `tile.corruption` for dynamic behavior
+
+#### 9. **PASSIVE EVENTS - Choice-Driven Narrative**
+**Problem:** EventCards just happen to player. No agency.
+**Solution:**
+- Replace single-effect events with **Branching Choices** (2-3 options per event)
+- Example: "Ritual Chamber"
+  - Option A: "Interrupt ritual" → Combat 3 Cultists, +2 Doom if win
+  - Option B: "Sneak past" → Agility test (4+), success = clue, fail = spawn enemies
+  - Option C: "Join the chant..." → +3 Insight but gain Madness (risky knowledge)
+- Creates narrative tension and meaningful player decisions
+
+#### 10. **NO WIN CONDITION VARIETY**
+**Problem:** All scenarios feel the same. Only victory path = find clues.
+**Solution:**
+- Implement **Victory Type System**:
+  - `investigation`: Find clues (current)
+  - `survival`: Survive X rounds
+  - `escape`: Reach exit tile alive
+  - `assassination`: Kill Boss enemy
+  - `ritual`: Multi-step quest (find components → reach location → defend 3 rounds)
+- Each scenario uses different victory type for diverse gameplay
+
+### 🎯 Priority Implementation Order
+
+**Phase 1: Core Depth (v3.10.0)**
+1. Momentum System
+2. Choice-Driven Events
+3. Risk/Reward Items (Cursed gear, Blood Pacts)
+
+**Phase 2: Strategic Variety (v3.11.0)**
+4. Multi-Objective System
+5. Dynamic Threat/Alert Level
+6. Doom Interactivity
+
+**Phase 3: Multiplayer Depth (v3.12.0)**
+7. Team Synergies
+8. Coordinated Actions
+
+**Phase 4: Content Expansion (v3.13.0)**
+9. Victory Type Variety
+10. Dynamic Tile Evolution
+
+### 🔍 Additional Observations
+- **Action Economy**: Current 2-action limit works well. Consider Madness effects that modify this.
+- **Dice System**: Dice rolling is satisfying. Keep as-is but add more ways to manipulate/re-roll.
+- **Inventory Management**: Currently unlimited. Consider weight/slot limit for tactical choices.
+- **Character Asymmetry**: Could be stronger. Each class should have 1 unique action only they can perform.
+
+**Recommended Next Steps:**
+1. Implement Momentum System first (easiest, highest impact)
+2. Convert existing EventCards to choice-driven format
+3. Add 2-3 Cursed Items to test risk/reward appetite
+4. Playtest and iterate
+
+---
