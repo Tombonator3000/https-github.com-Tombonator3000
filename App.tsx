@@ -36,7 +36,7 @@ import PuzzleModal from './components/PuzzleModal';
 import MerchantShop from './components/MerchantShop';
 import JournalModal from './components/JournalModal';
 import TurnNotification from './components/TurnNotification'; 
-import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary } from './utils/AssetLibrary';
+import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary, getCharacterVisual, getEnemyVisual } from './utils/AssetLibrary';
 import { loadSettings, DEFAULT_SETTINGS } from './utils/Settings';
 import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
@@ -44,7 +44,7 @@ const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const SETUP_CONFIG_KEY = 'shadows_1920s_setup_config_v1';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.9.18";
+const APP_VERSION = "3.9.19";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -155,6 +155,7 @@ const App: React.FC = () => {
 
   const audioInit = useRef(false);
   const ambientSynthRef = useRef<Tone.PolySynth | null>(null);
+  const musicPlayerRef = useRef<HTMLAudioElement | null>(null);
 
   // --- PERSISTENCE & INIT ---
   useEffect(() => {
@@ -168,15 +169,21 @@ const App: React.FC = () => {
       if (!audioInit.current) return;
       
       const { masterVolume, musicVolume, muted } = gameSettings.audio;
+      const masterGain = muted || masterVolume === 0 ? 0 : masterVolume / 100;
       
-      // Master Volume (Tone.Destination is in Decibels)
-      const masterDb = muted || masterVolume === 0 ? -Infinity : Tone.gainToDb(masterVolume / 100);
+      // Tone.js Master (Decibels)
+      const masterDb = masterGain === 0 ? -Infinity : Tone.gainToDb(masterGain);
       Tone.Destination.volume.rampTo(masterDb, 0.1);
 
-      // Music Volume (Ambient Synth)
+      // Procedural Music Synth
       if (ambientSynthRef.current) {
-          const musicDb = musicVolume === 0 ? -Infinity : Tone.gainToDb(musicVolume / 100) - 20; // -20 is base mix
+          const musicDb = musicVolume === 0 ? -Infinity : Tone.gainToDb(musicVolume / 100) - 20; 
           ambientSynthRef.current.volume.rampTo(musicDb, 0.5);
+      }
+
+      // File-based Music Player
+      if (musicPlayerRef.current) {
+          musicPlayerRef.current.volume = (musicVolume / 100) * masterGain;
       }
 
   }, [gameSettings.audio]);
@@ -234,33 +241,43 @@ const App: React.FC = () => {
       }));
   };
 
-  // --- AUDIO ---
+  // --- AUDIO ENGINE v2.0 (Hybrid: File -> Tone.js Fallback) ---
   const initAudio = async () => {
     if (audioInit.current) return;
     try {
         await Tone.start();
         audioInit.current = true;
         
+        // 1. Setup Procedural Fallback
         const filter = new Tone.Filter(200, "lowpass").toDestination();
         const pad = new Tone.PolySynth(Tone.Synth, { 
           oscillator: { type: 'sine' }, 
           envelope: { attack: 4, release: 4 } 
         }).connect(filter);
         
-        // Initial Volume Set
-        const { musicVolume } = loadSettings().audio;
+        const { musicVolume, masterVolume } = loadSettings().audio;
         const initialMusicDb = musicVolume === 0 ? -Infinity : Tone.gainToDb(musicVolume / 100) - 20;
         pad.set({ volume: initialMusicDb });
-        
-        ambientSynthRef.current = pad; // Store ref for updates
+        ambientSynthRef.current = pad; 
 
-        new Tone.LFO(0.05, 100, 300).connect(filter.frequency).start();
+        // 2. Try to Load Ambience File
+        const ambiencePath = '/assets/audio/music/ambience.mp3';
+        const audio = new Audio(ambiencePath);
+        audio.loop = true;
+        audio.volume = (musicVolume / 100) * (masterVolume / 100);
         
-        new Tone.Loop(time => { 
-          pad.triggerAttackRelease(['G1', 'D2', 'Bb2'], '2n', time); 
-        }, '1n').start(0);
-        
-        Tone.getTransport().start();
+        audio.play().then(() => {
+            console.log("Playing local ambience file.");
+            musicPlayerRef.current = audio;
+        }).catch(() => {
+            console.log("Local ambience not found. Starting Tone.js generator.");
+            new Tone.LFO(0.05, 100, 300).connect(filter.frequency).start();
+            new Tone.Loop(time => { 
+                pad.triggerAttackRelease(['G1', 'D2', 'Bb2'], '2n', time); 
+            }, '1n').start(0);
+            Tone.getTransport().start();
+        });
+
     } catch (e) {
         console.warn("Audio init failed", e);
     }
@@ -269,72 +286,55 @@ const App: React.FC = () => {
   const playStinger = (type: 'roll' | 'event' | 'click' | 'horror' | 'search' | 'combat' | 'heal' | 'madness' | 'block' | 'trap' | 'spell' | 'unlock' | 'coin') => {
     if (!audioInit.current) return;
     
-    const { sfxVolume, muted } = gameSettings.audio;
+    const { sfxVolume, muted, masterVolume } = gameSettings.audio;
     if (muted || sfxVolume === 0) return;
 
     const vol = sfxVolume / 100;
     const gainDb = Tone.gainToDb(vol);
 
-    if (type === 'roll') new Tone.MembraneSynth({ volume: gainDb }).toDestination().triggerAttackRelease("C1", "8n");
-    if (type === 'horror') new Tone.MembraneSynth({ volume: gainDb }).toDestination().triggerAttackRelease("G0", "1n");
-    if (type === 'click') new Tone.MetalSynth({ volume: gainDb - 20 }).toDestination().triggerAttackRelease("C5", "32n");
-    if (type === 'event') new Tone.MetalSynth({ volume: gainDb }).toDestination().triggerAttackRelease("C3", "4n");
-    if (type === 'search') new Tone.NoiseSynth({ volume: gainDb - 15 }).toDestination().triggerAttackRelease("16n");
-    if (type === 'combat') new Tone.MembraneSynth({ volume: gainDb - 5, envelope: { sustain: 0.1 } }).toDestination().triggerAttackRelease("D1", "4n");
-    if (type === 'heal') new Tone.Synth({ volume: gainDb - 10, envelope: { attack: 0.5 } }).toDestination().triggerAttackRelease("E4", "2n");
-    if (type === 'madness') {
-        const synth = new Tone.FMSynth({ volume: gainDb }).toDestination();
-        synth.triggerAttackRelease("C5", "4n");
-        synth.frequency.rampTo("C2", 1);
-    }
-    if (type === 'block') new Tone.MetalSynth({ volume: gainDb, frequency: 50, envelope: { decay: 0.1 } }).toDestination().triggerAttackRelease(50, "16n");
-    if (type === 'trap') {
-        const synth = new Tone.MetalSynth({ volume: gainDb, harmonicity: 100, resonance: 800 }).toDestination();
-        synth.triggerAttackRelease(200, "8n");
-    }
-    if (type === 'spell') {
-        const synth = new Tone.PolySynth(Tone.Synth, { volume: gainDb }).toDestination();
-        synth.triggerAttackRelease(["C5", "E5", "G5"], "4n");
-    }
-    if (type === 'unlock') {
-         new Tone.MetalSynth({ volume: gainDb, harmonicity: 200, resonance: 100 }).toDestination().triggerAttackRelease(800, "16n");
-    }
-    if (type === 'coin') {
-        new Tone.MetalSynth({ volume: gainDb, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }).toDestination().triggerAttackRelease("C6", "16n");
-    }
+    // Try Local File First
+    const sfxPath = `/assets/audio/sfx/${type}.mp3`;
+    const sfx = new Audio(sfxPath);
+    sfx.volume = vol * (masterVolume / 100);
+    sfx.play().catch(() => {
+        // Fallback to Tone.js Procedural Sound if file missing
+        if (type === 'roll') new Tone.MembraneSynth({ volume: gainDb }).toDestination().triggerAttackRelease("C1", "8n");
+        if (type === 'horror') new Tone.MembraneSynth({ volume: gainDb }).toDestination().triggerAttackRelease("G0", "1n");
+        if (type === 'click') new Tone.MetalSynth({ volume: gainDb - 20 }).toDestination().triggerAttackRelease("C5", "32n");
+        if (type === 'event') new Tone.MetalSynth({ volume: gainDb }).toDestination().triggerAttackRelease("C3", "4n");
+        if (type === 'search') new Tone.NoiseSynth({ volume: gainDb - 15 }).toDestination().triggerAttackRelease("16n");
+        if (type === 'combat') new Tone.MembraneSynth({ volume: gainDb - 5, envelope: { sustain: 0.1 } }).toDestination().triggerAttackRelease("D1", "4n");
+        if (type === 'heal') new Tone.Synth({ volume: gainDb - 10, envelope: { attack: 0.5 } }).toDestination().triggerAttackRelease("E4", "2n");
+        if (type === 'madness') {
+            const synth = new Tone.FMSynth({ volume: gainDb }).toDestination();
+            synth.triggerAttackRelease("C5", "4n");
+            synth.frequency.rampTo("C2", 1);
+        }
+        if (type === 'block') new Tone.MetalSynth({ volume: gainDb, frequency: 50, envelope: { decay: 0.1 } }).toDestination().triggerAttackRelease(50, "16n");
+        if (type === 'trap') {
+            const synth = new Tone.MetalSynth({ volume: gainDb, harmonicity: 100, resonance: 800 }).toDestination();
+            synth.triggerAttackRelease(200, "8n");
+        }
+        if (type === 'spell') {
+            const synth = new Tone.PolySynth(Tone.Synth, { volume: gainDb }).toDestination();
+            synth.triggerAttackRelease(["C5", "E5", "G5"], "4n");
+        }
+        if (type === 'unlock') {
+             new Tone.MetalSynth({ volume: gainDb, harmonicity: 200, resonance: 100 }).toDestination().triggerAttackRelease(800, "16n");
+        }
+        if (type === 'coin') {
+            new Tone.MetalSynth({ volume: gainDb, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }).toDestination().triggerAttackRelease("C6", "16n");
+        }
+    });
   };
 
   const addToLog = (message: string) => {
     setState(prev => ({ ...prev, log: [message, ...prev.log].slice(0, 50) }));
   };
 
-  // --- AI IMAGE GENERATION ---
-  const generateImage = async (prompt: string): Promise<string | null> => {
-    if (!process.env.API_KEY) return null;
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: { parts: [{ text: prompt }] },
-            config: { imageConfig: { aspectRatio: "1:1" } }
-        });
-        
-        const candidates = response.candidates;
-        if (candidates && candidates[0]?.content?.parts) {
-            for (const part of candidates[0].content.parts) {
-                if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
-            }
-        }
-        return null;
-    } catch (e) {
-        console.warn("AI Image gen failed:", e);
-        return null;
-    }
-  };
-
   const generateCharacterPortrait = async (player: Player) => {
       if (player.imageUrl) return;
-      const prompt = `A dark, moody, oil painting style portrait of a 1920s ${player.name} (${player.id}) in a Lovecraftian horror setting. High contrast, atmospheric, vintage.`;
-      const img = await generateImage(prompt);
+      const img = await getCharacterVisual(player);
       if (img) {
           setState(prev => ({
               ...prev,
@@ -345,6 +345,7 @@ const App: React.FC = () => {
 
   const generateTileVisual = async (tile: Tile) => {
       const lib = loadAssetLibrary();
+      // Logic for local checking is now inside generateLocationAsset
       if (lib[tile.name]) {
           setState(prev => ({
               ...prev,
@@ -353,6 +354,7 @@ const App: React.FC = () => {
           return;
       }
       if (tile.imageUrl) return;
+      
       const img = await generateLocationAsset(tile.name, tile.type);
       if (img) {
           lib[tile.name] = img;
@@ -367,9 +369,7 @@ const App: React.FC = () => {
 
   const generateEnemyVisual = async (enemy: Enemy) => {
       if (enemy.imageUrl) return;
-      const bestiaryEntry = BESTIARY[enemy.type];
-      const specificPrompt = bestiaryEntry?.visualPrompt || `A terrifying, nightmarish illustration of a ${enemy.name} (${enemy.type}) from Cthulhu mythos. Dark fantasy art, creature design, horror, menacing, detailed, isolated on dark background.`;
-      const img = await generateImage(specificPrompt);
+      const img = await getEnemyVisual(enemy);
       if (img) {
           setState(prev => ({
               ...prev,
@@ -546,25 +546,70 @@ const App: React.FC = () => {
               if (currentTile?.type === 'room') newTileType = Math.random() > 0.8 ? 'street' : 'room';
               else newTileType = Math.random() > 0.8 ? 'room' : 'street';
           }
+          
           const isCurrentConnector = currentTile?.category === 'connector';
-          const newTileCategory = isCurrentConnector ? (Math.random() > 0.1 ? 'location' : 'connector') : (Math.random() > 0.3 ? 'connector' : 'location');
-          const pool = newTileCategory === 'connector' ? (newTileType === 'room' ? INDOOR_CONNECTORS : OUTDOOR_CONNECTORS) : (newTileType === 'room' ? INDOOR_LOCATIONS : OUTDOOR_LOCATIONS);
+          // Bias towards alternating connector/location to create "structure"
+          const newTileCategory = isCurrentConnector 
+            ? (Math.random() > 0.3 ? 'location' : 'connector') // 70% chance to find room from hall
+            : (Math.random() > 0.3 ? 'connector' : 'location'); // 70% chance to leave room to hall
+
+          const pool = newTileCategory === 'connector' 
+            ? (newTileType === 'room' ? INDOOR_CONNECTORS : OUTDOOR_CONNECTORS) 
+            : (newTileType === 'room' ? INDOOR_LOCATIONS : OUTDOOR_LOCATIONS);
+          
           const newTileName = pool[Math.floor(Math.random() * pool.length)];
+          
           let objectType: TileObjectType | undefined = undefined;
           let isBlocking = false;
           let difficulty = 0;
           let reqSkill: 'strength' | 'insight' | 'agility' | undefined = undefined;
           const rng = Math.random();
 
-          if (newTileCategory === 'connector') {
-              if (rng > 0.6) {
-                  if (newTileType === 'room') { objectType = 'locked_door'; isBlocking = true; difficulty = 4; reqSkill = 'strength'; } 
-                  else { objectType = Math.random() > 0.5 ? 'rubble' : 'fog_wall'; isBlocking = true; difficulty = 3; reqSkill = objectType === 'fog_wall' ? 'insight' : 'strength'; }
-              } else if (rng < 0.2) objectType = Math.random() > 0.5 ? 'mirror' : 'switch';
-          } else {
-              if (rng > 0.7) { const containers: TileObjectType[] = ['bookshelf', 'crate', 'chest', 'cabinet', 'radio']; objectType = containers[Math.floor(Math.random() * containers.length)]; isBlocking = false; } 
-              else if (rng < 0.2) objectType = 'trap';
+          // OBSTACLE GENERATION
+          if (newTileCategory === 'location' && isCurrentConnector) {
+              // Entering a Room from a Connector - Chokepoint
+              if (rng < 0.5) { // 50% chance of door/obstacle
+                  isBlocking = true;
+                  if (rng < 0.2) {
+                      objectType = 'locked_door';
+                      difficulty = 4;
+                      reqSkill = 'strength';
+                  } else if (rng < 0.35) {
+                      objectType = 'barricade';
+                      difficulty = 3;
+                      reqSkill = 'strength';
+                  } else {
+                      objectType = 'fog_wall'; // Mystical barrier
+                      difficulty = 3;
+                      reqSkill = 'insight';
+                  }
+              }
+          } else if (newTileCategory === 'connector') {
+              // Hallway Hazards
+              if (rng < 0.15) {
+                  isBlocking = true;
+                  if (rng < 0.08) {
+                      objectType = 'rubble';
+                      difficulty = 3;
+                      reqSkill = 'strength';
+                  } else {
+                      objectType = 'fire';
+                      difficulty = 3; // Hard to put out
+                      reqSkill = 'agility';
+                  }
+              }
           }
+          
+          // If not blocked, maybe just loot containers
+          if (!isBlocking && newTileCategory === 'location') {
+               if (rng > 0.6) { 
+                   const containers: TileObjectType[] = ['bookshelf', 'crate', 'chest', 'cabinet', 'radio', 'altar']; 
+                   objectType = containers[Math.floor(Math.random() * containers.length)]; 
+               } else if (rng < 0.1) {
+                   objectType = 'trap'; // Hidden trap
+               }
+          }
+
           const isGate = newTileCategory === 'location' && Math.random() > 0.70; 
           let immediateSpawn: Enemy | null = null;
           if (newTileCategory === 'location' && Math.random() < 0.25) {
@@ -583,7 +628,7 @@ const App: React.FC = () => {
               let updatedEnemies = [...prev.enemies];
               let updatedLog = [...prev.log];
               let updatedEncountered = [...prev.encounteredEnemies];
-              if (immediateSpawn) { updatedEnemies.push(immediateSpawn); updatedLog.unshift(`A ${immediateSpawn.name} was waiting in the shadows!`); if (!updatedEncountered.includes(immediateSpawn.type)) updatedEncountered.push(immediateSpawn.type); playStinger('horror'); }
+              if (immediateSpawn) { updatedEnemies.push(immediateSpawn); updatedLog.unshift(`A ${immediateSpawn.name} was waiting in the shadows!`); if (!updatedEncountered.includes(immediateSpawn.type)) updatedEncountered.push(immediateSpawn.type); playStinger('horror'); generateEnemyVisual(immediateSpawn); }
               if (trapLog) updatedLog.unshift(trapLog);
               return { ...prev, board: [...prev.board, newTile], players: prev.players.map((p, i) => i === prev.activePlayerIndex ? finalPlayer : p), activeEvent: event, selectedTileId: null, enemies: updatedEnemies, log: updatedLog, encounteredEnemies: updatedEncountered };
           });
@@ -611,9 +656,29 @@ const App: React.FC = () => {
              const success = roll.filter(v => v >= 4).length;
              setState(prev => ({ ...prev, lastDiceRoll: roll }));
              if (success >= 1) {
-                 playStinger('click'); addToLog(`Suksess! ${activePlayer.name} fjernet ${selTile.object.type}.`); triggerFloatingText(selTile.q, selTile.r, "CLEARED!", 'text-green-500');
+                 playStinger('click'); 
+                 let clearMsg = `${activePlayer.name} cleared the path.`;
+                 if (selTile.object.type === 'fire') clearMsg = "Fire extinguished!";
+                 if (selTile.object.type === 'locked_door') clearMsg = "Door broken down!";
+                 
+                 addToLog(`Suksess! ${clearMsg}`); 
+                 triggerFloatingText(selTile.q, selTile.r, "CLEARED!", 'text-green-500');
+                 
                  setState(prev => ({ ...prev, board: prev.board.map(t => t.id === selTile.id ? { ...t, object: undefined } : t), players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p), selectedTileId: null }));
-             } else { addToLog(`Mislyktes.`); triggerFloatingText(selTile.q, selTile.r, "FAILED", 'text-red-500'); setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) })); }
+             } else { 
+                 let failMsg = "Failed to clear obstacle.";
+                 if (selTile.object.type === 'fire') {
+                     failMsg = "Burned by the flames! -1 HP";
+                     const dmgRes = applyPhysicalDamage(activePlayer, 1);
+                     addToLog(failMsg);
+                     if (dmgRes.log) addToLog(dmgRes.log);
+                     setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...dmgRes.player, actions: p.actions - 1 } : p) }));
+                 } else {
+                     addToLog(failMsg); 
+                     setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) })); 
+                 }
+                 triggerFloatingText(selTile.q, selTile.r, "FAILED", 'text-red-500'); 
+             }
           }
           break;
         
@@ -917,7 +982,7 @@ const App: React.FC = () => {
       else if (event.effectType === 'health') { const dmg = Math.abs(event.value); const result = applyPhysicalDamage(player, dmg); newPlayers[activePlayerIdx] = result.player; if (result.log) addToLog(result.log); }
       else if (event.effectType === 'insight') { newPlayers[activePlayerIdx] = { ...player, insight: Math.max(0, player.insight + event.value) }; triggerFloatingText(player.position.q, player.position.r, `+${event.value} INSIGHT`, 'text-blue-400'); }
       else if (event.effectType === 'doom') newDoom = Math.max(0, prev.doom + event.value);
-      else if (event.effectType === 'spawn') { const template = BESTIARY['cultist']; newEnemies.push({ id: `enemy-${Date.now()}`, position: { ...player.position }, visionRange: 3, attackRange: 1, attackType: 'melee', maxHp: template.hp, speed: 2, ...template }); if (!newEncountered.includes(template.type)) newEncountered.push(template.type); addToLog("A Cultist emerges!"); }
+      else if (event.effectType === 'spawn') { const template = BESTIARY['cultist']; newEnemies.push({ id: `enemy-${Date.now()}`, position: { ...player.position }, visionRange: 3, attackRange: 1, attackType: 'melee', maxHp: template.hp, speed: 2, ...template }); if (!newEncountered.includes(template.type)) newEncountered.push(template.type); addToLog("A Cultist emerges!"); generateEnemyVisual(newEnemies[newEnemies.length-1]); }
       return { ...prev, players: newPlayers, doom: newDoom, enemies: newEnemies, activeEvent: null, encounteredEnemies: newEncountered };
     });
     playStinger('click');
@@ -1626,8 +1691,10 @@ const App: React.FC = () => {
                     let label = 'Interact';
                     if (obj.type === 'locked_door') label = 'Break Down Door';
                     if (obj.type === 'rubble') label = 'Clear Rubble';
-                    if (obj.type === 'barricade') label = 'Dismantle';
+                    if (obj.type === 'barricade') label = 'Dismantle Barricade';
                     if (obj.type === 'fog_wall') label = 'Dispel Fog';
+                    if (obj.type === 'fire') label = 'Extinguish Fire';
+                    
                     return { id: 'interact-blocker', label, iconType: obj.reqSkill || 'strength', difficulty: obj.difficulty || 3 };
                 }
                 if (tile.object && !tile.object.searched && (['mirror', 'radio', 'switch'].includes(tile.object.type))) {

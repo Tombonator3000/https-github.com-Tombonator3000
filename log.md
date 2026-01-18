@@ -61,3 +61,29 @@ Track all major milestones, feature additions, and bug fixes here.
 *   **Hex Visuals:** Restored tile borders by applying the correct `strokeColor` to the parent hex container.
 *   **Textures:** Increased opacity and improved blending modes for internal CSS patterns to ensure tile types are visually distinct even without AI assets.
 *   **UI Polish:** Restored the "tactical map" aesthetic.
+
+## [v3.9.18 Tactical Obstacles & Procedural Gen]
+*   **Obstacle Generation:** Procedural generation now includes logical placement of obstacles: Walls/Doors at room entrances, Rubble/Fire in corridors.
+*   **Interaction Logic:** Updated interaction handling to support clearing hazards (fire, rubble) and unlocking doors with specific skill checks.
+*   **Risk/Reward:** Failing to clear hazardous terrain (like Fire) now deals damage.
+
+## [v3.9.19 Atmosphere Restoration]
+*   **Deep Audit:** Fixed Z-index layering issues where weather effects were obscured by game entities or vice versa.
+*   **Dynamic Weather:** Implemented a robust weather system that reacts to Scenario Modifiers (Thick Fog, Blood Moon).
+*   **Lighting Engine:** Enhanced the dynamic lighting overlay to provide stronger visual cues for Doom progression.
+
+## [v3.9.20 Content & Immersion Update]
+*   **Bestiary Overhaul:** Updated `constants.ts` with detailed, atmospheric flavor text and lore for all 16 enemy types.
+*   **AI Art Direction:** Refined `visualPrompt` strings for every enemy to ensure generated assets align with the "1920s Oil Painting" art style (High contrast, Chiaroscuro).
+
+## [v3.9.21 Asset Pipeline Upgrade]
+*   **Folder Structure:** Implemented standard asset paths:
+    *   `/assets/audio/music/ambience.mp3`
+    *   `/assets/audio/sfx/[event].mp3`
+    *   `/assets/graphics/tiles/[name].png`
+    *   `/assets/graphics/characters/[id].png`
+    *   `/assets/graphics/monsters/[type].png`
+*   **Priority Loading:** Game now prioritizes manual file placement in these folders.
+*   **Fallback Logic:** If manual assets are missing:
+    *   Visuals fall back to Gemini AI generation.
+    *   Audio falls back to Tone.js synthesis.

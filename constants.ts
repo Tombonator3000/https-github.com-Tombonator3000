@@ -314,9 +314,9 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'cultist',
     hp: 2, damage: 1, horror: 1,
     description: 'A brainwashed servant of the Outer Gods.',
-    visualPrompt: 'A cloaked cultist in dark robes with a hood obscuring their face, holding a jagged dagger. Dark, gritty, 1920s noir style.',
-    lore: 'Often recruited from the desperate and the mad, these individuals have traded their humanity for forbidden knowledge.',
-    defeatFlavor: 'The cultist collapses, clutching a dark amulet.',
+    visualPrompt: 'A sinister cultist in ragged, hooded robes, face obscured by shadow, clutching a jagged ceremonial dagger. Dramatic chiaroscuro lighting, 1920s horror illustration style, oil painting texture.',
+    lore: 'Recruited from the desperate and the mad, these fanatics have traded their humanity for forbidden promises. They seek only to usher in the end times, chanting in tongues that make the ears bleed.',
+    defeatFlavor: 'The cultist collapses, a dark amulet shattering on the cobblestones.',
     traits: []
   },
   sniper: {
@@ -324,9 +324,9 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'sniper',
     hp: 2, damage: 1, horror: 0,
     description: 'An assassin striking from the shadows.',
-    visualPrompt: 'A menacing figure in a trench coat and fedora, holding a long rifle, hiding in the shadows of a brick building. Film noir aesthetic.',
-    lore: 'Armed with stolen military rifles, they guard the ritual sites from a distance, prioritizing targets who know too much.',
-    defeatFlavor: 'The sniper falls, their rifle clattering to the ground.',
+    visualPrompt: 'A menacing silhouette in a trench coat and fedora, perched on a rooftop with a long rifle. Noir atmosphere, high contrast, rain-slicked city background, muted colors.',
+    lore: 'Armed with stolen military hardware and unholy blessings, these marksmen guard the ritual sites. They do not speak, they do not miss, and they prioritize targets who have seen too much.',
+    defeatFlavor: 'The sniper slumps forward, their rifle clattering to the ground.',
     traits: ['ranged']
   },
   priest: {
@@ -334,19 +334,19 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'priest',
     hp: 3, damage: 1, horror: 2,
     description: 'A chanter of doom.',
-    visualPrompt: 'An insane priest in tattered ceremonial vestments, eyes glowing with madness, chanting from a forbidden tome. Eldritch energy around them.',
-    lore: 'Their very voice warps reality. They do not fight with weapons, but with words that accelerate the coming of the end.',
-    defeatFlavor: 'The chanting stops abruptly as the priest exhales their last breath.',
-    traits: [] // Attack type is checked in code
+    visualPrompt: 'A deranged priest in ornate, tattered ceremonial vestments, eyes glowing with purple madness, holding a tome bound in human skin. Eldritch energy crackles around them. Dark fantasy art style.',
+    lore: 'Their very voice warps reality, accelerating the cosmic alignment. They do not fight with steel, but with words that rot the soul and summon the void closer to our world.',
+    defeatFlavor: 'The chanting is cut short by a gurgling gasp as the priest expires.',
+    traits: []
   },
   ghoul: {
     name: 'Ghoul',
     type: 'ghoul',
     hp: 3, damage: 2, horror: 2,
     description: 'A flesh-eating subterranean dweller.',
-    visualPrompt: 'A hunched, canine-like humanoid with rubbery skin, hoof-like feet, and a face like a dog, crouching in a graveyard. Lovecraftian horror art.',
-    lore: 'Canine-like humanoids that dwell in crypts and tunnels beneath the city. They are strangely intelligent and bargain with terrible secrets.',
-    defeatFlavor: 'It collapses into a pile of dust and grave-dirt!',
+    visualPrompt: 'A hunched, canine-like humanoid with rubbery grey skin, hoof-like feet, and a face like a feral dog, crouching in a graveyard. Dirt and bone fragments scattered around. Gritty, detailed horror art.',
+    lore: 'Subterranean dwellers that feast on the dead. Though bestial in appearance, they possess a chilling intelligence and often bargain with sorcerers for the choicest corpses.',
+    defeatFlavor: 'It collapses into a pile of dust and foul-smelling grave dirt.',
     traits: ['scavenger']
   },
   deepone: {
@@ -354,9 +354,9 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'deepone',
     hp: 3, damage: 2, horror: 2,
     description: 'An immortal amphibious humanoid.',
-    visualPrompt: 'A fish-frog hybrid humanoid with glistening gray-green scales, a white belly, bulging unblinking eyes, and gills on the neck. Wet and slimy atmosphere.',
-    lore: 'Servants of Dagon who dwell in underwater cities. They seek to breed with humans to extend their lineage onto land.',
-    defeatFlavor: 'The creature dissolves into a foul-smelling puddle of brine.',
+    visualPrompt: 'A terrifying fish-frog hybrid humanoid with glistening gray-green scales, a pale belly, and bulging unblinking eyes. Standing on a wet dock, dripping with slime. Lovecraftian atmosphere.',
+    lore: 'Immortal servants of Father Dagon who dwell in underwater cities. They possess a loathsome, unblinking stare and seek to breed with humans to extend their lineage onto land.',
+    defeatFlavor: 'The creature dissolves into a foul-smelling puddle of brine and ichor.',
     traits: ['aquatic']
   },
   shoggoth: {
@@ -364,58 +364,58 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'shoggoth',
     hp: 6, damage: 3, horror: 4,
     description: 'A protoplasmic mass of eyes and mouths.',
-    visualPrompt: 'A massive, shapeless monstrosity of iridescent black slime, covered in thousands of forming and unforming eyes and mouths. Protoplasmic horror.',
-    lore: 'Created as slave labor by the Elder Things eons ago. They are shifting, amorphous mountains of slime that crush everything in their path.',
+    visualPrompt: 'A massive, shapeless monstrosity of iridescent black slime, rolling forward like a tide. Covered in thousands of forming and unforming eyes and mouths. Protoplasmic texture, oil slick colors.',
+    lore: 'A nightmarish slave race created by the Elder Things eons ago. They are shifting mountains of iridescent slime that crush everything in their path, constantly crying "Tekeli-li! Tekeli-li!"',
     traits: ['massive', 'slow'],
-    defeatFlavor: 'The massive form loses cohesion, becoming a lifeless pool of slime.'
+    defeatFlavor: 'The massive form loses cohesion, becoming a lifeless pool of inert slime.'
   },
   'mi-go': {
     name: 'Mi-Go',
     type: 'mi-go',
     hp: 3, damage: 1, horror: 1,
     description: 'A fungoid crustacean from Yuggoth.',
-    visualPrompt: 'A pinkish, fungoid, crustacean-like alien creature with large membranous wings and an ellipsoid head covered in antennae. Cosmic horror sci-fi style.',
-    lore: 'They fly through the ether of space on membranous wings. Their technology is far beyond human comprehension, often involving brain extraction.',
+    visualPrompt: 'A pinkish, fungoid, crustacean-like alien creature with large membranous wings and a pulsating ellipsoid head covered in antennae. Holding a strange metallic cylinder. Cosmic sci-fi horror.',
+    lore: 'Fungi from Yuggoth who fly through the ether of space. Their technology is far beyond human comprehension, often involving the surgical extraction of living brains into metal cylinders.',
     traits: ['flying'],
-    defeatFlavor: 'The fungoid body disintegrates, vibrating out of existence.'
+    defeatFlavor: 'The fungoid body disintegrates, vibrating out of our dimension.'
   },
   nightgaunt: {
     name: 'Nightgaunt',
     type: 'nightgaunt',
     hp: 3, damage: 1, horror: 1,
     description: 'A faceless, horned flyer.',
-    visualPrompt: 'A sleek, oily black humanoid creature with no face, large curved horns, and bat-like wings. Silent and menacing.',
-    lore: 'Silent servants of Nodens. They do not speak, but tickle their victims into submission before carrying them off to the Dreamlands.',
+    visualPrompt: 'A sleek, oily black humanoid creature with absolutely no face, large curved horns, and bat-like wings. Smooth texture, merging with the shadows. Unsettling and silent.',
+    lore: 'Faceless, silent servants of Nodens. They do not speak or scream, but tickle their victims into submission before carrying them off to the Dreamlands to be abandoned in the dark.',
     traits: ['flying'],
-    defeatFlavor: 'It vanishes into the night sky without a sound.'
+    defeatFlavor: 'It vanishes into the night sky without a sound, leaving only a cold breeze.'
   },
   hound: {
     name: 'Hound of Tindalos',
     type: 'hound',
     hp: 4, damage: 2, horror: 3,
     description: 'A predator from the angles of time.',
-    visualPrompt: 'A lean, emaciated beast emerging from a sharp angle in the room. It looks made of smoke and blue ichor, with a long tongue. Non-euclidean horror.',
-    lore: 'They enter our reality through sharp angles in a room. Once they catch a scent, they pursue their prey across time itself.',
+    visualPrompt: 'A lean, emaciated beast emerging from a sharp 90-degree angle in a room. It appears made of blue smoke and ichor, with a long, jagged tongue. Non-euclidean geometry, abstract horror.',
+    lore: 'Predators that inhabit the angles of time, unlike life which exists in curves. Once they catch the scent of a time-traveler or seer, they pursue their prey across eons, manifesting through any sharp corner.',
     traits: ['fast', 'ambusher'],
-    defeatFlavor: 'The beast recedes back into the angles of reality.'
+    defeatFlavor: 'The beast howls and recedes back into the angles of reality.'
   },
   dark_young: {
     name: 'Dark Young',
     type: 'dark_young',
     hp: 6, damage: 2, horror: 3,
     description: 'Offspring of Shub-Niggurath.',
-    visualPrompt: 'A terrifying mass of ropy black tentacles and hooves, resembling a twisted, leafless tree that walks. Smelling of grave mold.',
-    lore: 'Enormous, tree-like monstrosities with hoofed legs and ropy tentacles smelling of grave mold.',
+    visualPrompt: 'A terrifying mass of ropy black tentacles and hooves, resembling a twisted, leafless tree that walks. Dripping with green goo, with gaping maws on the trunk. Forest horror.',
+    lore: 'The Black Goat of the Woods with a Thousand Young. These enormous, tree-like monstrosities smell of open graves and stomp through the forest on hoofed legs, crushing the sanity of all who behold them.',
     traits: ['massive'],
-    defeatFlavor: 'The monstrosity withers, resembling a dead tree.'
+    defeatFlavor: 'The monstrosity withers rapidly, resembling a dead, rotted tree stump.'
   },
   byakhee: {
     name: 'Byakhee',
     type: 'byakhee',
     hp: 3, damage: 2, horror: 1,
     description: 'An interstellar steed.',
-    visualPrompt: 'A hybrid monster partly crow, partly mole, partly ant, and partly decomposing human corpse. It has wings and can fly through space.',
-    lore: 'composed of crow, mole, buzzard, ant, and decomposed human being. They can fly through space and carry riders to the court of Azathoth.',
+    visualPrompt: 'A disturbing hybrid monster composed of crow, mole, ant, and decomposing human corpse. Large wings, furry texture, decaying flesh. Flying against a starry sky.',
+    lore: 'Interstellar steeds serving Hastur. They can fly through the vacuum of space, composed of matter that shouldn\'t exist together—fur, feathers, and rotting meat. A whistle can summon them.',
     traits: ['flying', 'fast'],
     defeatFlavor: 'It screeches one last time before dissolving into cosmic dust.'
   },
@@ -424,49 +424,49 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     type: 'star_spawn',
     hp: 8, damage: 3, horror: 5,
     description: 'A colossal kin of Cthulhu.',
-    visualPrompt: 'A gigantic, green, gelatinous monster with an octopus-like head, dragon wings, and claws. A smaller version of Cthulhu.',
-    lore: 'Smaller versions of the Great Dreamer himself. Their psychic presence alone can shatter the minds of the strongest investigators.',
+    visualPrompt: 'A gigantic, green, gelatinous monster with an octopus-like head, dragon wings, and claws. Towering over buildings, wet and slimy. Scale is massive. Lovecraftian masterpiece.',
+    lore: 'Smaller versions of the Great Dreamer himself. They waged war against the Elder Things eons ago. Their psychic presence alone can shatter the minds of the strongest investigators like glass.',
     traits: ['massive'],
-    defeatFlavor: 'The ground shakes as the colossal entity falls.'
+    defeatFlavor: 'The ground shakes violently as the colossal entity falls, liquefying into green ooze.'
   },
   formless_spawn: {
     name: 'Formless Spawn',
     type: 'formless_spawn',
     hp: 5, damage: 2, horror: 2,
     description: 'Black ooze of Tsathoggua.',
-    visualPrompt: 'A pitch-black, liquid shapeshifter changing forms rapidly. An oily toad-like shape emerging from the ooze.',
-    lore: 'A malleable black substance that can change shape instantly. It heals rapidly from physical wounds.',
+    visualPrompt: 'A pitch-black, liquid shapeshifter changing forms rapidly. An oily toad-like shape emerging from a puddle of tar. Reflective, viscous texture. Body horror.',
+    lore: 'Living, sentient puddles of black ichor associated with Tsathoggua. They can flow through the smallest cracks and instantly harden into weapons or tendrils to lash out at their prey.',
     traits: ['regenerate'],
-    defeatFlavor: 'The black ooze evaporates, leaving a stain on reality.'
+    defeatFlavor: 'The black ooze evaporates into foul steam, leaving a permanent stain on reality.'
   },
   hunting_horror: {
     name: 'Hunting Horror',
     type: 'hunting_horror',
     hp: 4, damage: 3, horror: 3,
     description: 'A viper of the void.',
-    visualPrompt: 'A colossal, serpentine creature flying through the air, resembling a dragon without wings, with a single distorted face.',
-    lore: 'A massive, serpentine entity resembling a dragon without wings. It serves Nyarlathotep and hunts those who pry too deep.',
+    visualPrompt: 'A colossal, serpentine creature flying through the air, resembling a dragon without wings, with a single distorted face. Scales are constantly shifting. Cosmic void background.',
+    lore: 'A massive, serpentine entity resembling a dragon without wings. It serves Nyarlathotep and hunts those who pry too deep into secrets better left buried. It hates the light.',
     traits: ['fast', 'flying'],
-    defeatFlavor: 'It coils in on itself and vanishes in a flash of light.'
+    defeatFlavor: 'It coils in on itself, shrieking, and vanishes in a blinding flash of light.'
   },
   moon_beast: {
     name: 'Moon-Beast',
     type: 'moon_beast',
     hp: 4, damage: 1, horror: 2,
     description: 'Sadistic torturers from the moon.',
-    visualPrompt: 'A pale, toad-like abomination with no eyes and a mass of short, pink tentacles vibrating on its snout. Squat and loathsome.',
-    lore: 'Pale, toad-like abominations with no eyes and a mass of pink tentacles on their snout. They enslave other races.',
+    visualPrompt: 'A pale, toad-like abomination with no eyes and a mass of short, pink tentacles vibrating on its snout. Squat, loathsome, and slippery. Dreamlands setting.',
+    lore: 'Blind, pale, toad-like abominations from the Dreamlands\' moon. They sail black galleys and enslave other races, taking sadistic pleasure in torture and suffering.',
     traits: ['ranged'],
-    defeatFlavor: 'The pale abomination falls silent.'
+    defeatFlavor: 'The pale abomination falls silent, its tentacles twitching one last time.'
   },
   boss: {
     name: 'Ancient One',
     type: 'boss',
     hp: 10, damage: 4, horror: 6,
     description: 'An avatar of cosmic destruction.',
-    visualPrompt: 'A cosmic entity of impossible geometry, surrounded by madness and void. An avatar of Nyarlathotep or Cthulhu.',
-    lore: 'You should not be seeing this. If you are, the end is already here.',
+    visualPrompt: 'A cosmic entity of impossible geometry, surrounded by madness and void. An avatar of Nyarlathotep or Cthulhu. Fractured reality, non-euclidean shapes, overwhelming scale.',
+    lore: 'You should not be seeing this. It is an intrusion from outside the ordered universe, a hole in the fabric of reality that burns the mind to look upon. If you are here, the end is already beginning.',
     traits: ['massive'],
-    defeatFlavor: 'The avatar is banished, screaming as it is pulled back into the void.'
+    defeatFlavor: 'The avatar is banished, screaming as it is pulled back into the void, sealing the gate.'
   }
 };

@@ -1,33 +1,38 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { INDOOR_LOCATIONS, OUTDOOR_LOCATIONS } from '../constants';
+import { INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, BESTIARY, CHARACTERS } from '../constants';
+import { Enemy, Player, CharacterType, EnemyType } from '../types';
 
 const ASSET_KEY = 'shadows_1920s_assets_v1';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export interface AssetLibrary {
-    [locationName: string]: string; // Maps location name to Base64 image string
+    [locationName: string]: string; // Maps location name to Base64 image string or URL path
 }
 
-// Try to load static assets (This will be empty initially, but user can populate it)
+// Try to load static assets
 let STATIC_ASSETS: AssetLibrary = {};
-try {
-    // In a real build step, we might import a JSON file.
-    // For this prototype, we will rely on the user pasting data or loading it via a mechanism if we had fs access.
-    // We will simulate "checking" for it.
-    // import assets from '../game_assets.json'; 
-    // STATIC_ASSETS = assets;
-} catch (e) {
-    // No static assets found
-}
+
+// Helper to check if a local file exists (Head request)
+const checkLocalAsset = async (path: string): Promise<boolean> => {
+    try {
+        const response = await fetch(path, { method: 'HEAD' });
+        return response.ok;
+    } catch (e) {
+        return false;
+    }
+};
+
+// Helper to sanitize names for filenames (e.g. "Dark Altar" -> "dark_altar")
+const toFileName = (name: string) => {
+    return name.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
+};
 
 // Load library from local storage OR static file
 export const loadAssetLibrary = (): AssetLibrary => {
     try {
         const saved = localStorage.getItem(ASSET_KEY);
         const localLib = saved ? JSON.parse(saved) : {};
-        
-        // Merge: Local storage overrides static (dev mode), but static fills gaps
         return { ...STATIC_ASSETS, ...localLib };
     } catch (e) {
         console.error("Failed to load asset library", e);
@@ -35,20 +40,29 @@ export const loadAssetLibrary = (): AssetLibrary => {
     }
 };
 
-// Save library to local storage
 export const saveAssetLibrary = (library: AssetLibrary) => {
     try {
         localStorage.setItem(ASSET_KEY, JSON.stringify(library));
     } catch (e) {
-        console.error("Failed to save asset library (likely quota exceeded)", e);
+        console.warn("Failed to save asset library (likely quota exceeded). Assets will persist per session only.", e);
     }
 };
 
-// Generate a single asset
+// --- TILES ---
+
 export const generateLocationAsset = async (locationName: string, type: 'room' | 'street' | 'building'): Promise<string | null> => {
+    // 1. Check Manual File
+    const fileName = toFileName(locationName);
+    const localPath = `/assets/graphics/tiles/${fileName}.png`;
+    
+    if (await checkLocalAsset(localPath)) {
+        console.log(`[AssetLibrary] Found local asset for ${locationName}`);
+        return localPath;
+    }
+
+    // 2. Check AI / API
     if (!process.env.API_KEY) return null;
     
-    // Strict, consistent prompt for uniform game art style
     const prompt = `A top-down, tabletop RPG battlemap tile of a ${locationName} (${type}) in a 1920s Lovecraftian horror setting. 
     Style: Dark, gritty, hand-painted oil painting aesthetic. High contrast, atmospheric lighting, ominous shadows. 
     Perspective: Strictly top-down (bird's eye view). 
@@ -59,9 +73,7 @@ export const generateLocationAsset = async (locationName: string, type: 'room' |
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
-            config: {
-                imageConfig: { aspectRatio: "1:1" }
-            }
+            config: { imageConfig: { aspectRatio: "1:1" } }
         });
         
         const candidates = response.candidates;
@@ -77,6 +89,71 @@ export const generateLocationAsset = async (locationName: string, type: 'room' |
         console.warn(`Failed to generate asset for ${locationName}:`, e);
         return null;
     }
+};
+
+// --- CHARACTERS ---
+
+export const getCharacterVisual = async (player: Player): Promise<string | null> => {
+    // 1. Check Manual File
+    const fileName = player.id; // e.g. 'detective'
+    const localPath = `/assets/graphics/characters/${fileName}.png`;
+
+    if (await checkLocalAsset(localPath)) {
+        return localPath;
+    }
+
+    // 2. Check AI Generation
+    if (!process.env.API_KEY) return null;
+
+    const prompt = `A dark, moody, oil painting style portrait of a 1920s ${CHARACTERS[player.id].name} (${player.id}) in a Lovecraftian horror setting. High contrast, atmospheric, vintage.`;
+    
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: prompt }] },
+            config: { imageConfig: { aspectRatio: "1:1" } }
+        });
+        
+        if (response.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
+            return `data:image/png;base64,${response.candidates[0].content.parts[0].inlineData.data}`;
+        }
+    } catch (e) {
+        console.warn("Character gen failed", e);
+    }
+    return null;
+};
+
+// --- ENEMIES ---
+
+export const getEnemyVisual = async (enemy: Enemy): Promise<string | null> => {
+    // 1. Check Manual File
+    const fileName = enemy.type;
+    const localPath = `/assets/graphics/monsters/${fileName}.png`;
+
+    if (await checkLocalAsset(localPath)) {
+        return localPath;
+    }
+
+    // 2. Check AI Generation
+    if (!process.env.API_KEY) return null;
+
+    const bestiaryEntry = BESTIARY[enemy.type];
+    const specificPrompt = bestiaryEntry?.visualPrompt || `A terrifying, nightmarish illustration of a ${enemy.name} (${enemy.type}) from Cthulhu mythos. Dark fantasy art, creature design, horror, menacing, detailed, isolated on dark background.`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: specificPrompt }] },
+            config: { imageConfig: { aspectRatio: "1:1" } }
+        });
+        
+        if (response.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
+            return `data:image/png;base64,${response.candidates[0].content.parts[0].inlineData.data}`;
+        }
+    } catch (e) {
+        console.warn("Enemy gen failed", e);
+    }
+    return null;
 };
 
 // Helper to get list of all missing assets

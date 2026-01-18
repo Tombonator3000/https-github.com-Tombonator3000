@@ -198,7 +198,6 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
 // DOOM LIGHTING CONFIG
 const getDoomLighting = (doom: number, activeModifiers: ScenarioModifier[] = []) => {
     // 0 is dead, 12 is safe.
-    // Inverse scale: 0 is safe, 1.0 is danger.
     const danger = Math.max(0, 1 - (doom / 12)); 
 
     let overlayColor = 'rgba(10, 20, 40, 0.4)'; // Default cool blue
@@ -214,13 +213,13 @@ const getDoomLighting = (doom: number, activeModifiers: ScenarioModifier[] = [])
 
     if (doom <= 3) {
         // Critical
-        overlayColor = isBloodMoon ? 'rgba(80, 0, 0, 0.4)' : 'rgba(60, 0, 0, 0.2)'; 
+        overlayColor = isBloodMoon ? 'rgba(80, 0, 0, 0.5)' : 'rgba(60, 0, 0, 0.3)'; 
         vignetteStrength = '90%'; // Tight
-        animation = 'doom-flicker 4s infinite, doom-pulse-red 2s infinite';
+        animation = isBloodMoon ? 'doom-pulse-red 3s infinite' : 'doom-flicker 4s infinite';
         contrast = 1.2;
     } else if (doom <= 6) {
         // Warning
-        overlayColor = isBloodMoon ? 'rgba(60, 20, 20, 0.3)' : 'rgba(40, 10, 40, 0.3)';
+        overlayColor = isBloodMoon ? 'rgba(60, 20, 20, 0.4)' : 'rgba(40, 10, 40, 0.3)';
         vignetteStrength = '75%';
         animation = 'none';
         contrast = 1.1;
@@ -231,6 +230,32 @@ const getDoomLighting = (doom: number, activeModifiers: ScenarioModifier[] = [])
 
     return { gradient, animation, contrast, danger };
 };
+
+// WEATHER CONFIG
+const getWeatherVisuals = (activeModifiers: ScenarioModifier[] = []) => {
+    const isFoggy = activeModifiers.some(m => m.effect === 'reduced_vision');
+    const isBloodMoon = activeModifiers.some(m => m.effect === 'strong_enemies');
+    
+    // Default Atmosphere
+    let bgImage = 'url("https://www.transparenttextures.com/patterns/foggy-birds.png")';
+    let opacity = 0.3;
+    let blendMode = 'screen';
+    let filter = 'blur(2px)';
+    let animation = 'animate-fog';
+
+    if (isFoggy) {
+        bgImage = 'url("https://www.transparenttextures.com/patterns/foggy-birds.png")'; // Thicker fog texture if available, or just increase opacity
+        opacity = 0.6; // Much thicker
+        filter = 'blur(4px) contrast(1.2)';
+    } else if (isBloodMoon) {
+        bgImage = 'url("https://www.transparenttextures.com/patterns/dark-matter.png")';
+        opacity = 0.4;
+        blendMode = 'color-dodge';
+        filter = 'sepia(1) hue-rotate(-50deg)'; // Red tint
+    }
+
+    return { bgImage, opacity, blendMode, filter, animation };
+}
 
 
 const GameBoard: React.FC<GameBoardProps> = ({ 
@@ -397,8 +422,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
     return moves;
   }, [tiles, visibleTiles]);
 
-  // Calculate dynamic lighting based on Doom
+  // Calculate dynamic visuals
   const lighting = getDoomLighting(doom, activeModifiers);
+  const weather = getWeatherVisuals(activeModifiers);
 
   return (
     <div 
@@ -425,24 +451,26 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* 2. Atmospheric Clouds / Weather Layer */}
       <div 
-        className="absolute inset-0 pointer-events-none z-20 transition-opacity duration-1000 animate-fog opacity-30"
+        className={`absolute inset-0 pointer-events-none z-25 transition-opacity duration-1000 ${weather.animation}`}
         style={{
-            backgroundImage: 'url("https://www.transparenttextures.com/patterns/foggy-birds.png")',
+            backgroundImage: weather.bgImage,
             backgroundSize: '600px',
-            mixBlendMode: 'screen',
-            filter: 'blur(2px)'
+            opacity: weather.opacity,
+            mixBlendMode: weather.blendMode as any,
+            filter: weather.filter
         }}
       />
-      {/* Darker Void Background for Depth */}
+      
+      {/* 3. Darker Void Background for Depth (Behind everything) */}
       <div className="absolute inset-0 pointer-events-none z-0 bg-[radial-gradient(circle_at_center,_transparent_0%,_#000_100%)] opacity-80" />
       
-      {/* Game Content */}
+      {/* Game Content Container - z-10 puts it between Void and Atmosphere */}
       <div 
         style={{ 
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
             transition: isDragging ? 'none' : 'transform 0.1s ease-out'
         }}
-        className="absolute top-0 left-0 will-change-transform"
+        className="absolute top-0 left-0 will-change-transform z-10"
       >
         {/* TILES */}
         {tiles.map(tile => {
@@ -585,8 +613,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     ) : (
                         <User className="text-white" size={20} />
                     )}
-                    {/* Lantern Light Source */}
+                    {/* Lantern Light Source - Pulse breathing animation */}
                     <div className="absolute inset-0 bg-amber-200/20 rounded-full animate-lantern pointer-events-none blur-xl scale-[3]"></div>
+                    
                     {/* Sanity Ring */}
                     <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none">
                         <circle cx="22" cy="22" r="21" fill="none" stroke="#7e22ce" strokeWidth="2" strokeDasharray="132" strokeDashoffset={132 * (1 - player.sanity/player.maxSanity)} className="transition-all duration-500" />
