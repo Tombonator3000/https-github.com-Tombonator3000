@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import * as Tone from 'tone';
 import { GoogleGenAI } from "@google/genai";
-import {
-  Skull,
+import { 
+  Skull, 
   ChevronRight,
   RotateCcw,
   Sword,
@@ -24,7 +24,6 @@ import {
 } from 'lucide-react';
 import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator, FloatingText, Item, Spell } from './types';
 import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS } from './constants';
-import { getApiKey, detectEnvironment, getEnvironmentInfo } from './env';
 import GameBoard from './components/GameBoard';
 import CharacterPanel from './components/CharacterPanel';
 import EnemyPanel from './components/EnemyPanel';
@@ -35,24 +34,12 @@ import MainMenu from './components/MainMenu';
 import OptionsMenu from './components/OptionsMenu';
 import PuzzleModal from './components/PuzzleModal';
 import MerchantShop from './components/MerchantShop';
+import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary } from './utils/AssetLibrary';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
-const APP_VERSION = "3.1.0";
-
-// Initialize AI client with environment-aware API key
-let ai: GoogleGenAI | null = null;
-const initializeAI = () => {
-  if (ai) return ai;
-  const apiKey = getApiKey();
-  if (apiKey) {
-    ai = new GoogleGenAI({ apiKey });
-    console.log(getEnvironmentInfo());
-  } else {
-    console.warn('No API key available. AI features disabled.');
-  }
-  return ai;
-};
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const APP_VERSION = "3.3.0";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -172,15 +159,25 @@ const App: React.FC = () => {
     const saved = localStorage.getItem(ROSTER_KEY);
     return saved ? JSON.parse(saved) : [];
   });
-  const [viewingVeterans, setViewingVeterans] = useState(false);
+  
+  // Asset Library State
+  const [assetLibrary, setAssetLibrary] = useState<AssetLibrary>({});
 
+  const [viewingVeterans, setViewingVeterans] = useState(false);
+  const [setupNames, setSetupNames] = useState<Record<string, string>>({});
   const [hoveredEnemyId, setHoveredEnemyId] = useState<string | null>(null);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
   const audioInit = useRef(false);
 
-  // --- PERSISTENCE ---
+  // --- PERSISTENCE & INIT ---
+  useEffect(() => {
+    // Load assets on boot
+    const lib = loadAssetLibrary();
+    setAssetLibrary(lib);
+  }, []);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
@@ -188,6 +185,19 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(ROSTER_KEY, JSON.stringify(roster));
   }, [roster]);
+
+  // Update visuals if assets change (e.g. from Options menu generation)
+  const refreshBoardVisuals = () => {
+      const lib = loadAssetLibrary();
+      setAssetLibrary(lib);
+      setState(prev => ({
+          ...prev,
+          board: prev.board.map(t => ({
+              ...t,
+              imageUrl: lib[t.name] || t.imageUrl
+          }))
+      }));
+  };
 
   // --- AUDIO ---
   const initAudio = async () => {
@@ -252,17 +262,16 @@ const App: React.FC = () => {
 
   // --- AI IMAGE GENERATION (NANO BANANA) ---
   const generateImage = async (prompt: string): Promise<string | null> => {
-    const aiClient = initializeAI();
-    if (!aiClient) return null;
+    if (!process.env.API_KEY) return null;
     try {
-        const response = await aiClient.models.generateContent({
+        const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
             config: {
                 imageConfig: { aspectRatio: "1:1" }
             }
         });
-
+        
         const candidates = response.candidates;
         if (candidates && candidates[0] && candidates[0].content && candidates[0].content.parts) {
             for (const part of candidates[0].content.parts) {
@@ -291,10 +300,27 @@ const App: React.FC = () => {
   };
 
   const generateTileVisual = async (tile: Tile) => {
+      // 1. Check if asset already exists in our library
+      const lib = loadAssetLibrary();
+      if (lib[tile.name]) {
+          setState(prev => ({
+              ...prev,
+              board: prev.board.map(t => t.id === tile.id ? { ...t, imageUrl: lib[tile.name] } : t)
+          }));
+          return;
+      }
+
+      // 2. If not, generate it and save it
       if (tile.imageUrl) return;
-      const prompt = `A top-down, hand-painted battlemap tile of a ${tile.name} (${tile.type}), 1920s Lovecraftian horror style. Dark, gritty texture, fog, eldritch atmosphere. No grid lines.`;
-      const img = await generateImage(prompt);
+      
+      const img = await generateLocationAsset(tile.name, tile.type);
       if (img) {
+          // Save to library
+          lib[tile.name] = img;
+          saveAssetLibrary(lib);
+          setAssetLibrary(lib);
+
+          // Update state
           setState(prev => ({
               ...prev,
               board: prev.board.map(t => t.id === tile.id ? { ...t, imageUrl: img } : t)
@@ -373,12 +399,11 @@ const App: React.FC = () => {
   };
 
   const generateNarrative = async (tile: Tile) => {
-    const aiClient = initializeAI();
-    if (!aiClient) return;
+    if (!process.env.API_KEY) return;
     generateTileVisual(tile);
     try {
       const prompt = `Skriv en kort, atmosfærisk beskrivelse (maks 2 setninger) på norsk for en etterforsker som går inn i "${tile.name}" i et Lovecraft-inspirert spill. Rommet inneholder: ${tile.object ? tile.object.type : 'ingenting spesielt'}. Doom-nivået er ${state.doom}.`;
-      const response = await aiClient.models.generateContent({
+      const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
       });
@@ -408,8 +433,12 @@ const App: React.FC = () => {
           startingSpells.push(SPELLS.find(s => s.id === 'wither')!);
       }
 
+      // Check if we have a saved name for this session, otherwise use default
+      const sessionName = setupNames[type] || char.name;
+
       const newPlayer: Player = { 
           ...char, 
+          name: sessionName,
           position: { q: 0, r: 0 }, 
           inventory: [], 
           spells: startingSpells,
@@ -431,8 +460,12 @@ const App: React.FC = () => {
           if (existing) return { ...prev, players: prev.players.filter(p => p.instanceId !== vet.instanceId) };
           if (prev.players.length >= 4) return prev;
 
+          // Check for session-specific rename for veteran
+          const sessionName = (vet.instanceId && setupNames[vet.instanceId]) || vet.name;
+
           const player: Player = {
               ...vet,
+              name: sessionName,
               position: { q: 0, r: 0 },
               actions: 2,
               isDead: false
@@ -442,6 +475,10 @@ const App: React.FC = () => {
   };
 
   const updatePlayerName = (identifier: string, newName: string, isVeteran: boolean) => {
+      // 1. Update the session memory so it persists if deselected/reselected
+      setSetupNames(prev => ({ ...prev, [identifier]: newName }));
+
+      // 2. Update the actual active player object if present
       setState(prev => ({
           ...prev,
           players: prev.players.map(p => {
@@ -599,18 +636,23 @@ const App: React.FC = () => {
   // --- MENU ACTIONS ---
   const handleStartNewGame = () => {
       setState(DEFAULT_STATE);
+      // Reset setup specific memory when starting fully new game
+      setSetupNames({});
       setIsMainMenuOpen(false);
+      refreshBoardVisuals(); // Ensure any newly generated assets from options are applied
       initAudio();
   };
 
   const handleContinueGame = () => {
       setIsMainMenuOpen(false);
+      refreshBoardVisuals();
       initAudio();
   };
 
   const handleResetData = () => {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(ROSTER_KEY);
+      // Also clear asset library? Maybe safe to keep it.
       window.location.reload();
   };
 
@@ -893,6 +935,12 @@ const App: React.FC = () => {
                triggerShake();
           }
 
+          // Use library image if available
+          const existingImage = assetLibrary[newTileName];
+          if (existingImage) {
+              newTile.imageUrl = existingImage;
+          }
+
           setState(prev => ({ 
             ...prev, 
             board: [...prev.board, newTile], 
@@ -901,6 +949,7 @@ const App: React.FC = () => {
             selectedTileId: null,
             log: trapLog ? [trapLog, ...prev.log] : prev.log
           }));
+          
           generateNarrative(newTile);
         } else {
           setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p), selectedTileId: null }));
@@ -1242,7 +1291,7 @@ const App: React.FC = () => {
       return (
         <>
             <MainMenu onNewGame={handleStartNewGame} onContinue={handleContinueGame} onOptions={() => setShowOptions(true)} canContinue={canContinue} version={APP_VERSION} />
-            {showOptions && <OptionsMenu onClose={() => setShowOptions(false)} onResetData={handleResetData} />}
+            {showOptions && <OptionsMenu onClose={() => { setShowOptions(false); refreshBoardVisuals(); }} onResetData={handleResetData} />}
         </>
       );
   }
@@ -1314,11 +1363,18 @@ const App: React.FC = () => {
                       )}
                       {isSelected ? (
                         <div className="flex items-center gap-2 mb-1">
-                          <input type="text" value={selectedPlayer.name} onChange={(e) => updatePlayerName(key, e.target.value, false)} onClick={(e) => e.stopPropagation()} className="bg-transparent border-b border-[#e94560] text-[#e94560] text-xl font-bold uppercase tracking-tight w-full focus:outline-none placeholder-slate-700" />
+                          <input 
+                            type="text" 
+                            value={selectedPlayer.name} 
+                            onChange={(e) => updatePlayerName(key, e.target.value, false)} 
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); }} 
+                            onMouseDown={(e) => { e.stopPropagation(); }}
+                            className="bg-transparent border-b border-[#e94560] text-[#e94560] text-xl font-bold uppercase tracking-tight w-full focus:outline-none placeholder-slate-700 z-50 relative cursor-text" 
+                          />
                           <Edit2 size={12} className="text-slate-600" />
                         </div>
                       ) : (
-                        <div className={`text-xl font-bold uppercase tracking-tight text-slate-100`}>{CHARACTERS[key].name}</div>
+                        <div className={`text-xl font-bold uppercase tracking-tight text-slate-100`}>{setupNames[key] || CHARACTERS[key].name}</div>
                       )}
                       <div className="text-[9px] text-slate-500 mt-2 uppercase tracking-[0.2em] leading-tight font-sans h-8">{CHARACTERS[key].special}</div>
                       <div className="flex gap-4 mt-4 text-sm font-bold">
@@ -1342,9 +1398,16 @@ const App: React.FC = () => {
                             <button key={vet.instanceId} onClick={() => toggleVeteranSelection(vet)} className={`group p-5 bg-[#1a120b] border-2 transition-all text-left relative overflow-hidden ${isSelected ? 'border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.3)]' : 'border-amber-900/50 hover:border-amber-700'}`}>
                               <div className="flex justify-between items-start">
                                   {isSelected ? (
-                                    <input type="text" value={selectedPlayer.name} onChange={(e) => updatePlayerName(vet.instanceId!, e.target.value, true)} onClick={(e) => e.stopPropagation()} className="bg-transparent border-b border-amber-500 text-amber-400 text-xl font-bold uppercase tracking-tight w-full focus:outline-none placeholder-amber-900/50 mr-2" />
+                                    <input 
+                                        type="text" 
+                                        value={selectedPlayer.name} 
+                                        onChange={(e) => updatePlayerName(vet.instanceId!, e.target.value, true)} 
+                                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); }} 
+                                        onMouseDown={(e) => { e.stopPropagation(); }}
+                                        className="bg-transparent border-b border-amber-500 text-amber-400 text-xl font-bold uppercase tracking-tight w-full focus:outline-none placeholder-amber-900/50 mr-2 z-50 relative cursor-text" 
+                                    />
                                   ) : (
-                                    <div className={`text-xl font-bold uppercase tracking-tight ${isSelected ? 'text-amber-400' : 'text-amber-100/80'}`}>{vet.name}</div>
+                                    <div className={`text-xl font-bold uppercase tracking-tight ${isSelected ? 'text-amber-400' : 'text-amber-100/80'}`}>{setupNames[vet.instanceId!] || vet.name}</div>
                                   )}
                                   <Trash2 size={14} className="text-slate-600 hover:text-red-500 z-20" onClick={(e) => { e.stopPropagation(); deleteVeteran(vet.instanceId!); }} />
                               </div>

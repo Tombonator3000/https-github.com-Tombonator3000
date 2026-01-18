@@ -150,7 +150,10 @@ export const INDOOR_LOCATIONS = [
   'Warehouse', 'Arkham Asylum', 'Historical Museum', 
   'St. Mary\'s Hospital', 'Sanitarium', 'Underground Vault',
   'Dusty Attic', 'Grand Hall', 'Study Room', 'Kitchen', 
-  'Ritual Chamber', 'Boiler Room', 'Servant Quarters'
+  'Ritual Chamber', 'Boiler Room', 'Servant Quarters',
+  'Ballroom', 'Conservatory', 'Billiard Room', 'Wine Cellar', 
+  'Panic Room', 'Trophy Room', 'Greenhouse', 'Observatory', 
+  'Master Bedroom', 'Nursery', 'Operating Theater', 'Padded Cell'
 ];
 
 export const OUTDOOR_LOCATIONS = [
@@ -158,7 +161,10 @@ export const OUTDOOR_LOCATIONS = [
   'Old Lighthouse', 'Blackwood Forest', 'Graveyard', 
   'University Campus', 'Bridge', 'Market District', 
   'River Bank', 'Train Station', 'Swamp', 'City Park',
-  'Merchant Street', 'Dark Pier'
+  'Merchant Street', 'Dark Pier',
+  'Dead End Alley', 'Crossroads', 'T-Junction', 'Roundabout', 
+  'Collapsed Bridge', 'Overgrown Path', 'Rotting Gazebo', 
+  'Fountain', 'Construction Site'
 ];
 
 export const LOCATION_NAMES = [...INDOOR_LOCATIONS, ...OUTDOOR_LOCATIONS];

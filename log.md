@@ -126,17 +126,11 @@ Track all major milestones, feature additions, and bug fixes here.
     *   *Continuity:* Saving to the Roster now happens *after* the shopping phase, ensuring veterans start their next case fully equipped.
 *   **Item Costs:** Updated the item database with Insight costs to support the economy.
 
-## [v3.2 Update - Multi-Platform Support]
-*   **Environment Detection:** Created `env.ts` utility to automatically detect deployment platform (AI Studio, GitHub Pages, or Local).
-*   **Flexible API Key Handling:**
-    *   *AI Studio:* Automatically detects and uses platform-provided API keys (window.GOOGLE_API_KEY).
-    *   *GitHub Pages:* Uses build-time injected API keys from environment variables.
-    *   *Local Development:* Uses .env file configuration.
-    *   *Graceful Degradation:* AI features are disabled if no key is available, allowing the game to run without errors.
-*   **Build System Improvements:**
-    *   *Relative Paths:* Configured Vite to use relative base paths (`./`) for universal compatibility.
-    *   *Flexible Base Path:* Added support for custom base paths via `BASE_PATH` environment variable.
-    *   *Code Splitting:* Implemented intelligent chunking for better performance (react-vendor, game-logic, ui-components).
-    *   *Entry Point Fix:* Fixed index.html to properly include the app entry point for Vite builds.
-*   **Deployment Documentation:** Created comprehensive `DEPLOYMENT.md` with platform-specific instructions, troubleshooting, and best practices.
-*   **Cross-Platform Testing:** Verified build works for both GitHub Pages and AI Studio deployment scenarios.
+## [v3.2 Update - Quality of Life: Character Setup]
+*   **Persistent Naming:** Renaming a character in the Setup phase is now "sticky". If you deselect a character and re-select them, their custom name is preserved for the session.
+*   **Input Focus Fix:** Fixed a UX issue where clicking inside the name input field would accidentally toggle the character selection off or cause the cursor to lose focus.
+
+## [v3.3 Update - Persistent Asset Library]
+*   **Asset Management System:** Implemented `utils/AssetLibrary.ts` to manage game graphics.
+*   **Persistent Graphics:** Generated images are now stored permanently in `localStorage`. Once a tile (e.g., "Library") is generated, it remains consistent across all future games.
+*   **Generator Tool:** Added a **"Generate All Assets"** tool in the Options menu. This iterates through all defined locations and pre-generates the graphics using the AI model, effectively "finishing" the game's art assets for the user.

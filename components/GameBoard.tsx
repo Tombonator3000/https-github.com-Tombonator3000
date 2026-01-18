@@ -27,7 +27,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
   const n = name.toLowerCase();
   
   // 1. WOOD FLOOR (Manors, Libraries, Old Houses)
-  if (n.includes('library') || n.includes('study') || n.includes('manor') || n.includes('hall') || n.includes('attic') || n.includes('servant')) {
+  if (n.includes('library') || n.includes('study') || n.includes('manor') || n.includes('hall') || n.includes('attic') || n.includes('servant') || n.includes('ballroom') || n.includes('billiard') || n.includes('bedroom') || n.includes('nursery') || n.includes('trophy')) {
     return {
       bg: 'bg-[#2a1d18]',
       style: {
@@ -40,7 +40,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
   }
 
   // 2. COLD TILES (Hospitals, Asylums, Labs)
-  if (n.includes('hospital') || n.includes('asylum') || n.includes('sanitarium') || n.includes('morgue') || n.includes('lab')) {
+  if (n.includes('hospital') || n.includes('asylum') || n.includes('sanitarium') || n.includes('morgue') || n.includes('lab') || n.includes('operating') || n.includes('padded')) {
     return {
       bg: 'bg-[#e2e8f0]', // Light slate
       style: {
@@ -68,8 +68,8 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
     };
   }
 
-  // 4. INDUSTRIAL / STORAGE (Warehouse, Boiler Room, Factory)
-  if (n.includes('warehouse') || n.includes('boiler') || n.includes('factory') || n.includes('station')) {
+  // 4. INDUSTRIAL / STORAGE (Warehouse, Boiler Room, Factory, Cellar)
+  if (n.includes('warehouse') || n.includes('boiler') || n.includes('factory') || n.includes('station') || n.includes('cellar')) {
     return {
       bg: 'bg-[#1c1917]',
       style: {
@@ -81,8 +81,8 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
     };
   }
 
-  // 5. NATURE / SWAMP (Swamp, Forest, Park, Garden)
-  if (n.includes('swamp') || n.includes('forest') || n.includes('park') || n.includes('garden') || n.includes('graveyard')) {
+  // 5. NATURE / SWAMP (Swamp, Forest, Park, Garden, Greenhouse)
+  if (n.includes('swamp') || n.includes('forest') || n.includes('park') || n.includes('garden') || n.includes('graveyard') || n.includes('greenhouse') || n.includes('conservatory') || n.includes('gazebo') || n.includes('overgrown')) {
     return {
       bg: 'bg-[#06180e]',
       style: {
@@ -107,8 +107,8 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
     };
   }
 
-  // 7. STREET / URBAN (Street, Square, Alley)
-  if (type === 'street' || n.includes('street') || n.includes('square') || n.includes('alley')) {
+  // 7. STREET / URBAN (Street, Square, Alley, Junction)
+  if (type === 'street' || n.includes('street') || n.includes('square') || n.includes('alley') || n.includes('dead end') || n.includes('junction') || n.includes('roundabout') || n.includes('crossroads') || n.includes('site')) {
     return {
       bg: 'bg-[#1e293b]',
       style: {

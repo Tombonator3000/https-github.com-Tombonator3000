@@ -1,6 +1,8 @@
 
-import React, { useState } from 'react';
-import { X, Trash2, Monitor, Volume2, VolumeX, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Trash2, Monitor, AlertTriangle, Image as ImageIcon, Loader, CheckCircle } from 'lucide-react';
+import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, getMissingAssets } from '../utils/AssetLibrary';
+import { INDOOR_LOCATIONS, OUTDOOR_LOCATIONS } from '../constants';
 
 interface OptionsMenuProps {
   onClose: () => void;
@@ -10,6 +12,18 @@ interface OptionsMenuProps {
 const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData }) => {
   const [confirmReset, setConfirmReset] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+  
+  // Asset Gen State
+  const [missingCount, setMissingCount] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [genProgress, setGenProgress] = useState(0);
+  const [currentGenItem, setCurrentGenItem] = useState('');
+
+  useEffect(() => {
+      const lib = loadAssetLibrary();
+      const missing = getMissingAssets(lib);
+      setMissingCount(missing.length);
+  }, []);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -21,6 +35,39 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData }) => {
             setIsFullscreen(false);
         }
     }
+  };
+
+  const handleGenerateAssets = async () => {
+      if (!process.env.API_KEY) {
+          alert("API Key missing.");
+          return;
+      }
+      setIsGenerating(true);
+      const lib = loadAssetLibrary();
+      const missing = getMissingAssets(lib);
+      const total = missing.length;
+
+      for (let i = 0; i < total; i++) {
+          const locName = missing[i];
+          setCurrentGenItem(locName);
+          setGenProgress(Math.round(((i) / total) * 100));
+          
+          const isIndoor = INDOOR_LOCATIONS.includes(locName);
+          const img = await generateLocationAsset(locName, isIndoor ? 'room' : 'street');
+          
+          if (img) {
+              lib[locName] = img;
+              saveAssetLibrary(lib); // Save incrementally
+          }
+          
+          // Small delay to be nice to the API
+          await new Promise(r => setTimeout(r, 1000));
+      }
+
+      setGenProgress(100);
+      setIsGenerating(false);
+      setCurrentGenItem('Done!');
+      setMissingCount(0);
   };
 
   return (
@@ -51,6 +98,44 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData }) => {
                 >
                     {isFullscreen ? 'Active' : 'Enable'}
                 </button>
+            </div>
+
+            {/* Asset Generation */}
+            <div className="p-4 bg-[#0a0a1a]/50 rounded border border-slate-800">
+                <div className="flex items-center gap-3 mb-4">
+                    <ImageIcon className="text-amber-400" />
+                    <div>
+                        <div className="text-slate-200 font-bold uppercase text-sm tracking-wider">Game Assets</div>
+                        <div className="text-slate-500 text-xs">
+                            {missingCount === 0 ? "All assets generated & cached." : `${missingCount} assets missing from library.`}
+                        </div>
+                    </div>
+                </div>
+
+                {isGenerating ? (
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-xs text-amber-400 font-bold uppercase">
+                            <span className="flex items-center gap-2"><Loader size={12} className="animate-spin"/> Painting: {currentGenItem}</span>
+                            <span>{genProgress}%</span>
+                        </div>
+                        <div className="h-2 bg-slate-900 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-500 transition-all duration-300" style={{width: `${genProgress}%`}}></div>
+                        </div>
+                    </div>
+                ) : (
+                    missingCount > 0 ? (
+                        <button 
+                            onClick={handleGenerateAssets}
+                            className="w-full py-2 bg-amber-900/20 hover:bg-amber-900/40 border border-amber-600/50 text-amber-400 uppercase tracking-widest font-bold text-xs rounded transition-colors flex items-center justify-center gap-2"
+                        >
+                            <ImageIcon size={14} /> Generate All Missing Assets (AI)
+                        </button>
+                    ) : (
+                        <div className="w-full py-2 bg-green-900/20 border border-green-600/50 text-green-400 uppercase tracking-widest font-bold text-xs rounded flex items-center justify-center gap-2">
+                            <CheckCircle size={14} /> Assets Ready
+                        </div>
+                    )
+                )}
             </div>
 
             {/* Data Management */}
