@@ -1,5 +1,44 @@
 
-import { Character, CharacterType, Item, EventCard, Tile, Scenario, Madness } from './types';
+import { Character, CharacterType, Item, EventCard, Tile, Scenario, Madness, Spell } from './types';
+
+export const SPELLS: Spell[] = [
+    {
+        id: 'wither',
+        name: 'Wither',
+        cost: 2,
+        description: 'Drains life force from a target.',
+        effectType: 'damage',
+        value: 2,
+        range: 3
+    },
+    {
+        id: 'mend',
+        name: 'Mend Flesh',
+        cost: 2,
+        description: 'Knits wounds together with arcane energy.',
+        effectType: 'heal',
+        value: 2,
+        range: 1
+    },
+    {
+        id: 'reveal',
+        name: 'True Sight',
+        cost: 1,
+        description: 'Reveals hidden clues in the area.',
+        effectType: 'reveal',
+        value: 1,
+        range: 0
+    },
+    {
+        id: 'banish',
+        name: 'Banish',
+        cost: 4,
+        description: 'A powerful rite to weaken the connection to the void.',
+        effectType: 'banish',
+        value: 5, // High damage/banish value
+        range: 2
+    }
+];
 
 export const CHARACTERS: Record<CharacterType, Character> = {
   detective: {
@@ -7,7 +46,7 @@ export const CHARACTERS: Record<CharacterType, Character> = {
     name: 'The Private Eye',
     hp: 5, maxHp: 5,
     sanity: 4, maxSanity: 4,
-    insight: 0,
+    insight: 1,
     special: '+1 die on Investigation'
   },
   professor: {
@@ -15,7 +54,7 @@ export const CHARACTERS: Record<CharacterType, Character> = {
     name: 'The Professor',
     hp: 3, maxHp: 3,
     sanity: 6, maxSanity: 6,
-    insight: 1,
+    insight: 3,
     special: 'Can read occult texts safely'
   },
   journalist: {
@@ -23,7 +62,7 @@ export const CHARACTERS: Record<CharacterType, Character> = {
     name: 'The Journalist',
     hp: 4, maxHp: 4,
     sanity: 4, maxSanity: 4,
-    insight: 0,
+    insight: 1,
     special: '+1 Movement speed'
   },
   veteran: {
@@ -39,15 +78,15 @@ export const CHARACTERS: Record<CharacterType, Character> = {
     name: 'The Occultist',
     hp: 3, maxHp: 3,
     sanity: 5, maxSanity: 5,
-    insight: 2,
-    special: 'Expert at rituals'
+    insight: 4,
+    special: 'Starts with knowledge of the Arcane'
   },
   doctor: {
     id: 'doctor',
     name: 'The Doctor',
     hp: 4, maxHp: 4,
     sanity: 5, maxSanity: 5,
-    insight: 0,
+    insight: 2,
     special: 'Can heal HP or Sanity'
   }
 };

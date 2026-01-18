@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Search, Sword, Heart, Package, LockOpen, Hammer, Wind } from 'lucide-react';
+import { Search, Sword, Heart, Package, LockOpen, Hammer, Wind, Zap } from 'lucide-react';
 import { ContextAction } from '../types';
 
 interface ActionBarProps {
@@ -8,9 +8,10 @@ interface ActionBarProps {
   actionsRemaining: number;
   isInvestigatorPhase: boolean;
   contextAction?: ContextAction | null; // Context specific action (e.g. "Break Door")
+  hasSpells?: boolean;
 }
 
-const ActionBar: React.FC<ActionBarProps> = ({ onAction, actionsRemaining, isInvestigatorPhase, contextAction }) => {
+const ActionBar: React.FC<ActionBarProps> = ({ onAction, actionsRemaining, isInvestigatorPhase, contextAction, hasSpells }) => {
   const disabled = actionsRemaining <= 0 || !isInvestigatorPhase;
 
   // Standard Actions
@@ -67,6 +68,22 @@ const ActionBar: React.FC<ActionBarProps> = ({ onAction, actionsRemaining, isInv
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-white">{action.label}</span>
                 </button>
             ))}
+            
+            {/* SPELL BUTTON */}
+            {hasSpells && (
+                <button
+                disabled={disabled}
+                onClick={() => onAction('cast')}
+                className={`
+                    group flex flex-col items-center justify-center w-20 h-20 rounded border ml-2
+                    ${disabled ? 'opacity-30 border-slate-800 grayscale cursor-not-allowed' : 'border-purple-600 hover:border-purple-400 bg-purple-900/20'}
+                    transition-all duration-200
+                `}
+                >
+                <Zap className={`mb-1 transition-colors text-purple-500 group-hover:text-purple-300`} size={24} />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-300 group-hover:text-white">Cast</span>
+                </button>
+            )}
           </div>
       )}
       

@@ -109,3 +109,12 @@ Track all major milestones, feature additions, and bug fixes here.
     *   *Hazards:* HQ has hidden traps. Shadows now implements **Trap Tiles**.
 *   **New Feature: Traps:** Added a 20% chance when exploring a room (if no loot is found) to trigger a Trap, dealing immediate damage and playing a sound effect.
 *   **Stability:** Added robust `activePlayer &&` render guards in `App.tsx` to prevent crashes when the player state is in flux during phase transitions.
+
+## [v3.0 Update - Arcane & Intellect]
+*   **Active Magic System:** Implemented a Spell system (`Spell` interface). Players (initially only the Occultist) can now cast active spells by spending `Insight` points.
+    *   *Spells:* "Wither" (Damage), "Mend Flesh" (Heal), "True Sight" (Reveal), "Banish" (Heavy Damage).
+    *   *UI:* Added a dedicated "Cast" button to the Action Bar if the player has spells in their grimoire.
+*   **Physical Puzzles (The Elder Sign):** Replaced the generic dice roll for some Locked Doors with a dedicated Mini-Game.
+    *   *Mechanic:* A "Memory Sequence" puzzle where players must replicate a pattern of glowing runes.
+    *   *Outcome:* Success unlocks the door instantly. Failure causes Sanity damage and keeps the door locked.
+    *   *Visuals:* Created `PuzzleModal.tsx` with immersive rune graphics and status feedback.

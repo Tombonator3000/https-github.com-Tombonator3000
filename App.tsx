@@ -21,8 +21,8 @@ import {
   Trash2,
   Edit2
 } from 'lucide-react';
-import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator, FloatingText, Item } from './types';
-import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS } from './constants';
+import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator, FloatingText, Item, Spell } from './types';
+import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS } from './constants';
 import GameBoard from './components/GameBoard';
 import CharacterPanel from './components/CharacterPanel';
 import EnemyPanel from './components/EnemyPanel';
@@ -31,11 +31,12 @@ import DiceRoller from './components/DiceRoller';
 import EventModal from './components/EventModal';
 import MainMenu from './components/MainMenu';
 import OptionsMenu from './components/OptionsMenu';
+import PuzzleModal from './components/PuzzleModal';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "2.9.0";
+const APP_VERSION = "3.0.0";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -51,6 +52,7 @@ const DEFAULT_STATE: GameState = {
     lastDiceRoll: null,
     activeEvent: null,
     activeCombat: null,
+    activePuzzle: null,
     selectedEnemyId: null,
     selectedTileId: null,
     activeScenario: null,
@@ -197,7 +199,7 @@ const App: React.FC = () => {
     }
   };
 
-  const playStinger = (type: 'roll' | 'event' | 'click' | 'horror' | 'search' | 'combat' | 'heal' | 'madness' | 'block' | 'trap') => {
+  const playStinger = (type: 'roll' | 'event' | 'click' | 'horror' | 'search' | 'combat' | 'heal' | 'madness' | 'block' | 'trap' | 'spell' | 'unlock') => {
     if (!audioInit.current) return;
     if (type === 'roll') new Tone.MembraneSynth().toDestination().triggerAttackRelease("C1", "8n");
     if (type === 'horror') new Tone.MembraneSynth().toDestination().triggerAttackRelease("G0", "1n");
@@ -215,6 +217,13 @@ const App: React.FC = () => {
     if (type === 'trap') {
         const synth = new Tone.MetalSynth({ harmonicity: 100, resonance: 800 }).toDestination();
         synth.triggerAttackRelease(200, "8n");
+    }
+    if (type === 'spell') {
+        const synth = new Tone.PolySynth(Tone.Synth).toDestination();
+        synth.triggerAttackRelease(["C5", "E5", "G5"], "4n");
+    }
+    if (type === 'unlock') {
+         new Tone.MetalSynth({ harmonicity: 200, resonance: 100 }).toDestination().triggerAttackRelease(800, "16n");
     }
   };
 
@@ -372,7 +381,22 @@ const App: React.FC = () => {
       if (prev.players.length >= 4) return prev;
       
       const char = CHARACTERS[type];
-      const newPlayer: Player = { ...char, position: { q: 0, r: 0 }, inventory: [], actions: 2, isDead: false, madness: [], activeMadness: null };
+      // Init spells for Occultist or others
+      const startingSpells: Spell[] = [];
+      if (type === 'occultist') {
+          startingSpells.push(SPELLS.find(s => s.id === 'wither')!);
+      }
+
+      const newPlayer: Player = { 
+          ...char, 
+          position: { q: 0, r: 0 }, 
+          inventory: [], 
+          spells: startingSpells,
+          actions: 2, 
+          isDead: false, 
+          madness: [], 
+          activeMadness: null 
+      };
       generateCharacterPortrait(newPlayer);
       return { ...prev, players: [...prev.players, newPlayer] };
     });
@@ -486,6 +510,40 @@ const App: React.FC = () => {
         selectedTileId: null
       };
     });
+  };
+
+  const handlePuzzleComplete = (success: boolean) => {
+      const tileId = state.activePuzzle?.targetTileId;
+      if (!tileId) {
+          setState(prev => ({...prev, activePuzzle: null}));
+          return;
+      }
+
+      if (success) {
+          playStinger('unlock');
+          addToLog(`Låsen gir etter! Du løste gåten.`);
+          triggerFloatingText(0, 0, "UNLOCKED!", "text-green-400"); // Positions don't strictly matter for center text
+          setState(prev => ({
+              ...prev,
+              activePuzzle: null,
+              board: prev.board.map(t => t.id === tileId ? { ...t, object: undefined } : t),
+              players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
+              selectedTileId: null
+          }));
+      } else {
+          playStinger('horror');
+          addToLog(`Sinnet ditt svikter. Du klarte ikke å løse gåten.`);
+          // Sanity damage penalty for failing puzzle?
+          const activeP = state.players[state.activePlayerIndex];
+          const result = applySanityDamage(activeP, 1);
+          
+          setState(prev => ({
+              ...prev,
+              activePuzzle: null,
+              players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...result.player, actions: p.actions - 1 } : p)
+          }));
+          if (result.sound) playStinger('madness');
+      }
   };
 
   // --- MENU ACTIONS ---
@@ -755,7 +813,7 @@ const App: React.FC = () => {
                         objectType = containers[Math.floor(Math.random() * containers.length)];
                         isBlocking = false;
                    } else if (lootRng < 0.2) {
-                       // NEW: 20% Chance for Trap
+                       // 20% Chance for Trap in rooms with no loot
                        objectType = 'trap';
                    }
                }
@@ -803,6 +861,21 @@ const App: React.FC = () => {
       case 'interact':
           const selTile = state.board.find(t => t.id === state.selectedTileId);
           if (!selTile || !selTile.object?.blocking) return;
+
+          // PUZZLE CHECK: 50% chance to trigger puzzle instead of dice roll for doors
+          if (Math.random() > 0.5 && selTile.object.type === 'locked_door') {
+              setState(prev => ({
+                  ...prev,
+                  activePuzzle: {
+                      type: 'sequence',
+                      difficulty: selTile.object!.difficulty || 3,
+                      targetTileId: selTile.id
+                  }
+              }));
+              addToLog("Låsen er kompleks. Du må tyde runene...");
+              return;
+          }
+
           playStinger('roll');
           const iDice = getDiceCount(2 + (activePlayer.id === 'veteran' && selTile.object.reqSkill === 'strength' ? 1 : 0));
           const roll = Array.from({ length: iDice }, () => Math.floor(Math.random() * 6) + 1);
@@ -868,6 +941,45 @@ const App: React.FC = () => {
             };
         });
         break;
+
+      case 'cast':
+          // ACTIVE MAGIC LOGIC
+          const spell = activePlayer.spells[0]; // For now, just grab the first spell (Wither for Occultist)
+          if (!spell) { addToLog("Du kan ingen formler."); return; }
+          
+          if (activePlayer.insight < spell.cost) {
+              addToLog(`Ikke nok Insight! Trenger ${spell.cost}.`);
+              triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "NO MANA", "text-blue-500");
+              return;
+          }
+
+          playStinger('spell');
+          setState(prev => ({
+              ...prev,
+              players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, insight: p.insight - spell.cost, actions: p.actions - 1 } : p)
+          }));
+          
+          triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `CAST ${spell.name}`, "text-purple-300");
+
+          if (spell.effectType === 'damage') {
+              // Auto-hit enemies in range
+              setState(prev => {
+                  let hitCount = 0;
+                  const updatedEnemies = prev.enemies.map(e => {
+                      if (hexDistance(e.position, activePlayer.position) <= spell.range) {
+                          hitCount++;
+                          const remaining = e.hp - spell.value;
+                          triggerFloatingText(e.position.q, e.position.r, `-${spell.value} (MAGIC)`, "text-purple-500");
+                          if (remaining <= 0) return { ...e, hp: 0, isDying: true };
+                          return { ...e, hp: remaining };
+                      }
+                      return e;
+                  });
+                  addToLog(`${spell.name} traff ${hitCount} fiender!`);
+                  return { ...prev, enemies: updatedEnemies };
+              });
+          }
+          break;
         
       case 'investigate':
         const curTile = state.board.find(t => t.q === activePlayer.position.q && t.r === activePlayer.position.r);
@@ -1250,7 +1362,7 @@ const App: React.FC = () => {
 
       <footer className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 z-40">
         <div className="bg-[#16213e]/90 backdrop-blur-xl border-2 border-[#e94560]/40 p-3 rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] flex items-center gap-4">
-          <ActionBar onAction={handleAction} actionsRemaining={activePlayer?.isDead ? 0 : (activePlayer?.actions ?? 0)} isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} contextAction={currentContextAction} />
+          <ActionBar onAction={handleAction} actionsRemaining={activePlayer?.isDead ? 0 : (activePlayer?.actions ?? 0)} isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} contextAction={currentContextAction} hasSpells={activePlayer?.spells && activePlayer.spells.length > 0} />
           <div className="w-px h-12 bg-slate-800 mx-2"></div>
           <button onClick={handleEndTurn} className="px-8 py-4 bg-[#e94560] text-white font-bold hover:bg-[#c9354d] transition-all flex items-center gap-3 uppercase text-[10px] tracking-[0.2em] rounded-xl shadow-[0_0_20px_rgba(233,69,96,0.3)] group">
             {state.activePlayerIndex === state.players.length - 1 ? "AVSLUTT RUNDEN" : "NESTE TUR"} 
@@ -1261,6 +1373,7 @@ const App: React.FC = () => {
 
       {state.lastDiceRoll && <div className="fixed inset-0 flex items-center justify-center z-[100] pointer-events-none"><DiceRoller values={state.lastDiceRoll} onComplete={() => setState(prev => ({ ...prev, lastDiceRoll: null }))} /></div>}
       {state.activeEvent && <EventModal event={state.activeEvent} onResolve={handleResolveEvent} />}
+      {state.activePuzzle && <PuzzleModal difficulty={state.activePuzzle.difficulty} onSolve={handlePuzzleComplete} />}
 
       {state.phase === GamePhase.GAME_OVER && (
         <div className="fixed inset-0 bg-black/98 z-[200] flex items-center justify-center p-8 backdrop-blur-3xl">

@@ -10,6 +10,16 @@ export enum GamePhase {
 
 export type CharacterType = 'detective' | 'professor' | 'journalist' | 'veteran' | 'occultist' | 'doctor';
 
+export interface Spell {
+  id: string;
+  name: string;
+  cost: number; // Insight cost
+  description: string;
+  effectType: 'damage' | 'heal' | 'reveal' | 'banish';
+  value: number;
+  range: number;
+}
+
 export interface Character {
   id: CharacterType;
   name: string;
@@ -33,6 +43,7 @@ export interface Madness {
 export interface Player extends Character {
   position: { q: number; r: number };
   inventory: Item[];
+  spells: Spell[]; // New: Active magic
   actions: number;
   isDead: boolean;
   madness: string[]; // Deprecated, keeping for safety
@@ -82,6 +93,7 @@ export interface TileObject {
   health?: number; // For breakable obstacles
   difficulty?: number; // Target number for skill check
   reqSkill?: 'strength' | 'insight' | 'agility';
+  puzzleType?: 'sequence' | 'dial'; // New: Determines if interaction triggers a mini-game
 }
 
 export interface Tile {
@@ -128,6 +140,12 @@ export interface FloatingText {
     randomOffset: { x: number; y: number }; // Visual jitter
 }
 
+export interface ActivePuzzle {
+    type: 'sequence';
+    difficulty: number;
+    targetTileId: string;
+}
+
 export interface GameState {
   phase: GamePhase;
   doom: number;
@@ -141,6 +159,7 @@ export interface GameState {
   lastDiceRoll: number[] | null;
   activeEvent: EventCard | null;
   activeCombat: { enemyId: string; playerId: string } | null;
+  activePuzzle: ActivePuzzle | null; // New: Current mini-game
   selectedEnemyId: string | null;
   selectedTileId: string | null; // New: For selecting tiles to interact with
   activeScenario: Scenario | null;
