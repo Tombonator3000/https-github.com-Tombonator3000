@@ -18,6 +18,7 @@ const ActionBar: React.FC<ActionBarProps> = ({ onAction, actionsRemaining, isInv
   const standardActions = [
     { id: 'investigate', label: 'Investigate', icon: Search, color: 'hover:text-green-400' },
     { id: 'attack', label: 'Attack', icon: Sword, color: 'hover:text-red-400' },
+    { id: 'flee', label: 'Flee', icon: Wind, color: 'hover:text-cyan-400' },
     { id: 'rest', label: 'Rest', icon: Heart, color: 'hover:text-pink-400' },
     { id: 'item', label: 'Use Item', icon: Package, color: 'hover:text-yellow-400' }
   ];

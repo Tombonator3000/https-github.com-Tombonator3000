@@ -39,7 +39,7 @@ import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.3.1-hotfix";
+const APP_VERSION = "3.4.0";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -984,6 +984,89 @@ const App: React.FC = () => {
         } else {
           setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p), selectedTileId: null }));
           if (targetTile && !targetTile.imageUrl) generateTileVisual(targetTile);
+        }
+        break;
+
+      case 'flee':
+        // 1. Check if enemy is on the tile
+        const immediateThreat = state.enemies.find(e => 
+            e.position.q === activePlayer.position.q && 
+            e.position.r === activePlayer.position.r
+        );
+
+        if (!immediateThreat) {
+            addToLog("Ingen fiender her å flykte fra.");
+            triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "NO THREAT", "text-slate-500");
+            return;
+        }
+
+        playStinger('roll');
+        const fleeDice = getDiceCount(2 + (activePlayer.id === 'journalist' ? 1 : 0));
+        const fleeRoll = Array.from({ length: fleeDice }, () => Math.floor(Math.random() * 6) + 1);
+        const fleeSuccess = fleeRoll.filter(v => v >= 4).length > 0;
+        
+        // 2. Identify neighbors
+        const neighborCoords = [
+            {q: activePlayer.position.q + 1, r: activePlayer.position.r},
+            {q: activePlayer.position.q + 1, r: activePlayer.position.r - 1},
+            {q: activePlayer.position.q, r: activePlayer.position.r - 1},
+            {q: activePlayer.position.q - 1, r: activePlayer.position.r},
+            {q: activePlayer.position.q - 1, r: activePlayer.position.r + 1},
+            {q: activePlayer.position.q, r: activePlayer.position.r + 1}
+        ];
+
+        // 3. Filter Safe Tiles (Exists, Not blocked, No enemy)
+        const safeTiles = neighborCoords.filter(n => {
+            const tile = state.board.find(t => t.q === n.q && t.r === n.r);
+            const enemyOnTile = state.enemies.some(e => e.position.q === n.q && e.position.r === n.r);
+            return tile && !tile.object?.blocking && !enemyOnTile;
+        });
+
+        setState(prev => ({ ...prev, lastDiceRoll: fleeRoll }));
+
+        if (fleeSuccess && safeTiles.length > 0) {
+            // SUCCESS: Move to random safe tile
+            const escapeTile = safeTiles[Math.floor(Math.random() * safeTiles.length)];
+            playStinger('click');
+            addToLog(`Suksess! ${activePlayer.name} unnslapp ${immediateThreat.name}.`);
+            triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "ESCAPED!", "text-cyan-400");
+            
+            setState(prev => ({
+                ...prev,
+                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: escapeTile, actions: p.actions - 1 } : p)
+            }));
+        } else {
+            // FAILURE: Stay put, take free hit
+            let failMsg = "Mislyktes!";
+            if (safeTiles.length === 0) failMsg = "Ingen vei ut!";
+            
+            addToLog(`${failMsg} ${immediateThreat.name} angriper fritt!`);
+            triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "CAUGHT!", "text-red-500");
+            
+            // Resolve Free Attack logic
+            const newHp = Math.max(0, activePlayer.hp - immediateThreat.damage);
+            const sanityResult = applySanityDamage(activePlayer, immediateThreat.horror);
+            
+            if (immediateThreat.damage > 0) {
+                triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `-${immediateThreat.damage} HP`, 'text-red-600');
+                triggerShake();
+            }
+            if (sanityResult.sound) playStinger('madness');
+            else playStinger('combat');
+
+            setState(prev => {
+                const newPlayers = [...prev.players];
+                let finalPlayer = sanityResult.player;
+                finalPlayer.hp = newHp;
+                finalPlayer.actions = finalPlayer.actions - 1; // Spend action to fail
+                finalPlayer.isDead = newHp <= 0 || finalPlayer.isDead;
+                newPlayers[prev.activePlayerIndex] = finalPlayer;
+                
+                return {
+                    ...prev,
+                    players: newPlayers
+                };
+            });
         }
         break;
 
