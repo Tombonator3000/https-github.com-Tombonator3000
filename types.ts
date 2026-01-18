@@ -73,7 +73,7 @@ export interface Enemy {
   imageUrl?: string; // New: Base64 image data
 }
 
-export type TileObjectType = 'altar' | 'bookshelf' | 'crate' | 'chest' | 'cabinet' | 'gate' | 'barricade' | 'locked_door' | 'rubble' | 'fire';
+export type TileObjectType = 'altar' | 'bookshelf' | 'crate' | 'chest' | 'cabinet' | 'gate' | 'barricade' | 'locked_door' | 'rubble' | 'fire' | 'trap';
 
 export interface TileObject {
   type: TileObjectType;

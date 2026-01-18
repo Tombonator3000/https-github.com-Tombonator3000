@@ -101,3 +101,11 @@ Track all major milestones, feature additions, and bug fixes here.
 ## [v2.8.2 Crash Fix]
 *   **Turn Transition Guard:** Fixed a critical "Black Screen" crash in `handleEndTurn` by completely rewriting the player cycling logic. It now safely scans ahead for the next living player.
 *   **Round Start Logic:** The Mythos phase now sets the `activePlayerIndex` to the first *living* player of the new round, preventing the UI from attempting to render actions for a deceased character.
+
+## [v2.9 Update - Traps & Analysis]
+*   **Analysis (HeroQuest & Mansions Comparison):**
+    *   *Progression:* HeroQuest offers gold/shops. Shadows focuses on procedural looting. **Recommendation:** Add a Merchant phase.
+    *   *Interaction:* MoM offers puzzles. Shadows uses dice rolls. **Recommendation:** Add simple logic mini-games.
+    *   *Hazards:* HQ has hidden traps. Shadows now implements **Trap Tiles**.
+*   **New Feature: Traps:** Added a 20% chance when exploring a room (if no loot is found) to trigger a Trap, dealing immediate damage and playing a sound effect.
+*   **Stability:** Added robust `activePlayer &&` render guards in `App.tsx` to prevent crashes when the player state is in flux during phase transitions.

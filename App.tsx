@@ -35,7 +35,7 @@ import OptionsMenu from './components/OptionsMenu';
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "2.8.3";
+const APP_VERSION = "2.9.0";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -197,7 +197,7 @@ const App: React.FC = () => {
     }
   };
 
-  const playStinger = (type: 'roll' | 'event' | 'click' | 'horror' | 'search' | 'combat' | 'heal' | 'madness' | 'block') => {
+  const playStinger = (type: 'roll' | 'event' | 'click' | 'horror' | 'search' | 'combat' | 'heal' | 'madness' | 'block' | 'trap') => {
     if (!audioInit.current) return;
     if (type === 'roll') new Tone.MembraneSynth().toDestination().triggerAttackRelease("C1", "8n");
     if (type === 'horror') new Tone.MembraneSynth().toDestination().triggerAttackRelease("G0", "1n");
@@ -212,6 +212,10 @@ const App: React.FC = () => {
         synth.frequency.rampTo("C2", 1);
     }
     if (type === 'block') new Tone.MetalSynth({ frequency: 50, envelope: { decay: 0.1 } }).toDestination().triggerAttackRelease(50, "16n");
+    if (type === 'trap') {
+        const synth = new Tone.MetalSynth({ harmonicity: 100, resonance: 800 }).toDestination();
+        synth.triggerAttackRelease(200, "8n");
+    }
   };
 
   const addToLog = (message: string) => {
@@ -453,19 +457,25 @@ const App: React.FC = () => {
       let nextPhase = GamePhase.INVESTIGATOR;
       let foundPlayer = false;
 
-      // Scan through the rest of the array
-      while (nextIndex < prev.players.length) {
-        if (!prev.players[nextIndex].isDead) {
-          foundPlayer = true;
-          break;
+      // Ensure nextIndex is within bounds if we are already at the end
+      if (nextIndex >= prev.players.length) {
+          nextIndex = 0;
+          nextPhase = GamePhase.MYTHOS;
+      } else {
+        // Scan through the rest of the array
+        while (nextIndex < prev.players.length) {
+            if (!prev.players[nextIndex].isDead) {
+            foundPlayer = true;
+            break;
+            }
+            nextIndex++;
         }
-        nextIndex++;
-      }
 
-      // If no living player found in the remainder of the list, it's Mythos time
-      if (!foundPlayer) {
-        nextPhase = GamePhase.MYTHOS;
-        nextIndex = 0; // Reset for safety, though Mythos phase usually ignores this until update
+        // If no living player found in the remainder of the list, it's Mythos time
+        if (!foundPlayer) {
+            nextPhase = GamePhase.MYTHOS;
+            nextIndex = 0; 
+        }
       }
 
       return { 
@@ -744,6 +754,9 @@ const App: React.FC = () => {
                         const containers: TileObjectType[] = ['bookshelf', 'crate', 'chest', 'cabinet'];
                         objectType = containers[Math.floor(Math.random() * containers.length)];
                         isBlocking = false;
+                   } else if (lootRng < 0.2) {
+                       // NEW: 20% Chance for Trap
+                       objectType = 'trap';
                    }
                }
           }
@@ -753,12 +766,32 @@ const App: React.FC = () => {
             object: objectType ? { type: objectType, searched: false, blocking: isBlocking, difficulty, reqSkill } : undefined 
           };
           const event = Math.random() > 0.85 ? EVENTS[Math.floor(Math.random() * EVENTS.length)] : null;
+          
+          // TRAP LOGIC
+          let finalPlayers = state.players.map((p, i) => i === state.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p);
+          let trapLog = '';
+          
+          if (objectType === 'trap') {
+               playStinger('trap');
+               trapLog = `DU GIKK I EN FELLE! 1 skade.`;
+               finalPlayers = finalPlayers.map((p, i) => {
+                   if (i === state.activePlayerIndex) {
+                       const newHp = Math.max(0, p.hp - 1);
+                       return { ...p, hp: newHp, isDead: newHp <= 0 };
+                   }
+                   return p;
+               });
+               triggerFloatingText(q, r, "-1 HP (TRAP)", "text-red-500 font-bold");
+               triggerShake();
+          }
+
           setState(prev => ({ 
             ...prev, 
             board: [...prev.board, newTile], 
-            players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p), 
+            players: finalPlayers, 
             activeEvent: event,
-            selectedTileId: null
+            selectedTileId: null,
+            log: trapLog ? [trapLog, ...prev.log] : prev.log
           }));
           generateNarrative(newTile);
         } else {
@@ -1176,6 +1209,7 @@ const App: React.FC = () => {
           <button onClick={handleResetGame} className="text-slate-500 hover:text-[#e94560]"><RotateCcw size={18}/></button>
       </header>
 
+      {/* RENDER GUARD: Only render CharacterPanel if activePlayer is valid */}
       {activePlayer && (
         <div className={`fixed left-4 top-20 bottom-24 transition-all duration-500 z-40 ${leftPanelCollapsed ? 'w-12 overflow-hidden' : 'w-80'}`}>
           <div className="h-full bg-[#0a0a1a]/90 backdrop-blur-2xl border-2 border-[#e94560]/20 rounded shadow-2xl flex flex-col relative">
