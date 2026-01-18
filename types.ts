@@ -69,10 +69,16 @@ export interface Item {
 
 export type EnemyAttackType = 'melee' | 'ranged' | 'sanity' | 'doom';
 
+export type EnemyType = 
+  | 'cultist' | 'deepone' | 'ghoul' | 'shoggoth' | 'boss' 
+  | 'sniper' | 'priest' | 'mi-go' | 'nightgaunt' | 'hound' 
+  | 'dark_young' | 'byakhee' | 'star_spawn' | 'formless_spawn' 
+  | 'hunting_horror' | 'moon_beast';
+
 export interface Enemy {
   id: string;
   name: string;
-  type: 'cultist' | 'deepone' | 'ghoul' | 'shoggoth' | 'boss' | 'sniper' | 'priest' | 'mi-go' | 'nightgaunt' | 'hound' | 'dark_young';
+  type: EnemyType;
   hp: number;
   maxHp: number;
   damage: number;
@@ -82,8 +88,20 @@ export interface Enemy {
   visionRange: number;
   attackRange: number;
   attackType: EnemyAttackType;
+  traits?: string[]; // New: 'flying', 'regenerate', 'massive', etc.
   isDying?: boolean; // For death animation
   imageUrl?: string; // New: Base64 image data
+}
+
+export interface BestiaryEntry {
+    name: string;
+    type: EnemyType;
+    description: string;
+    lore: string;
+    hp: number;
+    damage: number;
+    horror: number;
+    traits?: string[];
 }
 
 export type TileObjectType = 'altar' | 'bookshelf' | 'crate' | 'chest' | 'cabinet' | 'gate' | 'barricade' | 'locked_door' | 'rubble' | 'fire' | 'trap';
@@ -156,6 +174,7 @@ export interface GameState {
   activePlayerIndex: number;
   board: Tile[];
   enemies: Enemy[];
+  encounteredEnemies: string[]; // List of EnemyTypes seen
   cluesFound: number;
   log: string[];
   lastDiceRoll: number[] | null;

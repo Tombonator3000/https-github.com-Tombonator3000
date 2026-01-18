@@ -1,7 +1,8 @@
 
 import React from 'react';
 import { Enemy } from '../types';
-import { Skull, Swords, Brain, Activity, Crosshair, Zap } from 'lucide-react';
+import { BESTIARY } from '../constants';
+import { Skull, Swords, Brain, Activity, Crosshair, Zap, BookOpen } from 'lucide-react';
 
 interface EnemyPanelProps {
   enemy: Enemy;
@@ -10,6 +11,7 @@ interface EnemyPanelProps {
 
 const EnemyPanel: React.FC<EnemyPanelProps> = ({ enemy, onClose }) => {
   const hpPercent = (enemy.hp / enemy.maxHp) * 100;
+  const info = BESTIARY[enemy.type];
 
   return (
     <div className="bg-[#0a0a1a]/95 backdrop-blur-2xl border-2 border-purple-600/50 rounded-xl shadow-[0_0_40px_rgba(168,85,247,0.2)] overflow-hidden animate-in slide-in-from-right duration-300 w-full">
@@ -77,19 +79,11 @@ const EnemyPanel: React.FC<EnemyPanelProps> = ({ enemy, onClose }) => {
 
         {/* Classification */}
         <div className="pt-2 border-t border-slate-800">
-          <div className="text-[9px] text-slate-600 uppercase tracking-widest font-sans font-bold mb-1">Klassifisering</div>
+          <div className="text-[9px] text-slate-600 uppercase tracking-widest font-sans font-bold mb-1 flex items-center gap-2">
+              <BookOpen size={10} /> Arkham Files
+          </div>
           <p className="text-xs text-slate-400 italic">
-            {enemy.type === 'cultist' && "En hjernevasket tjener av de ytre gudene."}
-            {enemy.type === 'sniper' && "En kultist bevæpnet med rifle, trener siktet fra skyggene."}
-            {enemy.type === 'priest' && "En mørk prest som kaster forbannelser for å fremskynde undergangen."}
-            {enemy.type === 'ghoul' && "En kjøttetende skikkelse som trives i mørket."}
-            {enemy.type === 'deepone' && "En vederstyggelighet fra dypet."}
-            {enemy.type === 'shoggoth' && "En formløs masse av boblende kjøtt og øyne."}
-            {enemy.type === 'boss' && "En eldgammel kraft hinsides menneskelig fatteevne."}
-            {enemy.type === 'mi-go' && "En bevinget sopp-skapning fra Yuggoth med merkelig teknologi."}
-            {enemy.type === 'nightgaunt' && "En ansiktsløs flyger som beveger seg lydløst gjennom natten."}
-            {enemy.type === 'hound' && "En jeger fra Tindalos som beveger seg gjennom vinkler i tid og rom."}
-            {enemy.type === 'dark_young' && "Et enormt avkom av Shub-Niggurath, en masse av tentakler og hover."}
+             "{info?.description || 'A creature of unknown origin.'}"
           </p>
         </div>
       </div>

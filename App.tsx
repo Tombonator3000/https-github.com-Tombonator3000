@@ -20,10 +20,11 @@ import {
   Star,
   Trash2,
   Edit2,
-  ShoppingBag
+  ShoppingBag,
+  Book
 } from 'lucide-react';
-import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator, FloatingText, Item, Spell } from './types';
-import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS } from './constants';
+import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator, FloatingText, Item, Spell, EnemyType } from './types';
+import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS, BESTIARY } from './constants';
 import GameBoard from './components/GameBoard';
 import CharacterPanel from './components/CharacterPanel';
 import EnemyPanel from './components/EnemyPanel';
@@ -34,6 +35,7 @@ import MainMenu from './components/MainMenu';
 import OptionsMenu from './components/OptionsMenu';
 import PuzzleModal from './components/PuzzleModal';
 import MerchantShop from './components/MerchantShop';
+import JournalModal from './components/JournalModal';
 import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary } from './utils/AssetLibrary';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
@@ -50,6 +52,7 @@ const DEFAULT_STATE: GameState = {
     activePlayerIndex: 0,
     board: [START_TILE],
     enemies: [],
+    encounteredEnemies: [], // Track bestiary progress
     cluesFound: 0,
     log: [],
     lastDiceRoll: null,
@@ -136,6 +139,7 @@ const App: React.FC = () => {
   // --- STATE ---
   const [isMainMenuOpen, setIsMainMenuOpen] = useState(true);
   const [showOptions, setShowOptions] = useState(false);
+  const [showJournal, setShowJournal] = useState(false);
 
   const [state, setState] = useState<GameState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -699,6 +703,7 @@ const App: React.FC = () => {
       const newPlayers = [...prev.players];
       let newDoom = prev.doom;
       const newEnemies = [...prev.enemies];
+      let newEncountered = [...prev.encounteredEnemies];
 
       if (event.effectType === 'sanity') {
           const result = applySanityDamage(player, Math.abs(event.value));
@@ -721,13 +726,22 @@ const App: React.FC = () => {
           triggerFloatingText(player.position.q, player.position.r, `+${event.value} INSIGHT`, 'text-blue-400');
       }
       else if (event.effectType === 'doom') newDoom = Math.max(0, prev.doom + event.value);
-      else if (event.effectType === 'spawn') newEnemies.push({ 
-          id: `enemy-${Date.now()}`, name: 'Kultist', type: 'cultist', 
-          hp: 2, maxHp: 2, damage: 1, horror: 1, speed: 1, 
-          position: { ...player.position }, visionRange: 3, attackRange: 1, attackType: 'melee' 
-      });
+      else if (event.effectType === 'spawn') {
+          const template = BESTIARY['cultist'];
+          newEnemies.push({ 
+             id: `enemy-${Date.now()}`, 
+             position: { ...player.position }, 
+             visionRange: 3, 
+             attackRange: 1, 
+             attackType: 'melee',
+             maxHp: template.hp,
+             speed: 2,
+             ...template
+          });
+          if (!newEncountered.includes(template.type)) newEncountered.push(template.type);
+      }
       
-      return { ...prev, players: newPlayers, doom: newDoom, enemies: newEnemies, activeEvent: null };
+      return { ...prev, players: newPlayers, doom: newDoom, enemies: newEnemies, activeEvent: null, encounteredEnemies: newEncountered };
     });
     playStinger('click');
   }, [state.activeEvent, state.activePlayerIndex]);
@@ -742,6 +756,11 @@ const App: React.FC = () => {
           let newDoom = prev.doom - 1;
           
           const updatedEnemies = prev.enemies.map(enemy => {
+            // TRAIT: Regeneration
+            if (enemy.traits?.includes('regenerate') && enemy.hp < enemy.maxHp) {
+                enemy.hp = Math.min(enemy.maxHp, enemy.hp + 1);
+            }
+
             const alivePlayers = prev.players.filter(p => !p.isDead);
             if (alivePlayers.length === 0) return enemy;
             
@@ -776,7 +795,11 @@ const App: React.FC = () => {
 
                 const validMoves = neighbors.filter(n => {
                    const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
-                   return tile && !tile.object?.blocking;
+                   // TRAIT: Flying (ignore blockers)
+                   const ignoresBlockers = enemy.traits?.includes('flying');
+                   if (!tile) return false;
+                   if (tile.object?.blocking && !ignoresBlockers) return false;
+                   return true;
                 });
 
                 if (validMoves.length > 0) {
@@ -796,7 +819,14 @@ const App: React.FC = () => {
                 {q: enemy.position.q + 1, r: enemy.position.r - 1}, 
                 {q: enemy.position.q - 1, r: enemy.position.r + 1}
               ];
-              const validNeighbors = neighbors.filter(n => prev.board.some(t => t.q === n.q && t.r === n.r && !t.object?.blocking));
+              const validNeighbors = neighbors.filter(n => {
+                  const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
+                  if (!tile) return false;
+                  // TRAIT: Flying (ignore blockers)
+                  if (tile.object?.blocking && !enemy.traits?.includes('flying')) return false;
+                  return true;
+              });
+              
               if (validNeighbors.length > 0) {
                   bestMove = validNeighbors[Math.floor(Math.random() * validNeighbors.length)];
               }
@@ -840,20 +870,45 @@ const App: React.FC = () => {
           });
 
           const gateTiles = prev.board.filter(t => t.isGate);
+          let newEncountered = [...prev.encounteredEnemies];
+          
           if (gateTiles.length > 0 && Math.random() > 0.6) {
             const spawnGate = gateTiles[Math.floor(Math.random() * gateTiles.length)];
             const spawnRoll = Math.random();
-            let newEnemy: Enemy;
-            const base = { id: `enemy-${Date.now()}`, position: { q: spawnGate.q, r: spawnGate.r }, visionRange: 3 };
-            if (spawnRoll > 0.9) newEnemy = { ...base, name: 'Dark Young', type: 'dark_young', hp: 6, maxHp: 6, damage: 2, horror: 3, speed: 1, attackRange: 1, attackType: 'melee' };
-            else if (spawnRoll > 0.8) newEnemy = { ...base, name: 'Hound of Tindalos', type: 'hound', hp: 4, maxHp: 4, damage: 2, horror: 2, speed: 2, attackRange: 1, attackType: 'melee' };
-            else if (spawnRoll > 0.7) newEnemy = { ...base, name: 'Nightgaunt', type: 'nightgaunt', hp: 3, maxHp: 3, damage: 1, horror: 0, speed: 2, attackRange: 1, attackType: 'melee' };
-            else if (spawnRoll > 0.6) newEnemy = { ...base, name: 'Mi-Go', type: 'mi-go', hp: 3, maxHp: 3, damage: 1, horror: 1, speed: 1, attackRange: 3, attackType: 'ranged' };
-            else if (spawnRoll > 0.5) newEnemy = { ...base, name: 'Dark Priest', type: 'priest', hp: 3, maxHp: 3, damage: 0, horror: 2, speed: 1, attackRange: 2, attackType: 'doom' };
-            else if (spawnRoll > 0.4) newEnemy = { ...base, name: 'Sniper', type: 'sniper', hp: 2, maxHp: 2, damage: 1, horror: 0, speed: 1, attackRange: 3, attackType: 'ranged' };
-            else newEnemy = { ...base, name: 'Kultist', type: 'cultist', hp: 2, maxHp: 2, damage: 1, horror: 1, speed: 1, attackRange: 1, attackType: 'melee' };
+            let template: typeof BESTIARY[keyof typeof BESTIARY];
+
+            // WEIGHTED SPAWN TABLE
+            if (spawnRoll > 0.95) template = BESTIARY['star_spawn'];
+            else if (spawnRoll > 0.9) template = BESTIARY['dark_young'];
+            else if (spawnRoll > 0.85) template = BESTIARY['shoggoth'];
+            else if (spawnRoll > 0.80) template = BESTIARY['hunting_horror'];
+            else if (spawnRoll > 0.75) template = BESTIARY['formless_spawn'];
+            else if (spawnRoll > 0.70) template = BESTIARY['hound'];
+            else if (spawnRoll > 0.65) template = BESTIARY['byakhee'];
+            else if (spawnRoll > 0.60) template = BESTIARY['mi-go'];
+            else if (spawnRoll > 0.55) template = BESTIARY['nightgaunt'];
+            else if (spawnRoll > 0.50) template = BESTIARY['moon_beast'];
+            else if (spawnRoll > 0.45) template = BESTIARY['deepone'];
+            else if (spawnRoll > 0.40) template = BESTIARY['ghoul'];
+            else if (spawnRoll > 0.35) template = BESTIARY['priest'];
+            else if (spawnRoll > 0.30) template = BESTIARY['sniper'];
+            else template = BESTIARY['cultist'];
+
+            const newEnemy: Enemy = { 
+                id: `enemy-${Date.now()}`, 
+                position: { q: spawnGate.q, r: spawnGate.r }, 
+                visionRange: 3,
+                attackRange: 1,
+                attackType: 'melee',
+                maxHp: template.hp,
+                speed: 2,
+                ...template
+            };
+
             updatedEnemies.push(newEnemy);
             addToLog(`En ${newEnemy.name} stiger ut av portalen ved ${spawnGate.name}!`);
+            
+            if (!newEncountered.includes(template.type)) newEncountered.push(template.type);
           }
 
           const allDead = updatedPlayers.every(p => p.isDead);
@@ -871,6 +926,7 @@ const App: React.FC = () => {
             doom: newDoom, 
             round: prev.round + 1, 
             enemies: updatedEnemies, 
+            encounteredEnemies: newEncountered,
             players: finalPlayers, 
             activePlayerIndex: firstLivingIndex === -1 ? 0 : firstLivingIndex,
             phase: (newDoom <= 0 || allDead) ? GamePhase.GAME_OVER : GamePhase.INVESTIGATOR 
@@ -1576,6 +1632,9 @@ const App: React.FC = () => {
               ))}
             </div>
           </div>
+          <button onClick={() => setShowJournal(true)} className="text-slate-500 hover:text-amber-500 transition-colors" title="Bestiary">
+            <Book size={18} />
+          </button>
           <button onClick={handleResetGame} className="text-slate-500 hover:text-[#e94560]"><RotateCcw size={18}/></button>
       </header>
 
@@ -1632,42 +1691,11 @@ const App: React.FC = () => {
       {state.lastDiceRoll && <div className="fixed inset-0 flex items-center justify-center z-[100] pointer-events-none"><DiceRoller values={state.lastDiceRoll} onComplete={() => setState(prev => ({ ...prev, lastDiceRoll: null }))} /></div>}
       {state.activeEvent && <EventModal event={state.activeEvent} onResolve={handleResolveEvent} />}
       {state.activePuzzle && <PuzzleModal difficulty={state.activePuzzle.difficulty} onSolve={handlePuzzleComplete} />}
+      {showJournal && <JournalModal unlockedIds={state.encounteredEnemies} onClose={() => setShowJournal(false)} />}
 
       {state.phase === GamePhase.GAME_OVER && (
         <div className="fixed inset-0 bg-black/98 z-[200] flex items-center justify-center p-8 backdrop-blur-3xl">
            <div className="text-center max-w-2xl">
              <h2 className="text-9xl font-display text-[#e94560] italic mb-10 uppercase tracking-tighter">FINIS</h2>
              <p className="text-xl text-slate-400 mb-16 italic font-serif px-10">
-               {state.cluesFound >= requiredClues ? "Portalen er forseglet. Skyggene trekker seg tilbake..." : state.players.every(p => p.isDead) ? "Alle etterforskere er tapt. Mørket har seiret." : "Tiden rant ut. Dommedag er her."}
-             </p>
-             {state.players.some(p => !p.isDead) && (
-                 <div className="mb-10">
-                     <p className="text-sm uppercase tracking-widest text-slate-500 mb-4 font-bold">Overlevende (Klikk for å lagre)</p>
-                     <div className="flex justify-center gap-4 flex-wrap">
-                         {state.cluesFound >= requiredClues && (
-                             <button onClick={goToMerchant} className="flex items-center gap-2 px-6 py-3 border border-amber-600 rounded bg-[#1a120b] hover:bg-amber-900/40 hover:border-amber-400 transition-all text-amber-500 font-bold uppercase text-xs tracking-wider shadow-[0_0_20px_rgba(245,158,11,0.2)] animate-pulse">
-                                 <ShoppingBag size={16} /> Visit Black Market
-                             </button>
-                         )}
-                         {state.players.map(p => {
-                             if (p.isDead) return null;
-                             const isSaved = roster.some(v => v.instanceId === p.instanceId);
-                             return (
-                                 <button key={p.id} onClick={() => saveToRoster(p)} disabled={isSaved} className={`flex items-center gap-2 px-6 py-3 border border-slate-700 rounded bg-[#1a1a2e] hover:border-amber-500 transition-all ${isSaved ? 'opacity-50 cursor-default' : ''}`}>
-                                     <Save size={16} className="text-amber-500" /><span className="text-amber-100 font-bold uppercase text-xs tracking-wider">{p.name}</span>
-                                     {isSaved && <span className="text-[8px] text-green-500 ml-1">(SAVED)</span>}
-                                 </button>
-                             );
-                         })}
-                     </div>
-                 </div>
-             )}
-             <button onClick={handleResetGame} className="px-16 py-5 border-2 border-[#e94560] text-[#e94560] font-bold hover:bg-[#e94560] hover:text-white transition-all text-sm uppercase tracking-[0.4em]">AVSLUTT</button>
-           </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default App;
+               {state.cluesFound >= requiredClues ? "Portalen er forseglet. Skyggene trekker seg tilbake..." : state.players.every(p => p.isDead) ? "Alle etterforskere er tapt. Mørket har seiret."

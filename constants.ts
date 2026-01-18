@@ -1,5 +1,5 @@
 
-import { Character, CharacterType, Item, EventCard, Tile, Scenario, Madness, Spell } from './types';
+import { Character, CharacterType, Item, EventCard, Tile, Scenario, Madness, Spell, BestiaryEntry, EnemyType } from './types';
 
 export const SPELLS: Spell[] = [
     {
@@ -153,7 +153,12 @@ export const INDOOR_LOCATIONS = [
   'Ritual Chamber', 'Boiler Room', 'Servant Quarters',
   'Ballroom', 'Conservatory', 'Billiard Room', 'Wine Cellar', 
   'Panic Room', 'Trophy Room', 'Greenhouse', 'Observatory', 
-  'Master Bedroom', 'Nursery', 'Operating Theater', 'Padded Cell'
+  'Master Bedroom', 'Nursery', 'Operating Theater', 'Padded Cell',
+  'Alchemy Lab', 'Dissection Room', 'Apothecary', 'Lecture Hall', 'Records Room',
+  'Dining Hall', 'Portrait Gallery', 'Smoking Room', 'Sunroom',
+  'Hidden Passage', 'Coal Chute', 'Seance Room', 'Clock Tower', 'Bell Tower',
+  'Warden\'s Office', 'Evidence Locker', 'Holding Cell', 'Archivist\'s Office',
+  'Speakeasy', 'Bank Vault', 'Pawn Shop', 'Antique Store', 'Hotel Lobby', 'Radio Station'
 ];
 
 export const OUTDOOR_LOCATIONS = [
@@ -164,7 +169,11 @@ export const OUTDOOR_LOCATIONS = [
   'Merchant Street', 'Dark Pier',
   'Dead End Alley', 'Crossroads', 'T-Junction', 'Roundabout', 
   'Collapsed Bridge', 'Overgrown Path', 'Rotting Gazebo', 
-  'Fountain', 'Construction Site'
+  'Fountain', 'Construction Site',
+  'Fish Market', 'Shipyard', 'Boardwalk', 'Tidal Pool', 'Cliffside Path',
+  'Tenement Row', 'Cobblestone Street', 'Gas Station', 'Tram Stop', 'Theater District', 'Slums',
+  'Cornfield', 'Old Well', 'Stone Circle', 'Ritual Site', 'Cave Entrance',
+  'Narrow Lane', 'Broad Avenue', 'Underpass', 'Railway Crossing', 'Bus Stop'
 ];
 
 export const LOCATION_NAMES = [...INDOOR_LOCATIONS, ...OUTDOOR_LOCATIONS];
@@ -218,3 +227,129 @@ export const SCENARIOS: Scenario[] = [
     tileSet: 'indoor'
   }
 ];
+
+export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
+  cultist: {
+    name: 'Cultist',
+    type: 'cultist',
+    hp: 2, damage: 1, horror: 1,
+    description: 'A brainwashed servant of the Outer Gods.',
+    lore: 'Often recruited from the desperate and the mad, these individuals have traded their humanity for forbidden knowledge.'
+  },
+  sniper: {
+    name: 'Cult Sniper',
+    type: 'sniper',
+    hp: 2, damage: 1, horror: 0,
+    description: 'An assassin striking from the shadows.',
+    lore: 'Armed with stolen military rifles, they guard the ritual sites from a distance, prioritizing targets who know too much.'
+  },
+  priest: {
+    name: 'Dark Priest',
+    type: 'priest',
+    hp: 3, damage: 0, horror: 2,
+    description: 'A chanter of doom.',
+    lore: 'Their very voice warps reality. They do not fight with weapons, but with words that accelerate the coming of the end.'
+  },
+  ghoul: {
+    name: 'Ghoul',
+    type: 'ghoul',
+    hp: 3, damage: 2, horror: 2,
+    description: 'A flesh-eating subterranean dweller.',
+    lore: 'Canine-like humanoids that dwell in crypts and tunnels beneath the city. They are strangely intelligent and bargain with terrible secrets.'
+  },
+  deepone: {
+    name: 'Deep One',
+    type: 'deepone',
+    hp: 3, damage: 2, horror: 2,
+    description: 'An immortal amphibious humanoid.',
+    lore: 'Servants of Dagon who dwell in underwater cities. They seek to breed with humans to extend their lineage onto land.'
+  },
+  shoggoth: {
+    name: 'Shoggoth',
+    type: 'shoggoth',
+    hp: 6, damage: 3, horror: 4,
+    description: 'A protoplasmic mass of eyes and mouths.',
+    lore: 'Created as slave labor by the Elder Things eons ago. They are shifting, amorphous mountains of slime that crush everything in their path.',
+    traits: ['massive']
+  },
+  'mi-go': {
+    name: 'Mi-Go',
+    type: 'mi-go',
+    hp: 3, damage: 1, horror: 1,
+    description: 'A fungoid crustacean from Yuggoth.',
+    lore: 'They fly through the ether of space on membranous wings. Their technology is far beyond human comprehension, often involving brain extraction.',
+    traits: ['flying']
+  },
+  nightgaunt: {
+    name: 'Nightgaunt',
+    type: 'nightgaunt',
+    hp: 3, damage: 1, horror: 1,
+    description: 'A faceless, horned flyer.',
+    lore: 'Silent servants of Nodens. They do not speak, but tickle their victims into submission before carrying them off to the Dreamlands.',
+    traits: ['flying']
+  },
+  hound: {
+    name: 'Hound of Tindalos',
+    type: 'hound',
+    hp: 4, damage: 2, horror: 3,
+    description: 'A predator from the angles of time.',
+    lore: 'They enter our reality through sharp angles in a room. Once they catch a scent, they pursue their prey across time itself.',
+    traits: ['fast']
+  },
+  dark_young: {
+    name: 'Dark Young',
+    type: 'dark_young',
+    hp: 6, damage: 2, horror: 3,
+    description: 'Offspring of Shub-Niggurath.',
+    lore: 'Enormous, tree-like monstrosities with hoofed legs and ropy tentacles smelling of grave mold.',
+    traits: ['massive']
+  },
+  byakhee: {
+    name: 'Byakhee',
+    type: 'byakhee',
+    hp: 3, damage: 2, horror: 1,
+    description: 'An interstellar steed.',
+    lore: 'composed of crow, mole, buzzard, ant, and decomposed human being. They can fly through space and carry riders to the court of Azathoth.',
+    traits: ['flying', 'fast']
+  },
+  star_spawn: {
+    name: 'Star Spawn',
+    type: 'star_spawn',
+    hp: 8, damage: 3, horror: 5,
+    description: 'A colossal kin of Cthulhu.',
+    lore: 'Smaller versions of the Great Dreamer himself. Their psychic presence alone can shatter the minds of the strongest investigators.',
+    traits: ['massive']
+  },
+  formless_spawn: {
+    name: 'Formless Spawn',
+    type: 'formless_spawn',
+    hp: 5, damage: 2, horror: 2,
+    description: 'Black ooze of Tsathoggua.',
+    lore: 'A malleable black substance that can change shape instantly. It heals rapidly from physical wounds.',
+    traits: ['regenerate']
+  },
+  hunting_horror: {
+    name: 'Hunting Horror',
+    type: 'hunting_horror',
+    hp: 4, damage: 3, horror: 3,
+    description: 'A viper of the void.',
+    lore: 'A massive, serpentine entity resembling a dragon without wings. It serves Nyarlathotep and hunts those who pry too deep.',
+    traits: ['fast', 'flying']
+  },
+  moon_beast: {
+    name: 'Moon-Beast',
+    type: 'moon_beast',
+    hp: 4, damage: 1, horror: 2,
+    description: 'Sadistic torturers from the moon.',
+    lore: 'Pale, toad-like abominations with no eyes and a mass of pink tentacles on their snout. They enslave other races.',
+    traits: ['ranged']
+  },
+  boss: {
+    name: 'Ancient One',
+    type: 'boss',
+    hp: 10, damage: 4, horror: 6,
+    description: 'An avatar of cosmic destruction.',
+    lore: 'You should not be seeing this. If you are, the end is already here.',
+    traits: ['massive']
+  }
+};
