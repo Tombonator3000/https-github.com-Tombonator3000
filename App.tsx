@@ -35,7 +35,7 @@ import OptionsMenu from './components/OptionsMenu';
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "2.8";
+const APP_VERSION = "2.8.1";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -418,6 +418,7 @@ const App: React.FC = () => {
 
   const startGame = () => {
     if (state.players.length === 0 || !state.activeScenario) return;
+    initAudio(); // Ensure audio context starts on user interaction
     const scenario = state.activeScenario;
     const startTile: Tile = { ...START_TILE, name: scenario.startLocation };
     
@@ -577,22 +578,51 @@ const App: React.FC = () => {
                 return enemy; 
             }
 
-            let newQ = enemy.position.q;
-            let newR = enemy.position.r;
-
+            let bestMove = enemy.position;
             if (targetPlayer) {
-              if (targetPlayer.position.q > enemy.position.q) newQ++; else if (targetPlayer.position.q < enemy.position.q) newQ--;
-              if (targetPlayer.position.r > enemy.position.r) newR++; else if (targetPlayer.position.r < enemy.position.r) newR--;
+                // FIXED HEX MOVEMENT LOGIC
+                // Check all 6 neighbors and choose the one closer to target
+                const neighbors = [
+                    {q: enemy.position.q + 1, r: enemy.position.r},
+                    {q: enemy.position.q - 1, r: enemy.position.r},
+                    {q: enemy.position.q, r: enemy.position.r + 1},
+                    {q: enemy.position.q, r: enemy.position.r - 1},
+                    {q: enemy.position.q + 1, r: enemy.position.r - 1},
+                    {q: enemy.position.q - 1, r: enemy.position.r + 1}
+                ];
+
+                // Filter valid (on board, not blocked)
+                const validMoves = neighbors.filter(n => {
+                   // Can theoretically move to any existing tile that isn't blocked.
+                   // For now, enemies can overlap each other to prevent jamming.
+                   const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
+                   return tile && !tile.object?.blocking;
+                });
+
+                if (validMoves.length > 0) {
+                   validMoves.sort((a, b) => {
+                      const distA = hexDistance(a, targetPlayer!.position);
+                      const distB = hexDistance(b, targetPlayer!.position);
+                      return distA - distB;
+                   });
+                   bestMove = validMoves[0];
+                }
             } else {
-              const neighbors = [{q: newQ+1, r: newR}, {q: newQ-1, r: newR}, {q: newQ, r: newR+1}, {q: newQ, r: newR-1}, {q: newQ+1, r: newR-1}, {q: newQ-1, r: newR+1}];
+              // Patrol Logic
+              const neighbors = [
+                {q: enemy.position.q + 1, r: enemy.position.r}, 
+                {q: enemy.position.q - 1, r: enemy.position.r}, 
+                {q: enemy.position.q, r: enemy.position.r + 1}, 
+                {q: enemy.position.q, r: enemy.position.r - 1}, 
+                {q: enemy.position.q + 1, r: enemy.position.r - 1}, 
+                {q: enemy.position.q - 1, r: enemy.position.r + 1}
+              ];
               const validNeighbors = neighbors.filter(n => prev.board.some(t => t.q === n.q && t.r === n.r && !t.object?.blocking));
               if (validNeighbors.length > 0) {
-                  const randomMove = validNeighbors[Math.floor(Math.random() * validNeighbors.length)];
-                  newQ = randomMove.q;
-                  newR = randomMove.r;
+                  bestMove = validNeighbors[Math.floor(Math.random() * validNeighbors.length)];
               }
             }
-            return { ...enemy, position: { q: newQ, r: newR } };
+            return { ...enemy, position: bestMove };
           });
 
           // Resolve Attacks
@@ -885,11 +915,13 @@ const App: React.FC = () => {
              }
         } else {
             if (searchSuccesses > 0) {
-                if (Math.random() > 0.8) {
+                // IMPROVED SEARCH LOGIC
+                const searchRoll = Math.random();
+                if (searchRoll > 0.8) {
                     setState(prev => ({ ...prev, cluesFound: prev.cluesFound + 1, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
                     addToLog("Et spor!");
                     triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `CLUE!`, 'text-green-400');
-                } else if (Math.random() > 0.85) {
+                } else if (searchRoll > 0.65) {
                     const item = ITEMS[Math.floor(Math.random() * ITEMS.length)];
                     setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, inventory: [...p.inventory, item], actions: p.actions - 1 } : p) }));
                     addToLog(`Du fant ${item.name} på gulvet!`);
