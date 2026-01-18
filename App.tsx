@@ -41,8 +41,9 @@ import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
+const SETUP_CONFIG_KEY = 'shadows_1920s_setup_config_v1';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.4.0";
+const APP_VERSION = "3.4.1";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -183,7 +184,14 @@ const App: React.FC = () => {
   const [assetLibrary, setAssetLibrary] = useState<AssetLibrary>({});
 
   const [viewingVeterans, setViewingVeterans] = useState(false);
-  const [setupNames, setSetupNames] = useState<Record<string, string>>({});
+  const [setupNames, setSetupNames] = useState<Record<string, string>>(() => {
+      try {
+          const saved = localStorage.getItem(SETUP_CONFIG_KEY);
+          return saved ? JSON.parse(saved) : {};
+      } catch (e) {
+          return {};
+      }
+  });
   const [hoveredEnemyId, setHoveredEnemyId] = useState<string | null>(null);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
@@ -221,6 +229,14 @@ const App: React.FC = () => {
         console.warn("Roster save failed: Storage quota exceeded.", e);
     }
   }, [roster]);
+
+  useEffect(() => {
+      try {
+          localStorage.setItem(SETUP_CONFIG_KEY, JSON.stringify(setupNames));
+      } catch (e) {
+          console.warn("Setup config save failed.", e);
+      }
+  }, [setupNames]);
 
   // TURN NOTIFICATION TRIGGER
   useEffect(() => {
@@ -516,7 +532,7 @@ const App: React.FC = () => {
       }
 
       // Check if we have a saved name for this session, otherwise use default
-      const sessionName = setupNames[type] || char.name;
+      const sessionName = setupNames[type] && setupNames[type].trim() !== '' ? setupNames[type] : char.name;
 
       const newPlayer: Player = { 
           ...char, 
@@ -543,7 +559,9 @@ const App: React.FC = () => {
           if (prev.players.length >= 4) return prev;
 
           // Check for session-specific rename for veteran
-          const sessionName = (vet.instanceId && setupNames[vet.instanceId]) || vet.name;
+          const sessionName = (vet.instanceId && setupNames[vet.instanceId] && setupNames[vet.instanceId].trim() !== '') 
+            ? setupNames[vet.instanceId] 
+            : vet.name;
 
           const player: Player = {
               ...vet,
@@ -573,8 +591,25 @@ const App: React.FC = () => {
       }));
   };
 
+  const handleNameBlur = (identifier: string, currentName: string, defaultName: string, isVeteran: boolean) => {
+      // If name is empty on blur, revert to default to prevent nameless players
+      if (!currentName || currentName.trim() === '') {
+          updatePlayerName(identifier, defaultName, isVeteran);
+      }
+  };
+
   const startGame = () => {
     if (state.players.length === 0 || !state.activeScenario) return;
+    
+    // VALIDATION: Ensure all players have names
+    const invalidPlayer = state.players.find(p => !p.name || p.name.trim() === '');
+    if (invalidPlayer) {
+        playStinger('block');
+        // Shake screen or provide feedback (using simplified alert for now)
+        alert("All investigators must have a name!");
+        return;
+    }
+
     initAudio();
     const scenario = state.activeScenario;
     const startTile: Tile = { ...START_TILE, name: scenario.startLocation };
@@ -642,6 +677,7 @@ const App: React.FC = () => {
       setRoster(prev => prev.filter(p => p.instanceId !== instanceId));
   };
 
+  // ... (rest of App component methods: handleEndTurn, handlePuzzleComplete, handleAction, etc.) ...
   const handleEndTurn = () => {
     playStinger('click');
     setState(prev => {
@@ -718,8 +754,7 @@ const App: React.FC = () => {
   // --- MENU ACTIONS ---
   const handleStartNewGame = () => {
       setState(DEFAULT_STATE);
-      // Reset setup specific memory when starting fully new game
-      setSetupNames({});
+      // Keep setup names even on new game to avoid re-typing preferred names
       setIsMainMenuOpen(false);
       refreshBoardVisuals(); // Ensure any newly generated assets from options are applied
       initAudio();
@@ -734,11 +769,12 @@ const App: React.FC = () => {
   const handleResetData = () => {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(ROSTER_KEY);
+      localStorage.removeItem(SETUP_CONFIG_KEY);
       // Also clear asset library? Maybe safe to keep it.
       window.location.reload();
   };
 
-  // --- ACTIONS ---
+  // ... (handleResolveEvent, Mythos Phase Effect, handleAction, etc. remain unchanged) ...
   
   const handleResolveEvent = useCallback(() => {
     if (!state.activeEvent) return;
@@ -1733,6 +1769,7 @@ const App: React.FC = () => {
                             type="text" 
                             value={selectedPlayer.name} 
                             onChange={(e) => updatePlayerName(key, e.target.value, false)} 
+                            onBlur={(e) => handleNameBlur(key, e.target.value, CHARACTERS[key].name, false)}
                             onClick={(e) => { e.stopPropagation(); e.preventDefault(); }} 
                             onMouseDown={(e) => { e.stopPropagation(); }}
                             className="bg-transparent border-b border-[#e94560] text-[#e94560] text-xl font-bold uppercase tracking-tight w-full focus:outline-none placeholder-slate-700 z-50 relative cursor-text" 
@@ -1768,6 +1805,7 @@ const App: React.FC = () => {
                                         type="text" 
                                         value={selectedPlayer.name} 
                                         onChange={(e) => updatePlayerName(vet.instanceId!, e.target.value, true)} 
+                                        onBlur={(e) => handleNameBlur(vet.instanceId!, e.target.value, vet.name, true)}
                                         onClick={(e) => { e.stopPropagation(); e.preventDefault(); }} 
                                         onMouseDown={(e) => { e.stopPropagation(); }}
                                         className="bg-transparent border-b border-amber-500 text-amber-400 text-xl font-bold uppercase tracking-tight w-full focus:outline-none placeholder-amber-900/50 mr-2 z-50 relative cursor-text" 
