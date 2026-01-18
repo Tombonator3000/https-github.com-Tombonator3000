@@ -56,3 +56,8 @@ Track all major milestones, feature additions, and bug fixes here.
 ## [v3.9.16 Refactoring & Stability]
 *   **Code Separation:** Extracted Hexagonal Math, Line-of-Sight calculations, and Pathfinding (BFS) logic from `App.tsx` into a dedicated `utils/hexUtils.ts` module.
 *   **Maintainability:** Reduced main component bloat, making the game loop easier to read and debug.
+
+## [v3.9.17 Visual Restoration]
+*   **Hex Visuals:** Restored tile borders by applying the correct `strokeColor` to the parent hex container.
+*   **Textures:** Increased opacity and improved blending modes for internal CSS patterns to ensure tile types are visually distinct even without AI assets.
+*   **UI Polish:** Restored the "tactical map" aesthetic.

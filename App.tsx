@@ -44,7 +44,7 @@ const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const SETUP_CONFIG_KEY = 'shadows_1920s_setup_config_v1';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.9.16";
+const APP_VERSION = "3.9.18";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -89,10 +89,6 @@ const formatLogEntry = (entry: string) => {
     ];
 
     let formatted = entry;
-    // We can't use simple string replace for React components easily without dangerous HTML or parsing.
-    // Simple parser: split by words and checking is robust but complex. 
-    // For this prototype, we'll return a React node array.
-    
     const parts = entry.split(/(\s+)/); // Split by whitespace but keep delimiters
     return parts.map((part, i) => {
         let className = '';
@@ -174,7 +170,6 @@ const App: React.FC = () => {
       const { masterVolume, musicVolume, muted } = gameSettings.audio;
       
       // Master Volume (Tone.Destination is in Decibels)
-      // Map 0-100 to -60db to 0db
       const masterDb = muted || masterVolume === 0 ? -Infinity : Tone.gainToDb(masterVolume / 100);
       Tone.Destination.volume.rampTo(masterDb, 0.1);
 
@@ -277,7 +272,6 @@ const App: React.FC = () => {
     const { sfxVolume, muted } = gameSettings.audio;
     if (muted || sfxVolume === 0) return;
 
-    // Base volume calculation (0-1 multiplier)
     const vol = sfxVolume / 100;
     const gainDb = Tone.gainToDb(vol);
 
@@ -623,6 +617,179 @@ const App: React.FC = () => {
           }
           break;
         
+      case 'investigate': {
+          const currentTile = state.board.find(t => t.q === activePlayer.position.q && t.r === activePlayer.position.r);
+          if (!currentTile) return;
+          
+          if (!currentTile.searchable || currentTile.searched) {
+              addToLog("Ingenting mer å finne her.");
+              playStinger('block');
+              return;
+          }
+
+          playStinger('roll');
+          const iDice = getDiceCount(2 + activePlayer.insight, 'investigation');
+          const roll = Array.from({ length: iDice }, () => Math.floor(Math.random() * 6) + 1);
+          const success = roll.filter(v => v >= 4).length;
+          
+          setState(prev => ({ ...prev, lastDiceRoll: roll }));
+
+          if (success >= 1) {
+              playStinger('search');
+              // Loot logic
+              let lootMsg = "";
+              let foundItem: Item | null = null;
+              let cluesFound = 0;
+
+              if (Math.random() > 0.6) {
+                  // Find Item
+                  const pool = ITEMS.filter(i => i.type !== 'weapon' || Math.random() > 0.7); // mostly tools/consumables
+                  foundItem = pool[Math.floor(Math.random() * pool.length)];
+                  lootMsg = `Fant: ${foundItem.name}!`;
+                  triggerFloatingText(activePlayer.position.q, activePlayer.position.r, foundItem.name, "text-amber-400 font-bold");
+              } else {
+                  // Find Clue
+                  cluesFound = 1;
+                  lootMsg = `Fant viktige spor! (+1 Insight)`;
+                  triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "+1 CLUE", "text-cyan-400 font-bold");
+              }
+              
+              addToLog(`Suksess! ${lootMsg}`);
+
+              setState(prev => ({
+                  ...prev,
+                  cluesFound: prev.cluesFound + cluesFound,
+                  board: prev.board.map(t => t.id === currentTile.id ? { ...t, searched: true } : t),
+                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { 
+                      ...p, 
+                      actions: p.actions - 1, 
+                      insight: p.insight + cluesFound,
+                      inventory: foundItem ? [...p.inventory, foundItem] : p.inventory 
+                  } : p)
+              }));
+          } else {
+              addToLog("Fant ingenting av verdi.");
+              triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "FAILED", "text-slate-500");
+              setState(prev => ({
+                  ...prev,
+                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p)
+              }));
+          }
+          break;
+      }
+
+      case 'rest': {
+          if (activePlayer.activeMadness?.id === 'm2') { // Paranoia
+              addToLog("Du er for paranoid til å hvile!");
+              playStinger('block');
+              return;
+          }
+
+          const nearbyEnemies = state.enemies.filter(e => hexDistance(activePlayer.position, e.position) <= 1);
+          if (nearbyEnemies.length > 0) {
+              addToLog("Kan ikke hvile med fiender i nærheten!");
+              playStinger('block');
+              return;
+          }
+
+          playStinger('heal');
+          const newHp = Math.min(activePlayer.maxHp, activePlayer.hp + 1);
+          const newSanity = Math.min(activePlayer.maxSanity, activePlayer.sanity + 1);
+          
+          addToLog(`${activePlayer.name} tar en pause. (+1 HP, +1 Sanity)`);
+          triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "RESTED", "text-green-400 font-bold");
+
+          setState(prev => ({
+              ...prev,
+              players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, hp: newHp, sanity: newSanity, actions: p.actions - 1 } : p)
+          }));
+          break;
+      }
+
+      case 'flee': {
+          // Logic: Roll Agility. Success = Move to random safe adjacent tile instantly. Fail = 1 Dmg.
+          playStinger('roll');
+          const aDice = getDiceCount(2 + (activePlayer.id === 'journalist' ? 1 : 0), 'agility');
+          const roll = Array.from({ length: aDice }, () => Math.floor(Math.random() * 6) + 1);
+          const success = roll.filter(v => v >= 4).length;
+          
+          setState(prev => ({ ...prev, lastDiceRoll: roll }));
+          
+          if (success >= 1) {
+              // Find safe neighbor
+              const neighbors = [
+                  {q: activePlayer.position.q + 1, r: activePlayer.position.r}, {q: activePlayer.position.q - 1, r: activePlayer.position.r},
+                  {q: activePlayer.position.q, r: activePlayer.position.r + 1}, {q: activePlayer.position.q, r: activePlayer.position.r - 1},
+                  {q: activePlayer.position.q + 1, r: activePlayer.position.r - 1}, {q: activePlayer.position.q - 1, r: activePlayer.position.r + 1}
+              ];
+              // Filter valid moves
+              const validMoves = neighbors.filter(n => {
+                  const t = state.board.find(tile => tile.q === n.q && tile.r === n.r);
+                  const hasEnemy = state.enemies.some(e => e.position.q === n.q && e.position.r === n.r);
+                  return t && !t.object?.blocking && !hasEnemy;
+              });
+
+              if (validMoves.length > 0) {
+                  const escapeTo = validMoves[Math.floor(Math.random() * validMoves.length)];
+                  addToLog(`${activePlayer.name} flykter i panikk!`);
+                  triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "ESCAPED!", "text-cyan-400 font-bold");
+                  setState(prev => ({
+                      ...prev,
+                      players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: escapeTo, actions: p.actions - 1 } : p)
+                  }));
+              } else {
+                  addToLog(`${activePlayer.name} prøvde å flykte, men er omringet!`);
+                  triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "TRAPPED!", "text-red-500 font-bold");
+                  setState(prev => ({
+                      ...prev,
+                      players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p)
+                  }));
+              }
+          } else {
+              // Fail
+              addToLog(`${activePlayer.name} snubler i forsøket på å flykte. 1 skade.`);
+              const dmgRes = applyPhysicalDamage(activePlayer, 1);
+              setState(prev => ({
+                  ...prev,
+                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...dmgRes.player, actions: p.actions - 1 } : p)
+              }));
+          }
+          break;
+      }
+
+      case 'consume': {
+          const item = payload as Item;
+          if (!activePlayer.inventory.find(i => i.id === item.id)) return;
+          
+          playStinger('heal');
+          let logMsg = `Brukte ${item.name}.`;
+          let updatedPlayer = { ...activePlayer };
+
+          if (item.name.includes("Med") || item.effect.includes("Heal HP")) {
+              updatedPlayer.hp = Math.min(updatedPlayer.maxHp, updatedPlayer.hp + (item.bonus || 2));
+              logMsg += ` Helbredet HP.`;
+              triggerFloatingText(updatedPlayer.position.q, updatedPlayer.position.r, "+HP", "text-green-400");
+          } else if (item.name.includes("Whiskey") || item.effect.includes("Sanity")) {
+              updatedPlayer.sanity = Math.min(updatedPlayer.maxSanity, updatedPlayer.sanity + (item.bonus || 2));
+              logMsg += ` Roet nervene.`;
+              triggerFloatingText(updatedPlayer.position.q, updatedPlayer.position.r, "+SAN", "text-purple-400");
+          }
+
+          // Remove item
+          const invIndex = updatedPlayer.inventory.findIndex(i => i.id === item.id);
+          const newInv = [...updatedPlayer.inventory];
+          if (invIndex > -1) newInv.splice(invIndex, 1);
+          updatedPlayer.inventory = newInv;
+          updatedPlayer.actions -= 1; // Costs action? Let's say yes for balance.
+
+          addToLog(logMsg);
+          setState(prev => ({
+              ...prev,
+              players: prev.players.map((p, i) => i === prev.activePlayerIndex ? updatedPlayer : p)
+          }));
+          break;
+      }
+        
       case 'attack':
           let targetId = state.selectedEnemyId;
           const enemiesInRange = state.enemies.filter(e => !e.isDying && hexDistance(activePlayer.position, e.position) <= 1);
@@ -906,12 +1073,19 @@ const App: React.FC = () => {
               updatedEnemies.push(currentEnemy);
           } 
           
+          // Reset Actions for the new round
+          const nextRoundPlayers = players.map(p => ({
+              ...p,
+              // Default 2 actions, 1 if Catatonic (m4)
+              actions: p.activeMadness?.id === 'm4' ? 1 : 2
+          }));
+
           return { 
               ...prev, 
               doom: newDoom, 
               round: prev.round + 1, 
               enemies: updatedEnemies, 
-              players: players,
+              players: nextRoundPlayers,
               log: [...logMessages, ...prev.log],
               phase: (newDoom <= 0) ? GamePhase.GAME_OVER : GamePhase.INVESTIGATOR, 
               activePlayerIndex: 0 
@@ -1131,6 +1305,7 @@ const App: React.FC = () => {
   }
 
   if (state.phase === GamePhase.SETUP) {
+      // Setup phase UI omitted for brevity, identical to previous version
       if (!state.activeScenario) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#05050a] relative overflow-hidden">
@@ -1351,7 +1526,7 @@ const App: React.FC = () => {
           </div>
       </header>
 
-      {/* Panels (Left/Right/Bottom) - Included via Component Imports in real app */}
+      {/* Panels */}
       
       {activePlayer && !leftPanelCollapsed && (
         <div className="fixed inset-0 md:left-4 md:top-20 md:bottom-24 md:w-80 md:inset-auto transition-all duration-500 z-50 animate-in slide-in-from-bottom md:slide-in-from-left">
@@ -1364,7 +1539,13 @@ const App: React.FC = () => {
               <Minimize2 size={20}/>
             </button>
             <div className="flex-1 flex flex-col overflow-hidden pt-8 md:pt-0">
-                <CharacterPanel player={activePlayer} allPlayers={state.players} onTrade={(item, targetId) => handleAction('trade', { item, targetPlayerId: targetId })} onDrop={(item) => handleAction('drop', { item })} />
+                <CharacterPanel 
+                    player={activePlayer} 
+                    allPlayers={state.players} 
+                    onTrade={(item, targetId) => handleAction('trade', { item, targetPlayerId: targetId })} 
+                    onDrop={(item) => handleAction('drop', { item })} 
+                    onUse={(item) => handleAction('consume', item)}
+                />
             </div>
           </div>
         </div>

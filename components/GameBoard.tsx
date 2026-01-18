@@ -25,6 +25,10 @@ const HEX_SIZE = 95;
 const VISIBILITY_RANGE = 2; // Default range
 const DRAG_THRESHOLD = 5; // Pixels of movement required to count as a drag
 
+// SVG Polygon Points for Flat-Topped Hexagon (0-100 coordinate space)
+// Matches clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+const HEX_POLY_POINTS = "25,0 75,0 100,50 75,100 25,100 0,50";
+
 // --- ICON MAPPER FOR MONSTERS ---
 const getMonsterIcon = (type: EnemyType) => {
     switch (type) {
@@ -66,105 +70,103 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
   // 0. CONNECTORS (Hallways/Alleys)
   if (n.includes('hallway') || n.includes('corridor') || n.includes('passage') || n.includes('shaft')) {
       return {
-          bg: 'bg-[#15100e]',
+          bg: 'bg-[#1c1917]',
           style: {
-              backgroundImage: 'linear-gradient(90deg, #000 0%, transparent 20%, transparent 80%, #000 100%), repeating-linear-gradient(0deg, #1f1510 0, #1f1510 5px, #15100e 5px, #15100e 10px)'
+              backgroundImage: 'repeating-linear-gradient(90deg, #292524 0, #292524 1px, transparent 1px, transparent 10px)'
           },
-          strokeColor: '#44403c', // Stone 700
+          strokeColor: '#78716c', // Stone 500
           Icon: DoorOpen,
-          iconColor: 'text-stone-700'
+          iconColor: 'text-stone-400'
       };
   }
   if (n.includes('alley') || n.includes('path') || n.includes('tunnel') || n.includes('trail')) {
       return {
-          bg: 'bg-[#0f1115]',
+          bg: 'bg-[#0f172a]',
           style: {
-              backgroundImage: 'radial-gradient(circle, transparent 20%, #000 90%), repeating-radial-gradient(circle at 50% 100%, #1e293b 0, #0f1115 5px)'
+              backgroundImage: 'radial-gradient(circle, transparent 20%, #000 90%), repeating-radial-gradient(circle at 50% 100%, #334155 0, transparent 2px, transparent 6px)'
           },
-          strokeColor: '#334155', // Slate 700
+          strokeColor: '#475569', // Slate 600
           Icon: Milestone,
-          iconColor: 'text-slate-800'
+          iconColor: 'text-slate-500'
       };
   }
 
   // 1. WOOD FLOOR (Manors, Libraries, Old Houses)
   if (n.includes('library') || n.includes('study') || n.includes('manor') || n.includes('hall') || n.includes('attic') || n.includes('servant') || n.includes('ballroom') || n.includes('billiard') || n.includes('bedroom') || n.includes('nursery') || n.includes('trophy') || n.includes('staircase')) {
     return {
-      bg: 'bg-[#2a1d18]',
+      bg: 'bg-[#451a03]',
       style: {
-        backgroundImage: 'repeating-linear-gradient(90deg, transparent 0, transparent 18px, rgba(0,0,0,0.3) 19px, rgba(0,0,0,0.3) 20px)'
+        backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 10px)'
       },
-      strokeColor: '#78350f', // Amber 900
+      strokeColor: '#b45309', // Amber 700
       Icon: BookOpen,
-      iconColor: 'text-amber-900'
+      iconColor: 'text-amber-500'
     };
   }
 
   // 2. COLD TILES (Hospitals, Asylums, Labs)
   if (n.includes('hospital') || n.includes('asylum') || n.includes('sanitarium') || n.includes('morgue') || n.includes('lab') || n.includes('operating') || n.includes('padded')) {
     return {
-      bg: 'bg-[#e2e8f0]', // Light slate
+      bg: 'bg-[#334155]', 
       style: {
-        backgroundImage: 'linear-gradient(45deg, #cbd5e1 25%, transparent 25%, transparent 75%, #cbd5e1 75%, #cbd5e1), linear-gradient(45deg, #cbd5e1 25%, transparent 25%, transparent 75%, #cbd5e1 75%, #cbd5e1)',
+        backgroundImage: 'linear-gradient(0deg, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
         backgroundSize: '20px 20px',
-        backgroundPosition: '0 0, 10px 10px',
-        filter: 'brightness(0.6) sepia(0.2)'
       },
       strokeColor: '#94a3b8', // Slate 400
       Icon: Archive,
-      iconColor: 'text-slate-400'
+      iconColor: 'text-slate-300'
     };
   }
 
   // 3. RITUAL / RELIGIOUS (Church, Crypt, Altar)
   if (n.includes('church') || n.includes('crypt') || n.includes('ritual') || n.includes('temple') || n.includes('altar')) {
     return {
-      bg: 'bg-[#1a0505]',
+      bg: 'bg-[#450a0a]',
       style: {
-        backgroundImage: 'radial-gradient(circle at center, #3f0e0e 0%, transparent 70%)'
+        backgroundImage: 'radial-gradient(circle at center, #7f1d1d 0%, transparent 80%)'
       },
-      strokeColor: '#7f1d1d', // Red 900
+      strokeColor: '#ef4444', // Red 500
       Icon: Church,
-      iconColor: 'text-red-900'
+      iconColor: 'text-red-400'
     };
   }
 
   // 4. INDUSTRIAL / STORAGE (Warehouse, Boiler Room, Factory, Cellar)
   if (n.includes('warehouse') || n.includes('boiler') || n.includes('factory') || n.includes('station') || n.includes('cellar')) {
     return {
-      bg: 'bg-[#1c1917]',
+      bg: 'bg-[#292524]',
       style: {
-        backgroundImage: 'repeating-linear-gradient(45deg, #292524 0, #292524 5px, #1c1917 5px, #1c1917 10px)'
+        backgroundImage: 'repeating-linear-gradient(-45deg, #44403c 0, #44403c 2px, transparent 2px, transparent 8px)'
       },
-      strokeColor: '#57534e', // Stone 600
+      strokeColor: '#a8a29e', // Stone 400
       Icon: Box,
-      iconColor: 'text-stone-700'
+      iconColor: 'text-stone-400'
     };
   }
 
   // 5. NATURE / SWAMP (Swamp, Forest, Park, Garden, Greenhouse)
   if (n.includes('swamp') || n.includes('forest') || n.includes('park') || n.includes('garden') || n.includes('graveyard') || n.includes('greenhouse') || n.includes('conservatory') || n.includes('gazebo') || n.includes('overgrown')) {
     return {
-      bg: 'bg-[#06180e]',
+      bg: 'bg-[#064e3b]',
       style: {
-        backgroundImage: 'radial-gradient(circle at 20% 80%, #14532d 0%, transparent 40%), radial-gradient(circle at 80% 20%, #064e3b 0%, transparent 40%)'
+        backgroundImage: 'radial-gradient(circle at 20% 80%, rgba(255,255,255,0.1) 0%, transparent 20%)'
       },
-      strokeColor: '#14532d', // Green 900
+      strokeColor: '#4ade80', // Green 400
       Icon: n.includes('graveyard') ? Skull : Trees,
-      iconColor: 'text-green-900'
+      iconColor: 'text-green-400'
     };
   }
 
   // 6. WATER / DOCKS (Docks, River, Pier, Bridge)
   if (n.includes('dock') || n.includes('river') || n.includes('pier') || n.includes('bridge')) {
     return {
-      bg: 'bg-[#0f172a]',
+      bg: 'bg-[#172554]',
       style: {
-        backgroundImage: 'repeating-radial-gradient(circle at 50% 100%, #1e293b 0, #0f172a 10px)'
+        backgroundImage: 'repeating-radial-gradient(circle at 50% 100%, rgba(255,255,255,0.05) 0, transparent 5px)'
       },
-      strokeColor: '#164e63', // Cyan 900
+      strokeColor: '#60a5fa', // Blue 400
       Icon: Anchor,
-      iconColor: 'text-cyan-900'
+      iconColor: 'text-blue-400'
     };
   }
 
@@ -173,22 +175,22 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
     return {
       bg: 'bg-[#1e293b]',
       style: {
-        backgroundImage: 'linear-gradient(335deg, rgba(0,0,0,0.2) 23px, transparent 23px), linear-gradient(155deg, rgba(0,0,0,0.2) 23px, transparent 23px), linear-gradient(335deg, rgba(0,0,0,0.2) 23px, transparent 23px), linear-gradient(155deg, rgba(0,0,0,0.2) 23px, transparent 23px)',
-        backgroundSize: '58px 58px'
+        backgroundImage: 'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
+        backgroundSize: '20px 20px'
       },
-      strokeColor: '#475569', // Slate 600
+      strokeColor: '#cbd5e1', // Slate 300
       Icon: Building2,
-      iconColor: 'text-slate-700'
+      iconColor: 'text-slate-400'
     };
   }
 
   // 8. GENERIC ROOM
   return {
-    bg: 'bg-[#171717]',
+    bg: 'bg-[#262626]',
     style: {},
-    strokeColor: '#404040', // Neutral 700
+    strokeColor: '#737373', // Neutral 500
     Icon: Ghost, // Generic mysterious icon
-    iconColor: 'text-neutral-800'
+    iconColor: 'text-neutral-500'
   };
 };
 
@@ -429,28 +431,33 @@ const GameBoard: React.FC<GameBoardProps> = ({
           return (
             <div
               key={tile.id}
-              className={`absolute hex-clip flex items-center justify-center transition-all duration-500`}
+              className={`absolute flex items-center justify-center transition-all duration-500`}
               style={{
                 width: `${HEX_SIZE * 2}px`,
                 height: `${HEX_SIZE * 1.732}px`,
                 left: `${x - HEX_SIZE}px`,
-                top: `${y - HEX_SIZE * 0.866}px`,
+                top: `${y - HEX_SIZE * 0.866}px`
               }}
               onClick={() => {
                 if (!hasDragged.current) onTileClick(tile.q, tile.r);
               }}
             >
-              {/* Inner Hex (Border + Background) */}
+              {/* Inner Hex (Clipped Content) */}
               <div 
-                className={`absolute inset-[2px] hex-clip transition-all duration-500 ${visual.bg} relative overflow-hidden`}
+                className={`absolute inset-0 hex-clip transition-all duration-500 ${visual.bg} relative overflow-hidden`}
               >
                  {/* Generated AI Image */}
                  {tile.imageUrl && (
                      <img src={tile.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-overlay" />
                  )}
 
-                 {/* CSS Pattern Fallback */}
-                 {!tile.imageUrl && <div className="absolute inset-0 opacity-20" style={visual.style}></div>}
+                 {/* CSS Pattern Fallback - Simple Opacity */}
+                 {!tile.imageUrl && (
+                    <div 
+                        className="absolute inset-0 opacity-20" 
+                        style={visual.style}
+                    ></div>
+                 )}
 
                  {/* Fog of War / Exploration Tint */}
                  <div className={`absolute inset-0 transition-opacity duration-1000 ${isVisible ? 'opacity-0' : 'opacity-70 bg-black'}`}></div>
@@ -479,19 +486,38 @@ const GameBoard: React.FC<GameBoardProps> = ({
                  )}
               </div>
 
-              {/* Selection Highlight */}
-              <div className={`absolute inset-0 hex-clip pointer-events-none border-[3px] transition-all duration-300 ${tile.object?.blocking ? 'border-red-500/50' : 'border-transparent hover:border-white/30'}`}></div>
+              {/* SVG BORDER OVERLAY (True visible borders) */}
+              <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-10">
+                  <polygon 
+                     points={HEX_POLY_POINTS} 
+                     fill="none" 
+                     stroke={visual.strokeColor} 
+                     strokeWidth="2.5"
+                     strokeLinecap="round"
+                     strokeLinejoin="round"
+                  />
+                  {/* Selection Highlight */}
+                  {tile.object?.blocking && (
+                      <polygon 
+                         points={HEX_POLY_POINTS} 
+                         fill="none" 
+                         stroke="#ef4444" 
+                         strokeWidth="2"
+                         className="opacity-60"
+                      />
+                  )}
+              </svg>
             </div>
           );
         })}
 
-        {/* Possible Move Indicators */}
+        {/* Possible Move Indicators (Red Dashed Lines) */}
         {possibleMoves.map((move, i) => {
           const { x, y } = hexToPixel(move.q, move.r);
           return (
              <div
                 key={`move-${i}`}
-                className="absolute hex-clip flex items-center justify-center cursor-pointer opacity-30 hover:opacity-60 transition-opacity bg-white border-2 border-white border-dashed"
+                className="absolute flex items-center justify-center cursor-pointer transition-opacity z-20 group"
                 style={{
                     width: `${HEX_SIZE * 2}px`,
                     height: `${HEX_SIZE * 1.732}px`,
@@ -501,7 +527,19 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 onClick={() => {
                    if (!hasDragged.current) onTileClick(move.q, move.r);
                 }}
-             />
+             >
+                 {/* Dashed SVG Border */}
+                 <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full overflow-visible">
+                    <polygon 
+                        points={HEX_POLY_POINTS} 
+                        fill="rgba(255,255,255,0.05)" 
+                        stroke="#e94560" 
+                        strokeWidth="2" 
+                        strokeDasharray="6,4"
+                        className="group-hover:stroke-white group-hover:stroke-[3px] transition-all duration-300"
+                    />
+                 </svg>
+             </div>
           );
         })}
 

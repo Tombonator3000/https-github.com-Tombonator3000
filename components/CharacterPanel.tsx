@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Player, Item } from '../types';
 import { 
     Heart, Brain, Eye, Star, AlertCircle, Trash2, Gift, ShieldCheck, 
-    Backpack, Sword, Search, Zap, Cross, FileQuestion, X
+    Backpack, Sword, Search, Zap, Cross, FileQuestion, X, Syringe
 } from 'lucide-react';
 import Tooltip from './Tooltip';
 
@@ -12,9 +12,10 @@ interface CharacterPanelProps {
   allPlayers: Player[];
   onTrade: (item: Item, targetPlayerId: string) => void;
   onDrop: (item: Item) => void;
+  onUse?: (item: Item) => void; // New callback for consuming items
 }
 
-const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onTrade, onDrop }) => {
+const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onTrade, onDrop, onUse }) => {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [confirmDrop, setConfirmDrop] = useState(false);
 
@@ -273,6 +274,16 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
 
                     {/* Action Buttons */}
                     <div className="flex gap-2 mt-2">
+                        {/* CONSUME BUTTON (New) */}
+                        {selectedItem.type === 'consumable' && onUse && (
+                            <button 
+                                onClick={() => { onUse(selectedItem); setSelectedItem(null); }}
+                                className="flex-1 bg-green-900/30 hover:bg-green-900/50 border border-green-800 text-green-400 py-2 px-2 text-[10px] uppercase font-bold flex items-center justify-center gap-1 transition-colors"
+                            >
+                                <Syringe size={12} /> Use
+                            </button>
+                        )}
+
                         {potentialTradeTargets.length > 0 && (
                             <div className="relative group flex-1">
                                 <button className="w-full bg-[#1e3a8a]/20 hover:bg-[#1e3a8a]/40 border border-blue-900 text-blue-300 py-2 px-2 text-[10px] uppercase font-bold flex items-center justify-center gap-1 transition-colors">
@@ -301,7 +312,6 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
                                     setConfirmDrop(false);
                                 } else {
                                     setConfirmDrop(true);
-                                    // Auto-reset confirmation after 3 seconds
                                     setTimeout(() => setConfirmDrop(false), 3000);
                                 }
                             }}
