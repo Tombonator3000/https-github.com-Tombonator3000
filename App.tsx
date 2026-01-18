@@ -1305,7 +1305,6 @@ const App: React.FC = () => {
   }
 
   if (state.phase === GamePhase.SETUP) {
-      // Setup phase UI omitted for brevity, identical to previous version
       if (!state.activeScenario) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#05050a] relative overflow-hidden">
@@ -1507,6 +1506,7 @@ const App: React.FC = () => {
         onEnemyHover={setHoveredEnemyId} 
         floatingTexts={state.floatingTexts} 
         doom={state.doom}
+        activeModifiers={state.activeModifiers}
       />
 
       {/* Header */}
@@ -1526,7 +1526,7 @@ const App: React.FC = () => {
           </div>
       </header>
 
-      {/* Panels */}
+      {/* Panels (Left/Right/Bottom) - Included via Component Imports in real app */}
       
       {activePlayer && !leftPanelCollapsed && (
         <div className="fixed inset-0 md:left-4 md:top-20 md:bottom-24 md:w-80 md:inset-auto transition-all duration-500 z-50 animate-in slide-in-from-bottom md:slide-in-from-left">
@@ -1539,13 +1539,7 @@ const App: React.FC = () => {
               <Minimize2 size={20}/>
             </button>
             <div className="flex-1 flex flex-col overflow-hidden pt-8 md:pt-0">
-                <CharacterPanel 
-                    player={activePlayer} 
-                    allPlayers={state.players} 
-                    onTrade={(item, targetId) => handleAction('trade', { item, targetPlayerId: targetId })} 
-                    onDrop={(item) => handleAction('drop', { item })} 
-                    onUse={(item) => handleAction('consume', item)}
-                />
+                <CharacterPanel player={activePlayer} allPlayers={state.players} onTrade={(item, targetId) => handleAction('trade', { item, targetPlayerId: targetId })} onDrop={(item) => handleAction('drop', { item })} onUse={(item) => handleAction('consume', item)} />
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Tile, Player, Enemy, FloatingText, EnemyType } from '../types';
+import { Tile, Player, Enemy, FloatingText, EnemyType, ScenarioModifier } from '../types';
 import { 
   User, Skull, DoorOpen, EyeOff, Target, Eye, Lock, Flame, Hammer, Ban,
   BookOpen, Trees, Anchor, Church, Building2, Box, Ghost,
@@ -19,6 +19,7 @@ interface GameBoardProps {
   enemySightMap?: Set<string>;
   floatingTexts?: FloatingText[];
   doom: number;
+  activeModifiers?: ScenarioModifier[];
 }
 
 const HEX_SIZE = 95;
@@ -195,7 +196,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
 };
 
 // DOOM LIGHTING CONFIG
-const getDoomLighting = (doom: number) => {
+const getDoomLighting = (doom: number, activeModifiers: ScenarioModifier[] = []) => {
     // 0 is dead, 12 is safe.
     // Inverse scale: 0 is safe, 1.0 is danger.
     const danger = Math.max(0, 1 - (doom / 12)); 
@@ -205,15 +206,21 @@ const getDoomLighting = (doom: number) => {
     let animation = 'none';
     let contrast = 1;
 
+    // Modifiers affect base lighting
+    const isBloodMoon = activeModifiers.some(m => m.effect === 'strong_enemies');
+    if (isBloodMoon) {
+        overlayColor = 'rgba(60, 10, 10, 0.3)';
+    }
+
     if (doom <= 3) {
         // Critical
-        overlayColor = 'rgba(60, 0, 0, 0.2)'; 
+        overlayColor = isBloodMoon ? 'rgba(80, 0, 0, 0.4)' : 'rgba(60, 0, 0, 0.2)'; 
         vignetteStrength = '90%'; // Tight
         animation = 'doom-flicker 4s infinite, doom-pulse-red 2s infinite';
         contrast = 1.2;
     } else if (doom <= 6) {
         // Warning
-        overlayColor = 'rgba(40, 10, 40, 0.3)';
+        overlayColor = isBloodMoon ? 'rgba(60, 20, 20, 0.3)' : 'rgba(40, 10, 40, 0.3)';
         vignetteStrength = '75%';
         animation = 'none';
         contrast = 1.1;
@@ -236,7 +243,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
   onEnemyHover,
   enemySightMap,
   floatingTexts = [],
-  doom
+  doom,
+  activeModifiers = []
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const hasDragged = useRef(false);
@@ -357,15 +365,18 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
   const visibleTiles = useMemo(() => {
     const visible = new Set<string>();
+    const modRange = activeModifiers.some(m => m.effect === 'reduced_vision') ? -1 : 0;
+    const finalRange = Math.max(1, VISIBILITY_RANGE + modRange);
+
     players.filter(p => !p.isDead).forEach(p => {
       tiles.forEach(t => {
-        if (getDistance(p.position.q, p.position.r, t.q, t.r) <= VISIBILITY_RANGE) {
+        if (getDistance(p.position.q, p.position.r, t.q, t.r) <= finalRange) {
           visible.add(`${t.q},${t.r}`);
         }
       });
     });
     return visible;
-  }, [players, tiles]);
+  }, [players, tiles, activeModifiers]);
 
   const possibleMoves = useMemo(() => {
     const moves: { q: number, r: number }[] = [];
@@ -387,7 +398,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
   }, [tiles, visibleTiles]);
 
   // Calculate dynamic lighting based on Doom
-  const lighting = getDoomLighting(doom);
+  const lighting = getDoomLighting(doom, activeModifiers);
 
   return (
     <div 
@@ -402,15 +413,28 @@ const GameBoard: React.FC<GameBoardProps> = ({
       onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
     >
-      {/* Dynamic Lighting Overlay */}
+      {/* 1. Dynamic Lighting Overlay (Vignette & Color Grading) */}
       <div 
         className="absolute inset-0 pointer-events-none z-20 transition-all duration-1000"
         style={{
             background: lighting.gradient,
             animation: lighting.animation,
-            mixBlendMode: 'overlay' // Blend with the map
+            mixBlendMode: 'overlay' 
         }}
       />
+
+      {/* 2. Atmospheric Clouds / Weather Layer */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-20 transition-opacity duration-1000 animate-fog opacity-30"
+        style={{
+            backgroundImage: 'url("https://www.transparenttextures.com/patterns/foggy-birds.png")',
+            backgroundSize: '600px',
+            mixBlendMode: 'screen',
+            filter: 'blur(2px)'
+        }}
+      />
+      {/* Darker Void Background for Depth */}
+      <div className="absolute inset-0 pointer-events-none z-0 bg-[radial-gradient(circle_at_center,_transparent_0%,_#000_100%)] opacity-80" />
       
       {/* Game Content */}
       <div 
@@ -459,9 +483,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     ></div>
                  )}
 
-                 {/* Fog of War / Exploration Tint */}
-                 <div className={`absolute inset-0 transition-opacity duration-1000 ${isVisible ? 'opacity-0' : 'opacity-70 bg-black'}`}></div>
-
                  {/* Tile Icon */}
                  <div className="relative z-10 flex flex-col items-center opacity-80 pointer-events-none">
                      <visual.Icon size={24} className={visual.iconColor} />
@@ -484,6 +505,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
                          {tile.object.type === 'trap' && <EyeOff className="text-red-500 opacity-0 group-hover:opacity-100" size={18} />} 
                      </div>
                  )}
+
+                 {/* Fog of War / Exploration Tint (z-30 to cover contents) */}
+                 <div className={`absolute inset-0 transition-all duration-1000 backdrop-blur-[2px] z-30 pointer-events-none ${isVisible ? 'opacity-0' : 'opacity-80 bg-black'}`}></div>
               </div>
 
               {/* SVG BORDER OVERLAY (True visible borders) */}
