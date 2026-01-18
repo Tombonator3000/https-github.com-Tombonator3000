@@ -87,3 +87,18 @@ Track all major milestones, feature additions, and bug fixes here.
 *   **Fallback Logic:** If manual assets are missing:
     *   Visuals fall back to Gemini AI generation.
     *   Audio falls back to Tone.js synthesis.
+
+## [v3.9.22 Asset Folder Setup - 2026-01-18]
+*   **Physical Folder Creation:** Created `public/assets/` folder structure on GitHub:
+    *   `public/assets/audio/music/` - For background music files
+    *   `public/assets/audio/sfx/` - For sound effect files
+    *   `public/assets/graphics/tiles/` - For location/tile images
+    *   `public/assets/graphics/monsters/` - For enemy creature images
+    *   `public/assets/graphics/characters/` - For investigator portrait images
+*   **Documentation:** Added `assets/README.md` with complete guide on:
+    *   File naming conventions
+    *   Supported file formats
+    *   List of all expected asset filenames
+    *   Fallback behavior explanation
+*   **Git Integration:** Added `.gitkeep` files to ensure empty folders are tracked by Git.
+*   **Status:** Folder structure is ready for manual asset placement. AssetLibrary.ts is fully functional and will prioritize manual files over AI generation.
