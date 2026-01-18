@@ -69,7 +69,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
           style: {
               backgroundImage: 'linear-gradient(90deg, #000 0%, transparent 20%, transparent 80%, #000 100%), repeating-linear-gradient(0deg, #1f1510 0, #1f1510 5px, #15100e 5px, #15100e 10px)'
           },
-          borderColor: 'border-stone-800',
+          strokeColor: '#44403c', // Stone 700
           Icon: DoorOpen,
           iconColor: 'text-stone-700'
       };
@@ -80,7 +80,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
           style: {
               backgroundImage: 'radial-gradient(circle, transparent 20%, #000 90%), repeating-radial-gradient(circle at 50% 100%, #1e293b 0, #0f1115 5px)'
           },
-          borderColor: 'border-slate-800',
+          strokeColor: '#334155', // Slate 700
           Icon: Milestone,
           iconColor: 'text-slate-800'
       };
@@ -93,7 +93,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
       style: {
         backgroundImage: 'repeating-linear-gradient(90deg, transparent 0, transparent 18px, rgba(0,0,0,0.3) 19px, rgba(0,0,0,0.3) 20px)'
       },
-      borderColor: 'border-[#4a3627]',
+      strokeColor: '#78350f', // Amber 900
       Icon: BookOpen,
       iconColor: 'text-amber-900'
     };
@@ -109,7 +109,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
         backgroundPosition: '0 0, 10px 10px',
         filter: 'brightness(0.6) sepia(0.2)'
       },
-      borderColor: 'border-slate-400',
+      strokeColor: '#94a3b8', // Slate 400
       Icon: Archive,
       iconColor: 'text-slate-400'
     };
@@ -122,7 +122,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
       style: {
         backgroundImage: 'radial-gradient(circle at center, #3f0e0e 0%, transparent 70%)'
       },
-      borderColor: 'border-red-900',
+      strokeColor: '#7f1d1d', // Red 900
       Icon: Church,
       iconColor: 'text-red-900'
     };
@@ -135,7 +135,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
       style: {
         backgroundImage: 'repeating-linear-gradient(45deg, #292524 0, #292524 5px, #1c1917 5px, #1c1917 10px)'
       },
-      borderColor: 'border-stone-600',
+      strokeColor: '#57534e', // Stone 600
       Icon: Box,
       iconColor: 'text-stone-700'
     };
@@ -148,7 +148,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
       style: {
         backgroundImage: 'radial-gradient(circle at 20% 80%, #14532d 0%, transparent 40%), radial-gradient(circle at 80% 20%, #064e3b 0%, transparent 40%)'
       },
-      borderColor: 'border-green-900',
+      strokeColor: '#14532d', // Green 900
       Icon: n.includes('graveyard') ? Skull : Trees,
       iconColor: 'text-green-900'
     };
@@ -161,7 +161,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
       style: {
         backgroundImage: 'repeating-radial-gradient(circle at 50% 100%, #1e293b 0, #0f172a 10px)'
       },
-      borderColor: 'border-cyan-900',
+      strokeColor: '#164e63', // Cyan 900
       Icon: Anchor,
       iconColor: 'text-cyan-900'
     };
@@ -175,7 +175,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
         backgroundImage: 'linear-gradient(335deg, rgba(0,0,0,0.2) 23px, transparent 23px), linear-gradient(155deg, rgba(0,0,0,0.2) 23px, transparent 23px), linear-gradient(335deg, rgba(0,0,0,0.2) 23px, transparent 23px), linear-gradient(155deg, rgba(0,0,0,0.2) 23px, transparent 23px)',
         backgroundSize: '58px 58px'
       },
-      borderColor: 'border-slate-600',
+      strokeColor: '#475569', // Slate 600
       Icon: Building2,
       iconColor: 'text-slate-700'
     };
@@ -185,7 +185,7 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
   return {
     bg: 'bg-[#171717]',
     style: {},
-    borderColor: 'border-neutral-700',
+    strokeColor: '#404040', // Neutral 700
     Icon: Ghost, // Generic mysterious icon
     iconColor: 'text-neutral-800'
   };
@@ -314,6 +314,54 @@ const GameBoard: React.FC<GameBoardProps> = ({
   // Calculate dynamic lighting based on Doom
   const lighting = getDoomLighting(doom);
 
+  // SVG Hexagon Calculation (Flat Topped)
+  // Clip path points: 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%
+  // Width: 180, Height: 156
+  const hexPoints = "45,0 135,0 180,78 135,156 45,156 0,78";
+
+  // Coordinates for wall drawing (matched to clip-path vertices)
+  const hexVertices = [
+      { x: 45, y: 0 },   // Top Left
+      { x: 135, y: 0 },  // Top Right
+      { x: 180, y: 78 }, // Right Middle
+      { x: 135, y: 156 },// Bottom Right
+      { x: 45, y: 156 }, // Bottom Left
+      { x: 0, y: 78 }    // Left Middle
+  ];
+
+  // Helper to check connections for walls
+  // Flat Top Axial Neighbors:
+  // 0: Top Edge (q, r-1)
+  // 1: Top-Right Edge (q+1, r-1)
+  // 2: Bottom-Right Edge (q+1, r)
+  // 3: Bottom Edge (q, r+1)
+  // 4: Bottom-Left Edge (q-1, r+1)
+  // 5: Top-Left Edge (q-1, r)
+  const getWalls = (tile: Tile, allTiles: Tile[]) => {
+      const neighborOffsets = [
+          { dq: 0, dr: -1, p1: 0, p2: 1 }, // Top
+          { dq: 1, dr: -1, p1: 1, p2: 2 }, // Top Right
+          { dq: 1, dr: 0, p1: 2, p2: 3 },  // Bottom Right
+          { dq: 0, dr: 1, p1: 3, p2: 4 },  // Bottom
+          { dq: -1, dr: 1, p1: 4, p2: 5 }, // Bottom Left
+          { dq: -1, dr: 0, p1: 5, p2: 0 }  // Top Left
+      ];
+
+      return neighborOffsets.map(offset => {
+          const neighbor = allTiles.find(t => t.q === tile.q + offset.dq && t.r === tile.r + offset.dr);
+          // Also check if it's a valid ghost move (not yet a tile but explorable)
+          const isGhost = possibleMoves.some(m => m.q === tile.q + offset.dq && m.r === tile.r + offset.dr);
+          
+          return {
+              isBlocked: !neighbor && !isGhost,
+              x1: hexVertices[offset.p1].x,
+              y1: hexVertices[offset.p1].y,
+              x2: hexVertices[offset.p2].x,
+              y2: hexVertices[offset.p2].y
+          };
+      });
+  };
+
   return (
     <div 
       ref={containerRef} 
@@ -361,11 +409,22 @@ const GameBoard: React.FC<GameBoardProps> = ({
             <div 
               key={`ghost-${idx}`}
               onClick={(e) => { e.stopPropagation(); onTileClick(pos.q, pos.r); }}
-              className="absolute -translate-x-1/2 -translate-y-1/2 w-[180px] h-[156px] hex-clip border-2 border-dashed border-slate-700 bg-black/20 hover:border-[#e94560] hover:bg-[#e94560]/5 transition-all cursor-pointer flex flex-col items-center justify-center group z-0 backdrop-blur-sm"
+              className="absolute -translate-x-1/2 -translate-y-1/2 w-[180px] h-[156px] transition-all cursor-pointer flex flex-col items-center justify-center group z-0"
               style={{ left: x, top: y }}
             >
-              <DoorOpen className="opacity-0 group-hover:opacity-100 transition-opacity text-[#e94560] mb-1" size={24} />
-              <span className="opacity-0 group-hover:opacity-100 text-[10px] uppercase tracking-widest text-[#e94560] font-bold">Utforsk</span>
+              {/* SVG Dashed Outline for Ghost */}
+              <svg width="180" height="156" className="absolute inset-0 pointer-events-none">
+                  <polygon 
+                    points={hexPoints} 
+                    fill="rgba(0,0,0,0.3)" 
+                    stroke="#e94560" 
+                    strokeWidth="2" 
+                    strokeDasharray="10, 5"
+                    className="group-hover:fill-[#e94560]/10 transition-colors"
+                  />
+              </svg>
+              <DoorOpen className="opacity-0 group-hover:opacity-100 transition-opacity text-[#e94560] mb-1 z-10" size={24} />
+              <span className="opacity-0 group-hover:opacity-100 text-[10px] uppercase tracking-widest text-[#e94560] font-bold z-10">Utforsk</span>
             </div>
           );
         })}
@@ -378,22 +437,23 @@ const GameBoard: React.FC<GameBoardProps> = ({
           const isBlocking = tile.object?.blocking;
           
           const visuals = getTileVisuals(tile.name, tile.type);
+          const walls = getWalls(tile, tiles);
 
           return (
             <div 
               key={tile.id}
               onClick={() => onTileClick(tile.q, tile.r)}
-              className="absolute -translate-x-1/2 -translate-y-1/2 w-[180px] h-[156px] hex-clip transition-all duration-700"
+              className="absolute -translate-x-1/2 -translate-y-1/2 w-[180px] h-[156px] transition-all duration-700"
               style={{ 
                 left: x, 
                 top: y,
                 filter: isVisible ? 'none' : isThreatened ? 'brightness(0.6) grayscale(0.8)' : 'brightness(0.15) grayscale(0.9) blur(1px)'
               }}
             >
+              {/* HEX CLIPPED CONTENT */}
               <div 
                 className={`
-                  w-full h-full flex flex-col items-center justify-center p-6 text-center border-4 relative overflow-hidden
-                  ${isThreatened ? 'border-red-500 z-10' : visuals.borderColor}
+                  w-full h-full flex flex-col items-center justify-center p-6 text-center relative overflow-hidden hex-clip
                   ${visuals.bg}
                   transition-all duration-300
                 `}
@@ -411,10 +471,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                  {isThreatened && (
                      <div className="absolute inset-0 bg-red-900/30 pointer-events-none animate-pulse z-0 mix-blend-overlay"></div>
                  )}
-                 {isThreatened && (
-                     <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(220,38,38,0.6)] pointer-events-none z-0"></div>
-                 )}
-
+                 
                  {/* Background Watermark Icon - ONLY if no image */}
                  {!tile.imageUrl && (
                      <visuals.Icon 
@@ -476,9 +533,45 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
                 )}
               </div>
+
+              {/* SVG OVERLAY FOR BORDER & WALLS */}
+              <svg width="180" height="156" className="absolute inset-0 pointer-events-none z-30">
+                  {/* Hex Outline */}
+                  <polygon 
+                    points={hexPoints} 
+                    fill="none" 
+                    stroke={isThreatened ? '#ef4444' : visuals.strokeColor} 
+                    strokeWidth="3"
+                    className="drop-shadow-md"
+                  />
+                  
+                  {/* Dead End / Blocked Walls */}
+                  {walls.map((wall, idx) => (
+                      wall.isBlocked && (
+                          <g key={idx}>
+                              <line 
+                                x1={wall.x1} y1={wall.y1} 
+                                x2={wall.x2} y2={wall.y2} 
+                                stroke="#000" 
+                                strokeWidth="8" 
+                                strokeLinecap="square"
+                                className="opacity-50"
+                              />
+                              <line 
+                                x1={wall.x1} y1={wall.y1} 
+                                x2={wall.x2} y2={wall.y2} 
+                                stroke={visuals.strokeColor} 
+                                strokeWidth="2" 
+                                strokeDasharray="4, 4"
+                                className="opacity-80"
+                              />
+                          </g>
+                      )
+                  ))}
+              </svg>
               
               {!isVisible && !isThreatened && (
-                 <div className="absolute inset-0 bg-black/40 mix-blend-multiply pointer-events-none flex items-center justify-center">
+                 <div className="absolute inset-0 bg-black/40 mix-blend-multiply pointer-events-none flex items-center justify-center z-40">
                     <EyeOff size={24} className="text-slate-500 opacity-20" />
                  </div>
               )}
