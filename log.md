@@ -146,3 +146,15 @@ Track all major milestones, feature additions, and bug fixes here.
 *   **Enemy Expansion:** Added diverse enemies (Shoggoths, Mi-Go, Hounds of Tindalos) with unique traits (Flying, Regenerate, Massive).
 *   **UX - Turn Notifications:** Added cinematic "Turn Start" banners to clarify game flow in hot-seat mode.
 *   **UX - Action Juice:** Redesigned the Action Point indicators in `ActionBar` to be glowing orbs that shatter upon use, improving feedback on resource expenditure.
+
+## [v3.5 Update - Atmospheric Lighting]
+*   **Lantern Mechanics:** Investigators now emit a dynamic, flickering light source (`lantern-flicker`) on the board, illuminating their surroundings.
+*   **Enemy Auras:** Threats now possess an "Eldritch Glow" (purple/green) to visually distinguish them in the dark.
+*   **Fog Layer:** Added a scrolling fog texture overlay (`fog-move`) to the game board for depth and atmosphere.
+*   **Animation Engine:** Added CSS keyframes for organic light flickering and fog movement.
+
+## [v3.6 Update - Functional Item System]
+*   **Mechanic:** Items now have concrete passive effects implemented in the game logic.
+*   **Dice Modifiers:** Weapons increase Combat dice, Tools increase Investigation dice, and Agility items help with Fleeing.
+*   **Damage Mitigation:** Added logic to check inventory for Armor (reduces physical damage) and Relics (reduces sanity damage).
+*   **New Loot:** Added Tommy Gun (+3 Combat), Heavy Coat (Armor), Lucky Coin (Agility), and more.

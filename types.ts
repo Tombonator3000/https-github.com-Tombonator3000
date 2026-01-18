@@ -61,10 +61,11 @@ export interface SavedInvestigator extends Player {
 export interface Item {
   id: string;
   name: string;
-  type: 'weapon' | 'tool' | 'relic';
+  type: 'weapon' | 'tool' | 'relic' | 'armor' | 'consumable';
   effect: string;
   bonus?: number;
   cost?: number; // New: Price in Insight
+  statModifier?: 'combat' | 'investigation' | 'agility' | 'physical_defense' | 'mental_defense';
 }
 
 export type EnemyAttackType = 'melee' | 'ranged' | 'sanity' | 'doom';

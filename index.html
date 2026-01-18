@@ -55,6 +55,35 @@
             100% { box-shadow: inset 0 0 50px rgba(220, 38, 38, 0.2); background-color: rgba(50, 0, 0, 0.1); }
         }
 
+        /* Lantern Effects */
+        @keyframes lantern-flicker {
+            0% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); }
+            10% { opacity: 0.7; transform: translate(-50%, -50%) scale(0.98); }
+            20% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.02); }
+            30% { opacity: 0.75; transform: translate(-50%, -50%) scale(0.99); }
+            40% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.01); }
+            50% { opacity: 0.7; transform: translate(-50%, -50%) scale(0.97); }
+            60% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.03); }
+            70% { opacity: 0.75; transform: translate(-50%, -50%) scale(0.99); }
+            80% { opacity: 0.82; transform: translate(-50%, -50%) scale(1.01); }
+            90% { opacity: 0.73; transform: translate(-50%, -50%) scale(0.98); }
+            100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .animate-lantern {
+            animation: lantern-flicker 4s infinite linear;
+        }
+
+        /* Fog Effects */
+        @keyframes fog-move {
+            0% { background-position: 0 0; }
+            100% { background-position: 100px 50px; }
+        }
+        
+        .animate-fog {
+            animation: fog-move 30s linear infinite;
+        }
+
         /* Madness Effects */
         .madness-hallucination {
             animation: hallucination 6s infinite alternate;

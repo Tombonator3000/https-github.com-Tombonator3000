@@ -36,7 +36,7 @@ import OptionsMenu from './components/OptionsMenu';
 import PuzzleModal from './components/PuzzleModal';
 import MerchantShop from './components/MerchantShop';
 import JournalModal from './components/JournalModal';
-import TurnNotification from './components/TurnNotification'; // Imported new component
+import TurnNotification from './components/TurnNotification'; 
 import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary } from './utils/AssetLibrary';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
@@ -413,14 +413,22 @@ const App: React.FC = () => {
   const applySanityDamage = (player: Player, amount: number): { player: Player, log?: string, sound?: 'madness' } => {
     if (player.isDead) return { player };
 
-    let newSanity = player.sanity - amount;
+    // Check for Mitigation from Inventory (Relics)
+    const mitigation = player.inventory
+        .filter(i => i.statModifier === 'mental_defense')
+        .reduce((sum, item) => sum + (item.bonus || 0), 0);
+    
+    const actualAmount = Math.max(0, amount - mitigation);
+    let newSanity = player.sanity - actualAmount;
     let logMsg = '';
     let sound: 'madness' | undefined = undefined;
     let updatedPlayer = { ...player };
 
-    if (amount > 0) {
-        triggerFloatingText(player.position.q, player.position.r, `-${amount} SAN`, 'text-purple-400');
+    if (actualAmount > 0) {
+        triggerFloatingText(player.position.q, player.position.r, `-${actualAmount} SAN`, 'text-purple-400');
         triggerShake();
+    } else if (amount > 0 && actualAmount === 0) {
+        triggerFloatingText(player.position.q, player.position.r, `RESIST`, 'text-blue-300');
     }
 
     if (newSanity <= 0) {
@@ -441,6 +449,35 @@ const App: React.FC = () => {
     }
 
     return { player: updatedPlayer, log: logMsg, sound };
+  };
+
+  const applyPhysicalDamage = (player: Player, amount: number): { player: Player, log?: string } => {
+      if (player.isDead) return { player };
+
+      // Check for Mitigation from Inventory (Armor)
+      const mitigation = player.inventory
+          .filter(i => i.statModifier === 'physical_defense')
+          .reduce((sum, item) => sum + (item.bonus || 0), 0);
+
+      const actualAmount = Math.max(0, amount - mitigation);
+      const newHp = Math.max(0, player.hp - actualAmount);
+      let logMsg = '';
+      
+      if (actualAmount > 0) {
+          triggerFloatingText(player.position.q, player.position.r, `-${actualAmount} HP`, 'text-red-500');
+          triggerShake();
+      } else if (amount > 0 && actualAmount === 0) {
+          triggerFloatingText(player.position.q, player.position.r, `BLOCKED`, 'text-slate-400');
+      }
+
+      if (newHp <= 0) {
+          logMsg = `${player.name} har omkommet av sine skader.`;
+      }
+
+      return {
+          player: { ...player, hp: newHp, isDead: newHp <= 0 },
+          log: logMsg
+      };
   };
 
   const generateNarrative = async (tile: Tile) => {
@@ -724,13 +761,9 @@ const App: React.FC = () => {
       }
       else if (event.effectType === 'health') {
           const dmg = Math.abs(event.value);
-          if (dmg > 0) {
-              triggerFloatingText(player.position.q, player.position.r, `-${dmg} HP`, 'text-red-500');
-              triggerShake();
-          }
-          const newHp = Math.max(0, Math.min(player.maxHp, player.hp + event.value));
-          newPlayers[activePlayerIdx] = { ...player, hp: newHp, isDead: newHp <= 0 };
-          if (newHp <= 0) addToLog(`${player.name} har omkommet.`);
+          const result = applyPhysicalDamage(player, dmg);
+          newPlayers[activePlayerIdx] = result.player;
+          if (result.log) addToLog(result.log);
       }
       else if (event.effectType === 'insight') {
           newPlayers[activePlayerIdx] = { ...player, insight: Math.max(0, player.insight + event.value) };
@@ -861,19 +894,16 @@ const App: React.FC = () => {
                    addToLog(`${e.name} kaster en forbannelse! Doom øker.`);
                    triggerFloatingText(e.position.q, e.position.r, "DOOM!", 'text-purple-600');
               } else {
-                   const newHp = Math.max(0, victim.hp - e.damage);
-                   const sanityResult = applySanityDamage(victim, e.horror);
-                   if (e.damage > 0) {
-                       triggerFloatingText(victim.position.q, victim.position.r, `-${e.damage} HP`, 'text-red-600');
-                       triggerShake();
-                   }
+                   const physResult = applyPhysicalDamage(victim, e.damage);
+                   const sanityResult = applySanityDamage(physResult.player, e.horror);
+                   
                    let finalPlayer = sanityResult.player;
-                   finalPlayer.hp = newHp;
-                   finalPlayer.isDead = newHp <= 0 || finalPlayer.isDead;
                    updatedPlayers[victimIdx] = finalPlayer;
+                   
                    if (e.attackType === 'ranged') addToLog(`${e.name} skyter på ${victim.name}!`);
                    else addToLog(`${e.name} angriper ${victim.name}!`);
-                   if (newHp <= 0) addToLog(`${victim.name} har omkommet.`);
+                   
+                   if (physResult.log) addToLog(physResult.log);
                    if (sanityResult.log) addToLog(sanityResult.log);
                    if (sanityResult.sound) playStinger('madness');
               }
@@ -957,10 +987,18 @@ const App: React.FC = () => {
   const handleAction = (actionType: string, payload?: any) => {
     if (!activePlayer || activePlayer.actions <= 0 || activePlayer.isDead || state.phase !== GamePhase.INVESTIGATOR) return;
     const madness = activePlayer.activeMadness?.id;
-    const getDiceCount = (base: number) => {
+    
+    // Dynamic Dice Calculator
+    const getDiceCount = (base: number, skill: 'combat' | 'investigation' | 'agility') => {
         let count = base;
-        if (madness === 'm3') count -= 1;
-        return Math.max(1, count);
+        if (madness === 'm3') count -= 1; // Hysteria Penalty
+
+        // Check Inventory for Stat Modifiers (Pick BEST item)
+        const itemBonus = activePlayer.inventory
+            .filter(i => i.statModifier === skill)
+            .reduce((max, item) => Math.max(max, item.bonus || 0), 0);
+        
+        return Math.max(1, count + itemBonus);
     };
 
     switch (actionType) {
@@ -1015,21 +1053,15 @@ const App: React.FC = () => {
           const event = Math.random() > 0.85 ? EVENTS[Math.floor(Math.random() * EVENTS.length)] : null;
           
           // TRAP LOGIC
-          let finalPlayers = state.players.map((p, i) => i === state.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p);
           let trapLog = '';
+          let finalPlayer = { ...activePlayer, position: { q, r }, actions: activePlayer.actions - 1 };
           
           if (objectType === 'trap') {
                playStinger('trap');
                trapLog = `DU GIKK I EN FELLE! 1 skade.`;
-               finalPlayers = finalPlayers.map((p, i) => {
-                   if (i === state.activePlayerIndex) {
-                       const newHp = Math.max(0, p.hp - 1);
-                       return { ...p, hp: newHp, isDead: newHp <= 0 };
-                   }
-                   return p;
-               });
-               triggerFloatingText(q, r, "-1 HP (TRAP)", "text-red-500 font-bold");
-               triggerShake();
+               const dmgResult = applyPhysicalDamage(finalPlayer, 1);
+               finalPlayer = dmgResult.player;
+               // Floating text handled by applyPhysicalDamage
           }
 
           // Use library image if available
@@ -1041,7 +1073,7 @@ const App: React.FC = () => {
           setState(prev => ({ 
             ...prev, 
             board: [...prev.board, newTile], 
-            players: finalPlayers, 
+            players: prev.players.map((p, i) => i === prev.activePlayerIndex ? finalPlayer : p), 
             activeEvent: event,
             selectedTileId: null,
             log: trapLog ? [trapLog, ...prev.log] : prev.log
@@ -1068,7 +1100,7 @@ const App: React.FC = () => {
         }
 
         playStinger('roll');
-        const fleeDice = getDiceCount(2 + (activePlayer.id === 'journalist' ? 1 : 0));
+        const fleeDice = getDiceCount(2 + (activePlayer.id === 'journalist' ? 1 : 0), 'agility');
         const fleeRoll = Array.from({ length: fleeDice }, () => Math.floor(Math.random() * 6) + 1);
         const fleeSuccess = fleeRoll.filter(v => v >= 4).length > 0;
         
@@ -1111,22 +1143,16 @@ const App: React.FC = () => {
             triggerFloatingText(activePlayer.position.q, activePlayer.position.r, "CAUGHT!", "text-red-500");
             
             // Resolve Free Attack logic
-            const newHp = Math.max(0, activePlayer.hp - immediateThreat.damage);
-            const sanityResult = applySanityDamage(activePlayer, immediateThreat.horror);
+            const physResult = applyPhysicalDamage(activePlayer, immediateThreat.damage);
+            const sanityResult = applySanityDamage(physResult.player, immediateThreat.horror);
             
-            if (immediateThreat.damage > 0) {
-                triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `-${immediateThreat.damage} HP`, 'text-red-600');
-                triggerShake();
-            }
             if (sanityResult.sound) playStinger('madness');
             else playStinger('combat');
 
             setState(prev => {
                 const newPlayers = [...prev.players];
                 let finalPlayer = sanityResult.player;
-                finalPlayer.hp = newHp;
                 finalPlayer.actions = finalPlayer.actions - 1; // Spend action to fail
-                finalPlayer.isDead = newHp <= 0 || finalPlayer.isDead;
                 newPlayers[prev.activePlayerIndex] = finalPlayer;
                 
                 return {
@@ -1156,7 +1182,15 @@ const App: React.FC = () => {
           }
 
           playStinger('roll');
-          const iDice = getDiceCount(2 + (activePlayer.id === 'veteran' && selTile.object.reqSkill === 'strength' ? 1 : 0));
+          const skillMap: Record<string, 'combat' | 'investigation' | 'agility'> = {
+              'strength': 'combat', // Approximation
+              'insight': 'investigation',
+              'agility': 'agility'
+          };
+          const skillType = skillMap[selTile.object.reqSkill || 'strength'] || 'combat';
+          
+          const iDice = getDiceCount(2 + (activePlayer.id === 'veteran' && selTile.object.reqSkill === 'strength' ? 1 : 0), skillType);
+          
           const roll = Array.from({ length: iDice }, () => Math.floor(Math.random() * 6) + 1);
           const success = roll.filter(v => v >= 4).length;
           setState(prev => ({ ...prev, lastDiceRoll: roll }));
@@ -1185,7 +1219,7 @@ const App: React.FC = () => {
 
         if (!enemyOnTile) { addToLog("Ingenting å angripe her..."); return; }
         playStinger('combat');
-        const atkDice = getDiceCount(2 + (activePlayer.id === 'veteran' ? 1 : 0));
+        const atkDice = getDiceCount(2 + (activePlayer.id === 'veteran' ? 1 : 0), 'combat');
         const aRoll = Array.from({ length: atkDice }, () => Math.floor(Math.random() * 6) + 1);
         const hits = aRoll.filter(v => v >= 4).length;
         if (hits > 0) {
@@ -1263,7 +1297,7 @@ const App: React.FC = () => {
       case 'investigate':
         const curTile = state.board.find(t => t.q === activePlayer.position.q && t.r === activePlayer.position.r);
         playStinger('roll');
-        const invDice = getDiceCount(2 + (activePlayer.id === 'detective' ? 1 : 0));
+        const invDice = getDiceCount(2 + (activePlayer.id === 'detective' ? 1 : 0), 'investigation');
         const iRoll = Array.from({ length: invDice }, () => Math.floor(Math.random() * 6) + 1);
         const searchSuccess = iRoll.filter(v => v >= 4).length;
         setState(prev => ({ ...prev, lastDiceRoll: iRoll }));
@@ -1333,33 +1367,42 @@ const App: React.FC = () => {
 
       case 'item':
         const medKit = activePlayer.inventory.find(i => i.id === 'med');
+        const whiskey = activePlayer.inventory.find(i => i.id === 'whiskey');
         const book = activePlayer.inventory.find(i => i.id === 'book');
+        
+        let itemUsed = false;
+        let newPlayerState = { ...activePlayer };
+
         if (medKit) {
           playStinger('heal');
-          setState(prev => ({
-            ...prev,
-            players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { 
-              ...p, hp: Math.min(p.maxHp, p.hp + 2), 
-              inventory: p.inventory.filter(item => item !== medKit),
-              actions: p.actions - 1
-            } : p)
-          }));
+          newPlayerState.hp = Math.min(newPlayerState.maxHp, newPlayerState.hp + 2);
+          newPlayerState.inventory = newPlayerState.inventory.filter(i => i !== medKit);
           addToLog("Du brukte et medisinsk skrin.");
           triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `+2 HP`, 'text-green-500');
+          itemUsed = true;
+        } else if (whiskey) {
+          newPlayerState.sanity = Math.min(newPlayerState.maxSanity, newPlayerState.sanity + 2);
+          newPlayerState.inventory = newPlayerState.inventory.filter(i => i !== whiskey);
+          addToLog("Du drakk gammel whiskey. Nervene roer seg.");
+          triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `+2 SAN`, 'text-purple-400');
+          itemUsed = true;
         } else if (book) {
-           setState(prev => {
-               const player = prev.players[prev.activePlayerIndex];
-               if (!player) return prev;
-               const sanResult = applySanityDamage(player, 1);
-               const newP = sanResult.player;
-               newP.insight += 3;
-               newP.inventory = newP.inventory.filter(i => i !== book);
-               newP.actions -= 1;
-               if (sanResult.log) addToLog(sanResult.log);
-               if (sanResult.sound) playStinger('madness');
-               addToLog("Du leste Necronomicon. Kunnskapen brenner...");
-               return { ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? newP : p) };
-           });
+           const sanResult = applySanityDamage(newPlayerState, 1);
+           newPlayerState = sanResult.player;
+           newPlayerState.insight += 3;
+           newPlayerState.inventory = newPlayerState.inventory.filter(i => i !== book);
+           if (sanResult.log) addToLog(sanResult.log);
+           if (sanResult.sound) playStinger('madness');
+           addToLog("Du leste Necronomicon. Kunnskapen brenner...");
+           itemUsed = true;
+        }
+
+        if (itemUsed) {
+            newPlayerState.actions -= 1;
+            setState(prev => ({
+                ...prev,
+                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? newPlayerState : p)
+            }));
         } else {
           addToLog("Ingen brukbare gjenstander akkurat nå.");
         }

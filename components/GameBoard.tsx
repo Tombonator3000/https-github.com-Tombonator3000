@@ -265,9 +265,19 @@ const GameBoard: React.FC<GameBoardProps> = ({
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
     >
-      <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]"></div>
+      {/* BASE TEXTURE */}
+      <div className="absolute inset-0 opacity-20 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]"></div>
 
-      {/* DYNAMIC LIGHTING OVERLAY */}
+      {/* FOG LAYER - Drifting clouds */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-[1] opacity-10 animate-fog"
+        style={{
+            backgroundImage: "url('https://www.transparenttextures.com/patterns/foggy-birds.png')",
+            backgroundSize: '200px 200px'
+        }}
+      ></div>
+
+      {/* DYNAMIC LIGHTING OVERLAY (Global Vignette) */}
       <div 
           className="absolute inset-0 pointer-events-none z-[60] transition-all duration-1000 mix-blend-overlay"
           style={{
@@ -429,6 +439,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
               onMouseEnter={() => onEnemyHover?.(enemy.id)}
               onMouseLeave={() => onEnemyHover?.(null)}
             >
+               {/* ELDRITCH AURA LIGHT */}
+               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-purple-600/20 rounded-full blur-xl pointer-events-none mix-blend-screen animate-pulse -z-10"></div>
+
                <div className={`
                  w-14 h-14 bg-black/90 rounded-full flex items-center justify-center border-2 transition-all duration-300 overflow-hidden
                  ${isSelected ? 'border-purple-400 scale-125 shadow-[0_0_30px_rgba(168,85,247,0.8)]' : 'border-purple-600/60 shadow-[0_0_20px_rgba(168,85,247,0.4)] group-hover:scale-110 group-hover:border-purple-400'}
@@ -460,6 +473,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
           const isCurrent = player.actions > 0 && !player.isDead;
           return (
             <div key={player.id} className="absolute -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-700 pointer-events-none" style={{ left: x, top: y }}>
+              
+              {/* LANTERN LIGHT - Dynamic Lighting Source */}
+              {!player.isDead && (
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-orange-400/20 rounded-full blur-2xl pointer-events-none mix-blend-screen animate-lantern -z-10"></div>
+              )}
+
               <div className="relative flex flex-col items-center">
                 <div className={`
                   w-14 h-14 rounded-full flex items-center justify-center border-4 shadow-2xl transition-all overflow-hidden bg-slate-800
