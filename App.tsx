@@ -48,9 +48,18 @@ const APP_VERSION = "3.9.19";
 // Lazy AI initialization - only create when API key is available
 let aiInstance: GoogleGenAI | null = null;
 const getAI = (): GoogleGenAI | null => {
-  if (!process.env.API_KEY) return null;
+  // Check if API key exists and is a valid non-empty string
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || typeof apiKey !== 'string' || apiKey === 'null' || apiKey === 'undefined') {
+    return null;
+  }
   if (!aiInstance) {
-    aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    try {
+      aiInstance = new GoogleGenAI({ apiKey });
+    } catch (error) {
+      console.warn('Failed to initialize GoogleGenAI:', error);
+      return null;
+    }
   }
   return aiInstance;
 };

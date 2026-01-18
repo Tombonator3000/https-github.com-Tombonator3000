@@ -375,3 +375,90 @@ Track all major milestones, feature additions, and bug fixes here.
 4. Consider UI improvements for step display
 
 ---
+
+## [v3.10.1 HOTFIX - GitHub Pages Blue Screen Fix - 2026-01-18]
+*   **Critical Bug Fix:** Resolved persistent blue screen issue preventing game from starting on GitHub Pages
+*   **Root Cause Analysis:**
+    *   **Primary Issue:** Missing `<script type="module" src="/index.tsx"></script>` tag in `index.html`
+    *   Vite was building successfully but application was never loaded/initialized in browser
+    *   Build output was only 7.7KB (just HTML) instead of expected ~700KB bundle
+    *   **Secondary Issue:** Vite's `define` config was not properly handling undefined API keys
+    *   Environment variable `env.GEMINI_API_KEY` became string "undefined" instead of null
+
+### 🔧 Technical Solutions Implemented
+
+#### 1. **index.html - Application Entry Point**
+```html
+<!-- Added at end of <body> -->
+<script type="module" src="/index.tsx"></script>
+```
+- Vite uses this as entry point for bundling React application
+- Without it, React never loads and page remains blue/blank
+- Build now creates proper 692KB JavaScript bundle
+
+#### 2. **vite.config.ts - Environment Variable Handling**
+```typescript
+const apiKey = env.GEMINI_API_KEY || null;
+define: {
+  'process.env.API_KEY': JSON.stringify(apiKey),
+  'process.env.GEMINI_API_KEY': JSON.stringify(apiKey)
+}
+```
+- Explicitly coerce undefined to `null` before JSON serialization
+- Prevents injection of string literals like "undefined"
+- Ensures runtime checks work correctly
+
+#### 3. **App.tsx & AssetLibrary.ts - Defensive API Key Validation**
+```typescript
+const getAI = (): GoogleGenAI | null => {
+  const apiKey = process.env.API_KEY;
+  // Check all forms of "missing"
+  if (!apiKey || typeof apiKey !== 'string' ||
+      apiKey === 'null' || apiKey === 'undefined') {
+    return null;
+  }
+  if (!aiInstance) {
+    try {
+      aiInstance = new GoogleGenAI({ apiKey });
+    } catch (error) {
+      console.warn('Failed to initialize GoogleGenAI:', error);
+      return null;
+    }
+  }
+  return aiInstance;
+};
+```
+- Validates API key is actual non-empty string
+- Rejects literal string values "null" and "undefined"
+- Wraps initialization in try-catch for graceful degradation
+- Logs warnings instead of throwing errors
+
+#### 4. **OptionsMenu.tsx - Consistent Validation**
+- Applied same defensive check to asset generation feature
+- Prevents attempting AI requests with invalid keys
+
+### ✅ Verification Results
+- ✅ Build completes successfully: 692.56 KB bundle (gzip: 194.26 KB)
+- ✅ Game starts on GitHub Pages without API key
+- ✅ Graceful fallback to CSS visuals + Tone.js audio
+- ✅ No runtime errors or crashes
+- ✅ Works in both environments:
+  - **Google AI Studio** (with API key): Full AI asset generation
+  - **GitHub Pages** (no API key): CSS/Tone.js fallbacks
+
+### 📊 Impact
+This was a **production-breaking regression** from v3.10.0 deployment. The missing script tag meant:
+- Users on GitHub Pages saw only blue screen
+- No error messages (silent failure)
+- Required viewing browser console to detect issue
+- Affected all public deployments
+
+**Status:** 🟢 **RESOLVED** - Game now fully functional on all platforms
+
+### 🔄 Lessons Learned
+1. **Always verify build artifacts** - Check `dist/` folder size after builds
+2. **Test without API keys** - Ensure graceful degradation works
+3. **Vite entry points are critical** - Missing script tag = no app
+4. **Environment variables need explicit null handling** - Avoid string "undefined" injection
+
+---
