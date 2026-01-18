@@ -1,10 +1,11 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Tile, Player, Enemy, FloatingText } from '../types';
+import { Tile, Player, Enemy, FloatingText, EnemyType } from '../types';
 import { 
   User, Skull, DoorOpen, EyeOff, Target, Eye, Lock, Flame, Hammer, Ban,
   BookOpen, Trees, Anchor, Church, Building2, Box, Ghost,
-  Library, Archive, FileText, Radio, Zap, Gem, CloudFog, Milestone
+  Library, Archive, FileText, Radio, Zap, Gem, CloudFog, Milestone,
+  Fish, PawPrint, Biohazard, Crown, Crosshair, Bug, Smile
 } from 'lucide-react';
 
 interface GameBoardProps {
@@ -22,6 +23,40 @@ interface GameBoardProps {
 
 const HEX_SIZE = 95;
 const VISIBILITY_RANGE = 2;
+
+// --- ICON MAPPER FOR MONSTERS ---
+const getMonsterIcon = (type: EnemyType) => {
+    switch (type) {
+        case 'cultist':
+        case 'priest':
+            return { Icon: User, color: 'text-purple-300' };
+        case 'deepone':
+            return { Icon: Fish, color: 'text-cyan-400' };
+        case 'hound':
+            return { Icon: PawPrint, color: 'text-amber-600' };
+        case 'ghoul':
+            return { Icon: Skull, color: 'text-stone-400' };
+        case 'shoggoth':
+        case 'formless_spawn':
+            return { Icon: Biohazard, color: 'text-green-500' };
+        case 'mi-go':
+        case 'byakhee':
+            return { Icon: Bug, color: 'text-pink-400' }; // Use Bug if available, or fallback
+        case 'nightgaunt':
+        case 'hunting_horror':
+            return { Icon: Ghost, color: 'text-slate-400' };
+        case 'star_spawn':
+        case 'dark_young':
+        case 'boss':
+            return { Icon: Crown, color: 'text-red-600' };
+        case 'sniper':
+            return { Icon: Crosshair, color: 'text-red-400' };
+        case 'moon_beast':
+            return { Icon: Smile, color: 'text-slate-300' }; // Creepy smile
+        default:
+            return { Icon: Skull, color: 'text-red-500' };
+    }
+};
 
 // --- VISUAL HELPERS ---
 const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
@@ -458,6 +493,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
           
           if (!isVisible) return null;
 
+          const { Icon, color } = getMonsterIcon(enemy.type);
+
           return (
             <div 
               key={enemy.id} 
@@ -481,7 +518,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
                   {enemy.imageUrl ? (
                       <img src={enemy.imageUrl} alt={enemy.name} className="w-full h-full object-cover" />
                   ) : (
-                      <Skull size={24} className={`${isSelected ? 'text-purple-300' : 'text-purple-500'}`} />
+                      <Icon size={24} className={`${isSelected ? 'text-white' : color}`} />
                   )}
                   
                   {isSelected && !enemy.isDying && (

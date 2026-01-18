@@ -12,11 +12,11 @@ Track all major milestones, feature additions, and bug fixes here.
 *   *(Previous logs collapsed for brevity - see history)*
 *   **v3.7:** Dynamic Enemy AI (Wander/Hunt).
 *   **v3.8:** Connector System, New Interactables, and expanded Asset Generation.
+*   **v3.9:** Sequential Mythos AI & Swarm Logic.
 
-## [v3.9 Update - The Swarm]
-*   **Sequential AI:** Refactored the Mythos phase enemy logic. Enemies now move one by one, checking for occupied tiles to prevent stacking. They will try to surround players rather than occupying the same space.
-*   **Escalation Protocol:** 
-    *   **Doom 12-9:** Low spawn rate.
-    *   **Doom 8-4:** Moderate spawn rate.
-    *   **Doom 3-0:** 100% Spawn rate with high chance of double spawns.
-*   **Movement Logic:** Confirmed separation of "Wander" (Random patrol) and "Hunt" (Direct pathing) behaviors based on Line of Sight.
+## [v3.9.1 Update - Monsters Unleashed]
+*   **Spawn Fixes:** Addressed issue where players encountered zero enemies.
+    *   **Gate Rate:** Increased Gate spawn chance on Locations to 30%.
+    *   **Room Guardians:** Added a 25% chance for a monster to spawn immediately when a new Location is revealed.
+    *   **Event Deck:** Added explicit `spawn` events to the event pool.
+*   **Visual Identification:** Implemented distinct icons for different enemy families (Fish for Deep Ones, Biohazard for Shoggoths, etc.) so they are distinguishable on the board without AI images.

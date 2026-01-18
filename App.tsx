@@ -783,6 +783,7 @@ const App: React.FC = () => {
              ...template
           });
           if (!newEncountered.includes(template.type)) newEncountered.push(template.type);
+          addToLog("A Cultist emerges from the shadows!");
       }
       
       return { ...prev, players: newPlayers, doom: newDoom, enemies: newEnemies, activeEvent: null, encounteredEnemies: newEncountered };
@@ -802,18 +803,12 @@ const App: React.FC = () => {
           // SEQUENTIAL ENEMY MOVEMENT (Anti-Stacking)
           const updatedEnemies: Enemy[] = [];
           
-          // Helper to check if a tile is occupied by an already processed enemy OR a player
           const isTileOccupied = (q: number, r: number) => {
-              // Check against enemies already moved in this turn
               if (updatedEnemies.some(e => e.position.q === q && e.position.r === r)) return true;
-              // Check against enemies yet to move (from prev state) to prevent swapping into each other? 
-              // Simplification: Check against the *new* list being built.
-              // Note: We allow stacking with players (combat), but try to avoid stacking with other enemies.
               return false;
           };
 
           for (const enemy of prev.enemies) {
-            // TRAIT: Regeneration
             let currentEnemy = { ...enemy };
             if (currentEnemy.traits?.includes('regenerate') && currentEnemy.hp < currentEnemy.maxHp) {
                 currentEnemy.hp = Math.min(currentEnemy.maxHp, currentEnemy.hp + 1);
@@ -821,7 +816,6 @@ const App: React.FC = () => {
 
             const alivePlayers = prev.players.filter(p => !p.isDead);
             
-            // 1. Check for valid target
             let targetPlayer: Player | null = null;
             let minDist = Infinity;
             
@@ -833,17 +827,14 @@ const App: React.FC = () => {
               }
             });
 
-            // 2. Check Line of Sight & Range
             const hasLOS = targetPlayer && hasLineOfSight(currentEnemy.position, targetPlayer.position, prev.board, currentEnemy.visionRange);
             const inAttackRange = minDist <= currentEnemy.attackRange;
 
-            // 3. COMBAT: If has LOS and in range, STAY and ATTACK (don't move)
             if (hasLOS && inAttackRange) {
                 updatedEnemies.push(currentEnemy);
                 continue; 
             }
 
-            // 4. MOVEMENT LOGIC
             let bestMove = currentEnemy.position;
             const neighborCoords = [
                 {q: currentEnemy.position.q + 1, r: currentEnemy.position.r}, 
@@ -854,18 +845,16 @@ const App: React.FC = () => {
                 {q: currentEnemy.position.q - 1, r: currentEnemy.position.r + 1}
             ];
 
-            // Filter valid tiles (Exists, Not blocked, Not occupied by other enemy)
             const validMoves = neighborCoords.filter(n => {
                 const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
                 if (!tile) return false;
                 if (tile.object?.blocking && !currentEnemy.traits?.includes('flying')) return false;
-                if (isTileOccupied(n.q, n.r)) return false; // Prevent stacking
+                if (isTileOccupied(n.q, n.r)) return false; 
                 return true;
             });
 
             if (validMoves.length > 0) {
                 if (hasLOS && targetPlayer) {
-                    // HUNT: Move to neighbor closest to target
                     validMoves.sort((a, b) => {
                         const distA = hexDistance(a, targetPlayer!.position);
                         const distB = hexDistance(b, targetPlayer!.position);
@@ -873,7 +862,6 @@ const App: React.FC = () => {
                     });
                     bestMove = validMoves[0];
                 } else {
-                    // WANDER: Move randomly if no target is seen
                     bestMove = validMoves[Math.floor(Math.random() * validMoves.length)];
                 }
             }
@@ -881,7 +869,6 @@ const App: React.FC = () => {
             updatedEnemies.push({ ...currentEnemy, position: bestMove });
           }
 
-          // 5. ATTACK RESOLUTION (After everyone moved)
           let updatedPlayers = [...prev.players];
           let attackCount = 0;
 
@@ -917,7 +904,6 @@ const App: React.FC = () => {
             }
           });
 
-          // Log movement summary if enemies moved but didn't attack
           if (updatedEnemies.length > 0 && attackCount < updatedEnemies.length) {
               const movingCount = updatedEnemies.length - attackCount;
               addToLog(`${movingCount} fiender beveger seg i mørket...`);
@@ -928,16 +914,11 @@ const App: React.FC = () => {
           let newEncountered = [...prev.encounteredEnemies];
           
           if (gateTiles.length > 0) {
-            // DYNAMIC SPAWN RATE
-            // Doom 12-9: Low (20%)
-            // Doom 8-4: Moderate (40-50%)
-            // Doom 3-0: Critical (80-100%)
             let spawnChance = 0.2;
             if (newDoom < 9) spawnChance = 0.4;
-            if (newDoom < 4) spawnChance = 1.0; // Guaranteed spawn at critical doom
+            if (newDoom < 4) spawnChance = 1.0; 
 
             if (Math.random() < spawnChance) {
-                // Critical Doom (< 4) has chance for Double Spawn
                 const spawnCount = (newDoom < 4 && Math.random() > 0.5) ? 2 : 1;
 
                 for (let i = 0; i < spawnCount; i++) {
@@ -945,7 +926,6 @@ const App: React.FC = () => {
                     const spawnRoll = Math.random();
                     let template: typeof BESTIARY[keyof typeof BESTIARY];
 
-                    // WEIGHTED SPAWN TABLE
                     if (spawnRoll > 0.95) template = BESTIARY['star_spawn'];
                     else if (spawnRoll > 0.9) template = BESTIARY['dark_young'];
                     else if (spawnRoll > 0.85) template = BESTIARY['shoggoth'];
@@ -989,7 +969,6 @@ const App: React.FC = () => {
               return { ...p, actions: baseActions };
           });
 
-          // START NEW ROUND ON FIRST LIVING PLAYER
           const firstLivingIndex = finalPlayers.findIndex(p => !p.isDead);
 
           return { 
@@ -1054,14 +1033,11 @@ const App: React.FC = () => {
           if (tileSet === 'indoor') newTileType = 'room';
           else if (tileSet === 'outdoor') newTileType = 'street';
           else {
-              // Mixed sets: bias towards current type but allow changing via connector
               if (currentTile?.type === 'room') newTileType = Math.random() > 0.8 ? 'street' : 'room';
               else newTileType = Math.random() > 0.8 ? 'room' : 'street';
           }
 
-          // Determine Category (Connector vs Location)
-          // If coming from a Location, 70% chance next is Connector
-          // If coming from a Connector, 90% chance next is Location
+          // Determine Category
           const isCurrentConnector = currentTile?.category === 'connector';
           if (isCurrentConnector) {
               newTileCategory = Math.random() > 0.1 ? 'location' : 'connector';
@@ -1084,24 +1060,19 @@ const App: React.FC = () => {
 
           // OBJECT SPAWNING LOGIC
           if (newTileCategory === 'connector') {
-              // Connectors have higher chance of blocking obstacles or special interactables
               if (rng > 0.6) {
-                  // Obstacle
                   if (newTileType === 'room') {
                       objectType = 'locked_door'; isBlocking = true; difficulty = 4; reqSkill = 'strength';
                   } else {
-                      // Outdoors: "Gåte" logic - Puzzles/Barriers
                       objectType = Math.random() > 0.5 ? 'rubble' : 'fog_wall'; 
                       isBlocking = true; 
                       difficulty = 3; 
                       reqSkill = objectType === 'fog_wall' ? 'insight' : 'strength';
                   }
               } else if (rng < 0.2) {
-                  // Interactables in corridors (Light switch, Mirror)
                   objectType = Math.random() > 0.5 ? 'mirror' : 'switch';
               }
           } else {
-              // Locations have loot or traps
               if (rng > 0.7) {
                    const containers: TileObjectType[] = ['bookshelf', 'crate', 'chest', 'cabinet', 'radio'];
                    objectType = containers[Math.floor(Math.random() * containers.length)];
@@ -1111,8 +1082,26 @@ const App: React.FC = () => {
               }
           }
 
-          const isGate = newTileCategory === 'location' && Math.random() > 0.85; // Gates mostly in locations
+          // Increased Gate Probability (30% on Locations)
+          const isGate = newTileCategory === 'location' && Math.random() > 0.70; 
           
+          // IMMEDIATE SPAWN CHANCE (Guardians)
+          // 25% chance when revealing a new location tile that a monster spawns
+          let immediateSpawn: Enemy | null = null;
+          if (newTileCategory === 'location' && Math.random() < 0.25) {
+              const template = BESTIARY['cultist']; // Default guardian
+              immediateSpawn = {
+                  id: `enemy-${Date.now()}-guard`,
+                  position: { q, r },
+                  visionRange: 3,
+                  attackRange: 1,
+                  attackType: 'melee',
+                  maxHp: template.hp,
+                  speed: 2,
+                  ...template
+              };
+          }
+
           const newTile: Tile = { 
             id: `tile-${state.board.length}`, q, r, 
             name: newTileName, 
@@ -1121,9 +1110,9 @@ const App: React.FC = () => {
             explored: true, searchable: true, searched: false, isGate, 
             object: objectType ? { type: objectType, searched: false, blocking: isBlocking, difficulty, reqSkill } : undefined 
           };
+          
           const event = Math.random() > 0.85 ? EVENTS[Math.floor(Math.random() * EVENTS.length)] : null;
           
-          // TRAP LOGIC
           let trapLog = '';
           let finalPlayer = { ...activePlayer, position: { q, r }, actions: activePlayer.actions - 1 };
           
@@ -1139,14 +1128,30 @@ const App: React.FC = () => {
               newTile.imageUrl = existingImage;
           }
 
-          setState(prev => ({ 
-            ...prev, 
-            board: [...prev.board, newTile], 
-            players: prev.players.map((p, i) => i === prev.activePlayerIndex ? finalPlayer : p), 
-            activeEvent: event,
-            selectedTileId: null,
-            log: trapLog ? [trapLog, ...prev.log] : prev.log
-          }));
+          setState(prev => {
+              let updatedEnemies = [...prev.enemies];
+              let updatedLog = [...prev.log];
+              let updatedEncountered = [...prev.encounteredEnemies];
+
+              if (immediateSpawn) {
+                  updatedEnemies.push(immediateSpawn);
+                  updatedLog.unshift(`A ${immediateSpawn.name} was waiting in the shadows!`);
+                  if (!updatedEncountered.includes(immediateSpawn.type)) updatedEncountered.push(immediateSpawn.type);
+                  playStinger('horror');
+              }
+              if (trapLog) updatedLog.unshift(trapLog);
+
+              return { 
+                ...prev, 
+                board: [...prev.board, newTile], 
+                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? finalPlayer : p), 
+                activeEvent: event,
+                selectedTileId: null,
+                enemies: updatedEnemies,
+                log: updatedLog,
+                encounteredEnemies: updatedEncountered
+              };
+          });
           
           generateNarrative(newTile);
         } else {

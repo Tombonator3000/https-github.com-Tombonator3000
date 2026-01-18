@@ -114,11 +114,11 @@ export const ITEMS: Item[] = [
 export const EVENTS: EventCard[] = [
   { id: 'e1', title: 'Shadows in the Dark', description: 'You feel watched. Lose 1 Sanity.', effectType: 'sanity', value: -1 },
   { id: 'e2', title: 'Hidden Diary', description: 'Found important notes! +1 Insight.', effectType: 'insight', value: 1 },
-  { id: 'e3', title: 'Ambush!', description: 'A cultist strikes from the shadows!', effectType: 'health', value: -1 },
+  { id: 'e3', title: 'Dark Ritual', description: 'You stumble upon a ceremony in progress!', effectType: 'spawn', value: 1 },
   { id: 'e4', title: 'Helpful Witness', description: 'A local points the way. +1 Insight.', effectType: 'insight', value: 1 },
   { id: 'e5', title: 'Eldritch Sign', description: 'The ritual accelerates! Doom -1.', effectType: 'doom', value: -1 },
   { id: 'e6', title: 'Cold Mist', description: 'A bone-chilling mist surrounds you.', effectType: 'health', value: -1 },
-  { id: 'e7', title: 'Sudden Clarity', description: 'The pattern becomes clear.', effectType: 'insight', value: 2 },
+  { id: 'e7', title: 'Broken Seal', description: 'Something pushes through the veil.', effectType: 'spawn', value: 1 },
   { id: 'e8', title: 'Echoes of the Past', description: 'Voices from another time haunt you.', effectType: 'sanity', value: -2 }
 ];
 
