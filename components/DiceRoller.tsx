@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Sparkles, Skull, Check, X } from 'lucide-react';
+import { Sparkles, Skull, Check, X, Star } from 'lucide-react';
 
 interface DiceRollerProps {
   values: number[];
@@ -10,25 +10,33 @@ interface DiceRollerProps {
 const DiceRoller: React.FC<DiceRollerProps> = ({ values, onComplete }) => {
   const [displayValues, setDisplayValues] = useState<number[]>(values.map(() => 1));
   const [rotations, setRotations] = useState<number[]>(values.map(() => 0));
+  const [shakeOffsets, setShakeOffsets] = useState<{x: number, y: number}[]>(values.map(() => ({x: 0, y: 0})));
   const [isRolling, setIsRolling] = useState(true);
+  const [showParticles, setShowParticles] = useState(false);
 
   useEffect(() => {
-    // Rolling phase: Rapidly change numbers and rotate dice
+    // Rolling phase: Rapidly change numbers, rotate, and shake
     let interval = setInterval(() => {
       setDisplayValues(values.map(() => Math.floor(Math.random() * 6) + 1));
-      setRotations(values.map(() => Math.random() * 360)); // Random spin
-    }, 80);
+      setRotations(values.map(() => Math.random() * 360));
+      setShakeOffsets(values.map(() => ({
+          x: (Math.random() - 0.5) * 20,
+          y: (Math.random() - 0.5) * 20
+      })));
+    }, 60);
 
     // Settle phase
     let timeout = setTimeout(() => {
       clearInterval(interval);
       setDisplayValues(values);
-      setRotations(values.map(() => 0)); // Reset rotation to 0 for legibility
+      setRotations(values.map(() => 0));
+      setShakeOffsets(values.map(() => ({x: 0, y: 0})));
       setIsRolling(false);
+      setShowParticles(true);
       
       // Keep result visible for 2.5 seconds then complete
       setTimeout(onComplete, 2500);
-    }, 1000);
+    }, 1200);
 
     return () => {
       clearInterval(interval);
@@ -36,12 +44,38 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ values, onComplete }) => {
     };
   }, [values, onComplete]);
 
+  // Particle Component
+  const Particles = ({ success, type }: { success: boolean, type: 'crit' | 'fail' | 'normal' }) => {
+      const color = type === 'crit' ? 'text-amber-400' : type === 'fail' ? 'text-red-600' : 'text-green-400';
+      const Icon = type === 'crit' ? Sparkles : type === 'fail' ? Skull : Star;
+      
+      return (
+          <>
+            {[...Array(12)].map((_, i) => {
+                const angle = (i / 12) * 2 * Math.PI;
+                const dist = type === 'crit' ? 150 : 100;
+                const tx = Math.cos(angle) * dist + 'px';
+                const ty = Math.sin(angle) * dist + 'px';
+                return (
+                    <div 
+                        key={i} 
+                        className={`particle ${color}`}
+                        style={{ '--tx': tx, '--ty': ty } as React.CSSProperties}
+                    >
+                        <Icon size={type === 'crit' ? 24 : 16} />
+                    </div>
+                );
+            })}
+          </>
+      );
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[100] pointer-events-none">
       {/* Backdrop Blur */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300"></div>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md animate-in fade-in duration-300"></div>
 
-      <div className="relative flex gap-6 items-center bg-[#0f172a]/90 px-12 py-10 rounded-3xl border-4 border-[#e94560]/50 shadow-[0_0_100px_rgba(0,0,0,0.8)] animate-in zoom-in-90 duration-300">
+      <div className={`relative flex gap-8 items-center bg-[#0f172a]/95 px-20 py-16 rounded-3xl border-4 border-[#e94560]/50 shadow-[0_0_100px_rgba(233,69,96,0.3)] animate-in zoom-in-90 duration-300`}>
         
         {displayValues.map((val, idx) => {
           // Determine State
@@ -51,23 +85,23 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ values, onComplete }) => {
           const isFail = !isRolling && val > 1 && val < 4;
 
           // Base Styles
-          let containerClass = "w-24 h-24 rounded-2xl flex items-center justify-center text-5xl font-bold shadow-2xl transition-all duration-500 relative overflow-hidden ";
+          let containerClass = "w-32 h-32 rounded-2xl flex items-center justify-center text-7xl font-bold shadow-2xl transition-all duration-300 relative overflow-visible ";
           let textClass = "";
           
           if (isRolling) {
-            containerClass += "bg-slate-100 border-4 border-slate-300 text-slate-800 scale-90 blur-[1px]";
+            containerClass += "bg-slate-200 border-4 border-slate-400 text-slate-800 scale-90 blur-[1px]";
           } else if (isCritSuccess) {
-            containerClass += "bg-gradient-to-br from-amber-100 to-amber-300 border-4 border-amber-500 scale-125 z-20 shadow-[0_0_50px_rgba(251,191,36,0.8)] animate-bounce";
-            textClass = "text-amber-700 drop-shadow-md";
+            containerClass += "bg-gradient-to-br from-amber-100 to-amber-400 border-4 border-amber-600 scale-125 z-20 shadow-[0_0_60px_rgba(251,191,36,0.8)] animate-bounce";
+            textClass = "text-amber-800 drop-shadow-md";
           } else if (isSuccess) {
-            containerClass += "bg-white border-4 border-green-500 scale-110 shadow-[0_0_20px_rgba(34,197,94,0.5)]";
-            textClass = "text-green-600";
+            containerClass += "bg-white border-4 border-green-600 scale-110 shadow-[0_0_30px_rgba(34,197,94,0.6)]";
+            textClass = "text-green-700";
           } else if (isCritFail) {
-            containerClass += "bg-[#2a0a0a] border-4 border-red-700 rotate-6 scale-95 shadow-[0_0_30px_rgba(185,28,28,0.6)] grayscale contrast-125";
+            containerClass += "bg-[#1a0505] border-4 border-red-600 rotate-12 scale-95 shadow-[0_0_40px_rgba(220,38,38,0.6)] grayscale contrast-125";
             textClass = "text-red-500 line-through decoration-4 decoration-red-900";
           } else if (isFail) {
-            containerClass += "bg-slate-300 border-4 border-slate-500 opacity-60 scale-90";
-            textClass = "text-slate-600";
+            containerClass += "bg-slate-700 border-4 border-slate-600 opacity-70 scale-90 grayscale text-slate-400";
+            textClass = "text-slate-500";
           }
 
           return (
@@ -75,26 +109,26 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ values, onComplete }) => {
               key={idx} 
               className={containerClass}
               style={{ 
-                transform: isRolling ? `rotate(${rotations[idx]}deg)` : isCritFail ? 'rotate(12deg)' : 'rotate(0deg)' 
+                transform: isRolling 
+                    ? `translate(${shakeOffsets[idx].x}px, ${shakeOffsets[idx].y}px) rotate(${rotations[idx]}deg)` 
+                    : isCritFail ? 'rotate(12deg)' : 'rotate(0deg)' 
               }}
             >
               {/* Internal Effects/Icons */}
               {!isRolling && isCritSuccess && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Sparkles className="text-amber-500 w-full h-full opacity-20 animate-spin-slow" />
-                  <div className="absolute top-1 right-1"><Sparkles size={16} className="text-amber-600 animate-pulse" /></div>
+                  <div className="absolute -top-3 -right-3"><Sparkles size={32} className="text-amber-500 animate-[spin_3s_linear_infinite]" /></div>
                 </div>
               )}
 
               {!isRolling && isCritFail && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Skull className="text-red-900 w-full h-full opacity-20" />
-                  <div className="absolute top-1 right-1"><X size={16} className="text-red-600" /></div>
+                  <div className="absolute top-2 right-2"><X size={24} className="text-red-600" /></div>
                 </div>
               )}
 
               {!isRolling && isSuccess && (
-                <div className="absolute top-1 right-1"><Check size={16} className="text-green-500" /></div>
+                <div className="absolute top-2 right-2"><Check size={24} className="text-green-600" /></div>
               )}
 
               {/* The Number */}
@@ -102,9 +136,18 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ values, onComplete }) => {
                 {val}
               </span>
 
+              {/* Particles on Result */}
+              {showParticles && (
+                  <div className="absolute inset-0 pointer-events-none">
+                      {isCritSuccess && <Particles success={true} type="crit" />}
+                      {isSuccess && <Particles success={true} type="normal" />}
+                      {isCritFail && <Particles success={false} type="fail" />}
+                  </div>
+              )}
+
               {/* Shine Effect for standard rolls */}
               {(isRolling || isSuccess) && (
-                <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent pointer-events-none"></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent pointer-events-none rounded-xl"></div>
               )}
             </div>
           );
@@ -113,15 +156,15 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ values, onComplete }) => {
       
       {/* Result Text */}
       {!isRolling && (
-        <div className="absolute bottom-20 text-center animate-in slide-in-from-bottom-4 duration-500">
+        <div className="absolute bottom-20 text-center animate-in slide-in-from-bottom-8 duration-500">
              {values.some(v => v === 6) ? (
-                 <div className="text-amber-400 font-display text-4xl uppercase tracking-widest drop-shadow-[0_0_10px_rgba(251,191,36,0.8)]">Critical Success!</div>
+                 <div className="text-amber-400 font-display text-6xl uppercase tracking-widest drop-shadow-[0_0_20px_rgba(251,191,36,0.8)] animate-pulse">Critical Success!</div>
              ) : values.filter(v => v >= 4).length > 0 ? (
-                 <div className="text-green-400 font-display text-3xl uppercase tracking-widest drop-shadow-md">Success</div>
+                 <div className="text-green-400 font-display text-5xl uppercase tracking-widest drop-shadow-md">Success</div>
              ) : values.some(v => v === 1) ? (
-                 <div className="text-red-500 font-display text-4xl uppercase tracking-widest font-bold drop-shadow-[0_0_15px_rgba(220,38,38,0.8)] shake">Catastrophe!</div>
+                 <div className="text-red-500 font-display text-6xl uppercase tracking-widest font-bold drop-shadow-[0_0_20px_rgba(220,38,38,0.8)] shake">Catastrophe!</div>
              ) : (
-                 <div className="text-slate-400 font-display text-2xl uppercase tracking-widest">Failure</div>
+                 <div className="text-slate-400 font-display text-4xl uppercase tracking-widest">Failure</div>
              )}
         </div>
       )}

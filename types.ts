@@ -229,6 +229,7 @@ export interface GameState {
   activeModifiers: ScenarioModifier[]; // New: Roguelite run modifiers
   floatingTexts: FloatingText[];
   screenShake: boolean;
+  activeSpell: Spell | null; // New: Currently selected spell waiting for target
 }
 
 export interface EventCard {

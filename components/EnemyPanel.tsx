@@ -3,6 +3,7 @@ import React from 'react';
 import { Enemy } from '../types';
 import { BESTIARY } from '../constants';
 import { Skull, Swords, Brain, Activity, Crosshair, BookOpen, X } from 'lucide-react';
+import Tooltip from './Tooltip';
 
 interface EnemyPanelProps {
   enemy: Enemy;
@@ -52,19 +53,23 @@ const EnemyPanel: React.FC<EnemyPanelProps> = ({ enemy, onClose }) => {
 
             {/* Threat Stats */}
             <div className="grid grid-cols-2 gap-3">
-            <div className="bg-black/40 border border-slate-800 p-3 rounded flex flex-col items-center relative overflow-hidden">
-                {enemy.attackType === 'ranged' && <div className="absolute top-1 right-1 text-[8px] bg-red-900 text-white px-1 rounded">RANGED</div>}
-                {enemy.attackType === 'doom' && <div className="absolute top-1 right-1 text-[8px] bg-purple-900 text-white px-1 rounded">DOOM</div>}
-                
-                <Swords size={18} className="text-red-500 mb-1" />
-                <span className="text-lg font-bold text-white tabular-nums">{enemy.damage}</span>
-                <span className="text-[8px] text-slate-500 uppercase font-sans tracking-tighter">Kampstyrke</span>
-            </div>
-            <div className="bg-black/40 border border-slate-800 p-3 rounded flex flex-col items-center">
-                <Brain size={18} className="text-purple-400 mb-1" />
-                <span className="text-lg font-bold text-white tabular-nums">{enemy.horror}</span>
-                <span className="text-[8px] text-slate-500 uppercase font-sans tracking-tighter">Skrekk-nivå</span>
-            </div>
+            <Tooltip variant="action" content="Damage dealt to your Health when this enemy attacks." position="top">
+                <div className="bg-black/40 border border-slate-800 p-3 rounded flex flex-col items-center relative overflow-hidden w-full cursor-help">
+                    {enemy.attackType === 'ranged' && <div className="absolute top-1 right-1 text-[8px] bg-red-900 text-white px-1 rounded">RANGED</div>}
+                    {enemy.attackType === 'doom' && <div className="absolute top-1 right-1 text-[8px] bg-purple-900 text-white px-1 rounded">DOOM</div>}
+                    
+                    <Swords size={18} className="text-red-500 mb-1" />
+                    <span className="text-lg font-bold text-white tabular-nums">{enemy.damage}</span>
+                    <span className="text-[8px] text-slate-500 uppercase font-sans tracking-tighter">Kampstyrke</span>
+                </div>
+            </Tooltip>
+            <Tooltip variant="lore" content="Sanity damage dealt when you encounter or are attacked by this horror." position="top">
+                <div className="bg-black/40 border border-slate-800 p-3 rounded flex flex-col items-center w-full cursor-help">
+                    <Brain size={18} className="text-purple-400 mb-1" />
+                    <span className="text-lg font-bold text-white tabular-nums">{enemy.horror}</span>
+                    <span className="text-[8px] text-slate-500 uppercase font-sans tracking-tighter">Skrekk-nivå</span>
+                </div>
+            </Tooltip>
             </div>
 
             {/* Ranged Info */}

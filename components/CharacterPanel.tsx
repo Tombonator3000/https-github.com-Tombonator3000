@@ -5,6 +5,7 @@ import {
     Heart, Brain, Eye, Star, AlertCircle, Trash2, Gift, ShieldCheck, 
     Backpack, Sword, Search, Zap, Cross, FileQuestion, X
 } from 'lucide-react';
+import Tooltip from './Tooltip';
 
 interface CharacterPanelProps {
   player: Player;
@@ -48,6 +49,19 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
       }
   };
 
+  const renderItemTooltip = (item: Item) => (
+      <div className="text-left space-y-1">
+          <div className="font-bold text-[#eecfa1] uppercase tracking-wider border-b border-amber-900/50 pb-1 mb-1">{item.name}</div>
+          <div className="text-[10px] text-amber-500 uppercase font-bold">{item.type}</div>
+          <div className="italic text-slate-300">{item.effect}</div>
+          {item.statModifier && (
+              <div className="flex items-center gap-1 text-[10px] text-green-400 font-bold bg-green-900/20 px-1 rounded w-max mt-1">
+                  <span>+ {item.bonus} {item.statModifier.replace('_', ' ').toUpperCase()}</span>
+              </div>
+          )}
+      </div>
+  );
+
   return (
     <div className="h-full flex flex-col bg-[#1a120b] text-[#d4c5a3] font-serif relative overflow-hidden">
       {/* Background Texture Effect */}
@@ -87,59 +101,69 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
         {/* VITALITY & SANITY */}
         <div className="space-y-4">
             {/* Health */}
-            <div>
-                <div className="flex justify-between items-end mb-1 px-1">
-                    <span className="text-xs font-bold uppercase tracking-widest text-[#a63a3a] flex items-center gap-1"><Heart size={12} fill="currentColor" /> Vitality</span>
-                    <span className="text-sm font-display text-[#eecfa1]">{player.hp} / {player.maxHp}</span>
-                </div>
-                <div className="h-3 bg-[#0f0a08] border border-[#3e2c20] p-[1px]">
-                    <div className="h-full bg-gradient-to-r from-[#7f1d1d] to-[#991b1b] transition-all duration-500 relative" style={{ width: `${hpPercent}%` }}>
-                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/noise.png')] opacity-20"></div>
+            <Tooltip variant="ui" content={<div className="w-40 text-center">Physical health. Reaching 0 results in <strong>Permanent Death</strong>.</div>} position="right">
+                <div>
+                    <div className="flex justify-between items-end mb-1 px-1">
+                        <span className="text-xs font-bold uppercase tracking-widest text-[#a63a3a] flex items-center gap-1"><Heart size={12} fill="currentColor" /> Vitality</span>
+                        <span className="text-sm font-display text-[#eecfa1]">{player.hp} / {player.maxHp}</span>
+                    </div>
+                    <div className="h-3 bg-[#0f0a08] border border-[#3e2c20] p-[1px]">
+                        <div className="h-full bg-gradient-to-r from-[#7f1d1d] to-[#991b1b] transition-all duration-500 relative" style={{ width: `${hpPercent}%` }}>
+                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/noise.png')] opacity-20"></div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </Tooltip>
 
             {/* Sanity */}
-            <div>
-                <div className="flex justify-between items-end mb-1 px-1">
-                    <span className="text-xs font-bold uppercase tracking-widest text-[#6d28d9] flex items-center gap-1"><Brain size={12} fill="currentColor" /> Sanity</span>
-                    <span className="text-sm font-display text-[#eecfa1]">{player.sanity} / {player.maxSanity}</span>
-                </div>
-                <div className="h-3 bg-[#0f0a08] border border-[#3e2c20] p-[1px]">
-                    <div className="h-full bg-gradient-to-r from-[#4c1d95] to-[#5b21b6] transition-all duration-500 relative" style={{ width: `${sanPercent}%` }}>
-                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/noise.png')] opacity-20"></div>
+            <Tooltip variant="ui" content={<div className="w-40 text-center">Mental stability. Reaching 0 inflicts a <strong>Permanent Madness</strong> trait.</div>} position="right">
+                <div>
+                    <div className="flex justify-between items-end mb-1 px-1">
+                        <span className="text-xs font-bold uppercase tracking-widest text-[#6d28d9] flex items-center gap-1"><Brain size={12} fill="currentColor" /> Sanity</span>
+                        <span className="text-sm font-display text-[#eecfa1]">{player.sanity} / {player.maxSanity}</span>
+                    </div>
+                    <div className="h-3 bg-[#0f0a08] border border-[#3e2c20] p-[1px]">
+                        <div className="h-full bg-gradient-to-r from-[#4c1d95] to-[#5b21b6] transition-all duration-500 relative" style={{ width: `${sanPercent}%` }}>
+                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/noise.png')] opacity-20"></div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </Tooltip>
         </div>
 
         {/* CORE STATS */}
         <div className="flex gap-4">
-            <div className="flex-1 bg-[#231710] border border-[#3e2c20] p-3 flex flex-col items-center shadow-inner">
-                <span className="text-[10px] text-[#8b6b4e] uppercase tracking-widest mb-1">Insight</span>
-                <div className="flex items-center gap-2 text-[#eecfa1]">
-                    <Eye size={20} />
-                    <span className="text-2xl font-display font-bold">{player.insight}</span>
+            <Tooltip variant="ui" content="Currency for the Black Market and casting Spells." position="bottom">
+                <div className="flex-1 bg-[#231710] border border-[#3e2c20] p-3 flex flex-col items-center shadow-inner cursor-help group hover:border-[#eecfa1] transition-colors">
+                    <span className="text-[10px] text-[#8b6b4e] uppercase tracking-widest mb-1 group-hover:text-[#eecfa1]">Insight</span>
+                    <div className="flex items-center gap-2 text-[#eecfa1]">
+                        <Eye size={20} />
+                        <span className="text-2xl font-display font-bold">{player.insight}</span>
+                    </div>
                 </div>
-            </div>
-            <div className="flex-1 bg-[#231710] border border-[#3e2c20] p-3 flex flex-col items-center shadow-inner">
-                <span className="text-[10px] text-[#8b6b4e] uppercase tracking-widest mb-1">Actions</span>
-                <div className="flex items-center gap-2 text-[#eecfa1]">
-                    <Star size={20} />
-                    <span className="text-2xl font-display font-bold">{player.actions}</span>
+            </Tooltip>
+            <Tooltip variant="ui" content="Actions refresh every turn. Moving, Searching, and Combat cost 1 AP." position="bottom">
+                <div className="flex-1 bg-[#231710] border border-[#3e2c20] p-3 flex flex-col items-center shadow-inner cursor-help group hover:border-[#eecfa1] transition-colors">
+                    <span className="text-[10px] text-[#8b6b4e] uppercase tracking-widest mb-1 group-hover:text-[#eecfa1]">Actions</span>
+                    <div className="flex items-center gap-2 text-[#eecfa1]">
+                        <Star size={20} />
+                        <span className="text-2xl font-display font-bold">{player.actions}</span>
+                    </div>
                 </div>
-            </div>
+            </Tooltip>
         </div>
 
         {/* MENTAL CONDITION */}
         {player.activeMadness && (
-            <div className="bg-[#2a1215] border border-[#7f1d1d] p-4 relative overflow-hidden animate-in fade-in">
-                <div className="absolute -right-4 -top-4 text-[#7f1d1d] opacity-20"><Brain size={64} /></div>
-                <h3 className="text-[#fca5a5] font-display italic text-lg flex items-center gap-2 mb-1">
-                    <AlertCircle size={16} /> {player.activeMadness.name}
-                </h3>
-                <p className="text-xs text-[#fecaca]/80 italic leading-relaxed">{player.activeMadness.description}</p>
-            </div>
+            <Tooltip variant="lore" content="A permanent affliction caused by the horrors of the mythos." position="top">
+                <div className="bg-[#2a1215] border border-[#7f1d1d] p-4 relative overflow-hidden animate-in fade-in cursor-help">
+                    <div className="absolute -right-4 -top-4 text-[#7f1d1d] opacity-20"><Brain size={64} /></div>
+                    <h3 className="text-[#fca5a5] font-display italic text-lg flex items-center gap-2 mb-1">
+                        <AlertCircle size={16} /> {player.activeMadness.name}
+                    </h3>
+                    <p className="text-xs text-[#fecaca]/80 italic leading-relaxed">{player.activeMadness.description}</p>
+                </div>
+            </Tooltip>
         )}
 
         {/* TRAITS */}
@@ -150,13 +174,15 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
                 </h3>
                 <div className="flex flex-wrap gap-2">
                     {player.traits.map(trait => (
-                        <div key={trait.id} className={`px-2 py-1 border text-[10px] uppercase font-bold tracking-wider ${
-                            trait.type === 'positive' 
-                            ? 'border-[#14532d] bg-[#052e16] text-[#86efac]' 
-                            : 'border-[#7f1d1d] bg-[#450a0a] text-[#fca5a5]'
-                        }`}>
-                            {trait.name}
-                        </div>
+                        <Tooltip key={trait.id} variant="lore" content={trait.description} position="top">
+                            <div className={`px-2 py-1 border text-[10px] uppercase font-bold tracking-wider cursor-help ${
+                                trait.type === 'positive' 
+                                ? 'border-[#14532d] bg-[#052e16] text-[#86efac]' 
+                                : 'border-[#7f1d1d] bg-[#450a0a] text-[#fca5a5]'
+                            }`}>
+                                {trait.name}
+                            </div>
+                        </Tooltip>
                     ))}
                 </div>
             </div>
@@ -165,7 +191,9 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
         {/* PASSIVE */}
         <div className="pt-4 border-t border-[#3e2c20]/50">
             <h3 className="text-[10px] text-[#8b6b4e] uppercase tracking-widest mb-1">Innate Ability</h3>
-            <p className="text-sm text-[#d4c5a3] italic font-serif">"{player.special}"</p>
+            <Tooltip variant="lore" content="Unique character passive effect." position="top">
+                <p className="text-sm text-[#d4c5a3] italic font-serif cursor-help inline-block">"{player.special}"</p>
+            </Tooltip>
         </div>
 
         {/* INVENTORY SYSTEM 2.0 */}
@@ -204,11 +232,13 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
                             `}
                         >
                             {item ? (
-                                <div className={`flex flex-col items-center gap-1 ${isSelected ? 'text-[#eecfa1]' : 'text-[#8b6b4e]'}`}>
-                                    {getItemIcon(item.type)}
-                                    {/* Small type indicator dot */}
-                                    <div className={`w-1 h-1 rounded-full mt-1 ${item.type === 'weapon' ? 'bg-red-500' : item.type === 'relic' ? 'bg-purple-500' : 'bg-slate-500'}`}></div>
-                                </div>
+                                <Tooltip variant="lore" content={renderItemTooltip(item)} position="top">
+                                    <div className={`flex flex-col items-center gap-1 ${isSelected ? 'text-[#eecfa1]' : 'text-[#8b6b4e]'}`}>
+                                        {getItemIcon(item.type)}
+                                        {/* Small type indicator dot */}
+                                        <div className={`w-1 h-1 rounded-full mt-1 ${item.type === 'weapon' ? 'bg-red-500' : item.type === 'relic' ? 'bg-purple-500' : 'bg-slate-500'}`}></div>
+                                    </div>
+                                </Tooltip>
                             ) : (
                                 <div className="text-[#231710] opacity-50 text-xs font-display"></div>
                             )}

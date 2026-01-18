@@ -23,6 +23,7 @@ interface GameBoardProps {
 
 const HEX_SIZE = 95;
 const VISIBILITY_RANGE = 2; // Default range
+const DRAG_THRESHOLD = 5; // Pixels of movement required to count as a drag
 
 // --- ICON MAPPER FOR MONSTERS ---
 const getMonsterIcon = (type: EnemyType) => {
@@ -236,11 +237,14 @@ const GameBoard: React.FC<GameBoardProps> = ({
   doom
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasDragged = useRef(false);
+  const lastTouchDistance = useRef<number | null>(null);
   
   const [scale, setScale] = useState(0.8);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragStartRaw, setDragStartRaw] = useState({ x: 0, y: 0 }); // For threshold check
 
   useEffect(() => {
     if (containerRef.current) {
@@ -249,14 +253,25 @@ const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, []);
 
+  // --- MOUSE HANDLERS ---
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     setIsDragging(true);
     setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+    setDragStartRaw({ x: e.clientX, y: e.clientY });
+    hasDragged.current = false;
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
+    
+    // Check threshold to avoid micro-movements counting as drags
+    const dx = e.clientX - dragStartRaw.x;
+    const dy = e.clientY - dragStartRaw.y;
+    if (Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+        hasDragged.current = true;
+    }
+
     setPosition({
       x: e.clientX - dragStart.x,
       y: e.clientY - dragStart.y
@@ -264,6 +279,64 @@ const GameBoard: React.FC<GameBoardProps> = ({
   };
 
   const handleMouseUp = () => setIsDragging(false);
+
+  // --- TOUCH HANDLERS ---
+  const handleTouchStart = (e: React.TouchEvent) => {
+      // If 1 finger, treat as Drag/Pan start
+      if (e.touches.length === 1) {
+          setIsDragging(true);
+          const t = e.touches[0];
+          setDragStart({ x: t.clientX - position.x, y: t.clientY - position.y });
+          setDragStartRaw({ x: t.clientX, y: t.clientY });
+          hasDragged.current = false;
+      } 
+      // If 2 fingers, treat as Zoom start
+      else if (e.touches.length === 2) {
+          setIsDragging(false); // Stop dragging if we are now pinching
+          const dist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+          );
+          lastTouchDistance.current = dist;
+      }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+      // Pan
+      if (e.touches.length === 1 && isDragging) {
+          const t = e.touches[0];
+          const dx = t.clientX - dragStartRaw.x;
+          const dy = t.clientY - dragStartRaw.y;
+          
+          if (Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+              hasDragged.current = true;
+          }
+
+          setPosition({
+              x: t.clientX - dragStart.x,
+              y: t.clientY - dragStart.y
+          });
+      } 
+      // Zoom
+      else if (e.touches.length === 2) {
+          const dist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+          );
+
+          if (lastTouchDistance.current !== null) {
+              const delta = dist - lastTouchDistance.current;
+              const sensitivity = 0.005; // Zoom speed
+              setScale(prev => Math.min(Math.max(prev + delta * sensitivity, 0.3), 1.5));
+          }
+          lastTouchDistance.current = dist;
+      }
+  };
+
+  const handleTouchEnd = () => {
+      setIsDragging(false);
+      lastTouchDistance.current = null;
+  };
 
   const handleWheel = (e: React.WheelEvent) => {
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
@@ -314,373 +387,217 @@ const GameBoard: React.FC<GameBoardProps> = ({
   // Calculate dynamic lighting based on Doom
   const lighting = getDoomLighting(doom);
 
-  // SVG Hexagon Calculation (Flat Topped)
-  // Clip path points: 25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%
-  // Width: 180, Height: 156
-  const hexPoints = "45,0 135,0 180,78 135,156 45,156 0,78";
-
-  // Coordinates for wall drawing (matched to clip-path vertices)
-  const hexVertices = [
-      { x: 45, y: 0 },   // Top Left
-      { x: 135, y: 0 },  // Top Right
-      { x: 180, y: 78 }, // Right Middle
-      { x: 135, y: 156 },// Bottom Right
-      { x: 45, y: 156 }, // Bottom Left
-      { x: 0, y: 78 }    // Left Middle
-  ];
-
-  // Helper to check connections for walls
-  // Flat Top Axial Neighbors:
-  // 0: Top Edge (q, r-1)
-  // 1: Top-Right Edge (q+1, r-1)
-  // 2: Bottom-Right Edge (q+1, r)
-  // 3: Bottom Edge (q, r+1)
-  // 4: Bottom-Left Edge (q-1, r+1)
-  // 5: Top-Left Edge (q-1, r)
-  const getWalls = (tile: Tile, allTiles: Tile[]) => {
-      const neighborOffsets = [
-          { dq: 0, dr: -1, p1: 0, p2: 1 }, // Top
-          { dq: 1, dr: -1, p1: 1, p2: 2 }, // Top Right
-          { dq: 1, dr: 0, p1: 2, p2: 3 },  // Bottom Right
-          { dq: 0, dr: 1, p1: 3, p2: 4 },  // Bottom
-          { dq: -1, dr: 1, p1: 4, p2: 5 }, // Bottom Left
-          { dq: -1, dr: 0, p1: 5, p2: 0 }  // Top Left
-      ];
-
-      return neighborOffsets.map(offset => {
-          const neighbor = allTiles.find(t => t.q === tile.q + offset.dq && t.r === tile.r + offset.dr);
-          // Also check if it's a valid ghost move (not yet a tile but explorable)
-          const isGhost = possibleMoves.some(m => m.q === tile.q + offset.dq && m.r === tile.r + offset.dr);
-          
-          return {
-              isBlocked: !neighbor && !isGhost,
-              x1: hexVertices[offset.p1].x,
-              y1: hexVertices[offset.p1].y,
-              x2: hexVertices[offset.p2].x,
-              y2: hexVertices[offset.p2].y
-          };
-      });
-  };
-
   return (
     <div 
-      ref={containerRef} 
-      className={`w-full h-full relative overflow-hidden bg-[#05050a] cursor-move ${isDragging ? 'cursor-grabbing' : ''}`}
+      ref={containerRef}
+      className="w-full h-full overflow-hidden relative cursor-move bg-[#05050a] touch-none"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
     >
-      {/* BASE TEXTURE */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]"></div>
-
-      {/* FOG LAYER - Drifting clouds */}
+      {/* Dynamic Lighting Overlay */}
       <div 
-        className="absolute inset-0 pointer-events-none z-[1] opacity-10 animate-fog"
+        className="absolute inset-0 pointer-events-none z-20 transition-all duration-1000"
         style={{
-            backgroundImage: "url('https://www.transparenttextures.com/patterns/foggy-birds.png')",
-            backgroundSize: '200px 200px'
+            background: lighting.gradient,
+            animation: lighting.animation,
+            mixBlendMode: 'overlay' // Blend with the map
         }}
-      ></div>
-
-      {/* DYNAMIC LIGHTING OVERLAY (Global Vignette) */}
-      <div 
-          className="absolute inset-0 pointer-events-none z-[60] transition-all duration-1000 mix-blend-overlay"
-          style={{
-              background: lighting.gradient,
-              animation: lighting.animation,
-              filter: `contrast(${lighting.contrast})`
-          }}
       />
-
+      
+      {/* Game Content */}
       <div 
-        className="absolute transition-transform duration-100 ease-out"
         style={{ 
-          left: position.x, 
-          top: position.y, 
-          transform: `scale(${scale})`
+            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+            transition: isDragging ? 'none' : 'transform 0.1s ease-out'
         }}
+        className="absolute top-0 left-0 will-change-transform"
       >
-        {/* Ghost Tiles (Possible Movement) */}
-        {possibleMoves.map((pos, idx) => {
-          const { x, y } = hexToPixel(pos.q, pos.r);
-          return (
-            <div 
-              key={`ghost-${idx}`}
-              onClick={(e) => { e.stopPropagation(); onTileClick(pos.q, pos.r); }}
-              className="absolute -translate-x-1/2 -translate-y-1/2 w-[180px] h-[156px] transition-all cursor-pointer flex flex-col items-center justify-center group z-0"
-              style={{ left: x, top: y }}
-            >
-              {/* SVG Dashed Outline for Ghost */}
-              <svg width="180" height="156" className="absolute inset-0 pointer-events-none">
-                  <polygon 
-                    points={hexPoints} 
-                    fill="rgba(0,0,0,0.3)" 
-                    stroke="#e94560" 
-                    strokeWidth="2" 
-                    strokeDasharray="10, 5"
-                    className="group-hover:fill-[#e94560]/10 transition-colors"
-                  />
-              </svg>
-              <DoorOpen className="opacity-0 group-hover:opacity-100 transition-opacity text-[#e94560] mb-1 z-10" size={24} />
-              <span className="opacity-0 group-hover:opacity-100 text-[10px] uppercase tracking-widest text-[#e94560] font-bold z-10">Utforsk</span>
-            </div>
-          );
-        })}
-
-        {/* Active Tiles */}
+        {/* TILES */}
         {tiles.map(tile => {
           const { x, y } = hexToPixel(tile.q, tile.r);
           const isVisible = visibleTiles.has(`${tile.q},${tile.r}`);
-          const isThreatened = enemySightMap?.has(`${tile.q},${tile.r}`);
-          const isBlocking = tile.object?.blocking;
+          const visual = getTileVisuals(tile.name, tile.type);
           
-          const visuals = getTileVisuals(tile.name, tile.type);
-          const walls = getWalls(tile, tiles);
+          if (!isVisible && !tile.explored) return null;
 
           return (
-            <div 
+            <div
               key={tile.id}
-              onClick={() => onTileClick(tile.q, tile.r)}
-              className="absolute -translate-x-1/2 -translate-y-1/2 w-[180px] h-[156px] transition-all duration-700"
-              style={{ 
-                left: x, 
-                top: y,
-                filter: isVisible ? 'none' : isThreatened ? 'brightness(0.6) grayscale(0.8)' : 'brightness(0.15) grayscale(0.9) blur(1px)'
+              className={`absolute hex-clip flex items-center justify-center transition-all duration-500`}
+              style={{
+                width: `${HEX_SIZE * 2}px`,
+                height: `${HEX_SIZE * 1.732}px`,
+                left: `${x - HEX_SIZE}px`,
+                top: `${y - HEX_SIZE * 0.866}px`,
+              }}
+              onClick={() => {
+                if (!hasDragged.current) onTileClick(tile.q, tile.r);
               }}
             >
-              {/* HEX CLIPPED CONTENT */}
+              {/* Inner Hex (Border + Background) */}
               <div 
-                className={`
-                  w-full h-full flex flex-col items-center justify-center p-6 text-center relative overflow-hidden hex-clip
-                  ${visuals.bg}
-                  transition-all duration-300
-                `}
-                style={{
-                    ...visuals.style,
-                    ...(tile.imageUrl ? { 
-                        backgroundImage: `url(${tile.imageUrl})`, 
-                        backgroundSize: 'cover', 
-                        backgroundPosition: 'center',
-                        backgroundColor: '#000' // Fallback
-                    } : {})
-                }}
+                className={`absolute inset-[2px] hex-clip transition-all duration-500 ${visual.bg} relative overflow-hidden`}
               >
-                 {/* Vision Cone Red Overlay */}
-                 {isThreatened && (
-                     <div className="absolute inset-0 bg-red-900/30 pointer-events-none animate-pulse z-0 mix-blend-overlay"></div>
+                 {/* Generated AI Image */}
+                 {tile.imageUrl && (
+                     <img src={tile.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-overlay" />
                  )}
-                 
-                 {/* Background Watermark Icon - ONLY if no image */}
-                 {!tile.imageUrl && (
-                     <visuals.Icon 
-                        size={80} 
-                        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10 pointer-events-none ${visuals.iconColor}`} 
-                        strokeWidth={1}
-                     />
-                 )}
-                 
-                 {/* Dark overlay for text readability if image exists */}
-                 {tile.imageUrl && <div className="absolute inset-0 bg-black/40"></div>}
 
-                 {/* Content */}
-                 <div className="relative z-10 bg-black/70 px-2 py-1 rounded backdrop-blur-[2px] border border-black/50">
-                    <h4 className={`text-[10px] font-bold font-display italic tracking-tight ${isThreatened ? 'text-red-300' : 'text-slate-200'}`}>{tile.name}</h4>
+                 {/* CSS Pattern Fallback */}
+                 {!tile.imageUrl && <div className="absolute inset-0 opacity-20" style={visual.style}></div>}
+
+                 {/* Fog of War / Exploration Tint */}
+                 <div className={`absolute inset-0 transition-opacity duration-1000 ${isVisible ? 'opacity-0' : 'opacity-70 bg-black'}`}></div>
+
+                 {/* Tile Icon */}
+                 <div className="relative z-10 flex flex-col items-center opacity-80 pointer-events-none">
+                     <visual.Icon size={24} className={visual.iconColor} />
                  </div>
-                
-                {/* OBSTACLE & CONTAINER RENDERING */}
-                {tile.object && (
-                    <div className="flex flex-col items-center animate-in zoom-in duration-300 mt-2 relative z-20">
-                        {/* BLOCKERS */}
-                        {isBlocking && (
-                          <>
-                            {tile.object.type === 'locked_door' && <Lock size={20} className="text-amber-500 mb-1 drop-shadow-md" />}
-                            {tile.object.type === 'rubble' && <Hammer size={20} className="text-stone-400 mb-1 drop-shadow-md" />}
-                            {tile.object.type === 'fire' && <Flame size={20} className="text-orange-500 mb-1 animate-pulse drop-shadow-md" />}
-                            {tile.object.type === 'barricade' && <Ban size={20} className="text-amber-700 mb-1 drop-shadow-md" />}
-                            {tile.object.type === 'fog_wall' && <CloudFog size={20} className="text-purple-300 mb-1 animate-pulse drop-shadow-md" />}
-                            <span className="text-[8px] uppercase font-bold text-white bg-red-900/80 px-2 py-0.5 rounded shadow-sm border border-red-700">
-                                {tile.object.type === 'fog_wall' ? 'GÅTE' : 'LÅST'}
-                            </span>
-                          </>
-                        )}
 
-                        {/* SEARCHABLES */}
-                        {!isBlocking && (
-                          <div className={`transition-all ${tile.object.searched ? 'opacity-40 grayscale' : 'opacity-100'}`}>
-                             {tile.object.type === 'bookshelf' && <Library size={24} className="text-amber-200 mb-1 drop-shadow-md" />}
-                             {tile.object.type === 'chest' && <Archive size={24} className="text-yellow-400 mb-1 drop-shadow-md" />}
-                             {tile.object.type === 'crate' && <Box size={24} className="text-amber-600 mb-1 drop-shadow-md" />}
-                             {tile.object.type === 'cabinet' && <FileText size={24} className="text-stone-300 mb-1 drop-shadow-md" />}
-                             
-                             {/* NEW INTERACTABLES */}
-                             {tile.object.type === 'radio' && <Radio size={24} className="text-emerald-400 mb-1 drop-shadow-md animate-pulse" />}
-                             {tile.object.type === 'switch' && <Zap size={24} className="text-yellow-300 mb-1 drop-shadow-md" />}
-                             {tile.object.type === 'mirror' && <Gem size={24} className="text-cyan-300 mb-1 drop-shadow-md opacity-80" />}
-
-                             {!tile.object.searched && (
-                               <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-ping"></div>
-                             )}
-                          </div>
-                        )}
-                    </div>
-                )}
-
-                {isThreatened && (
-                    <div className="absolute top-3 right-3 text-red-500 animate-pulse z-20">
-                        <Eye size={16} />
-                    </div>
-                )}
+                 {/* Objects on Tile */}
+                 {tile.object && (
+                     <div className="absolute bottom-4 z-20 flex flex-col items-center animate-in zoom-in duration-300">
+                         {tile.object.type === 'fire' && <Flame className="text-orange-500 animate-pulse" size={20} />}
+                         {tile.object.type === 'locked_door' && <Lock className="text-amber-500" size={20} />}
+                         {tile.object.type === 'rubble' && <Hammer className="text-stone-500" size={20} />}
+                         {tile.object.type === 'barricade' && <Ban className="text-red-500" size={20} />}
+                         {tile.object.type === 'fog_wall' && <CloudFog className="text-purple-300 animate-pulse" size={20} />}
+                         {tile.object.type === 'bookshelf' && <Library className="text-amber-700" size={18} />}
+                         {tile.object.type === 'cabinet' && <Archive className="text-slate-500" size={18} />}
+                         {tile.object.type === 'chest' && <Box className="text-yellow-600" size={18} />}
+                         {tile.object.type === 'altar' && <Gem className="text-red-600" size={18} />}
+                         {tile.object.type === 'switch' && <Zap className="text-yellow-400" size={18} />}
+                         {tile.object.type === 'radio' && <Radio className="text-green-800" size={18} />}
+                         {tile.object.type === 'trap' && <EyeOff className="text-red-500 opacity-0 group-hover:opacity-100" size={18} />} 
+                     </div>
+                 )}
               </div>
 
-              {/* SVG OVERLAY FOR BORDER & WALLS */}
-              <svg width="180" height="156" className="absolute inset-0 pointer-events-none z-30">
-                  {/* Hex Outline */}
-                  <polygon 
-                    points={hexPoints} 
-                    fill="none" 
-                    stroke={isThreatened ? '#ef4444' : visuals.strokeColor} 
-                    strokeWidth="3"
-                    className="drop-shadow-md"
-                  />
-                  
-                  {/* Dead End / Blocked Walls */}
-                  {walls.map((wall, idx) => (
-                      wall.isBlocked && (
-                          <g key={idx}>
-                              <line 
-                                x1={wall.x1} y1={wall.y1} 
-                                x2={wall.x2} y2={wall.y2} 
-                                stroke="#000" 
-                                strokeWidth="8" 
-                                strokeLinecap="square"
-                                className="opacity-50"
-                              />
-                              <line 
-                                x1={wall.x1} y1={wall.y1} 
-                                x2={wall.x2} y2={wall.y2} 
-                                stroke={visuals.strokeColor} 
-                                strokeWidth="2" 
-                                strokeDasharray="4, 4"
-                                className="opacity-80"
-                              />
-                          </g>
-                      )
-                  ))}
-              </svg>
-              
-              {!isVisible && !isThreatened && (
-                 <div className="absolute inset-0 bg-black/40 mix-blend-multiply pointer-events-none flex items-center justify-center z-40">
-                    <EyeOff size={24} className="text-slate-500 opacity-20" />
-                 </div>
-              )}
+              {/* Selection Highlight */}
+              <div className={`absolute inset-0 hex-clip pointer-events-none border-[3px] transition-all duration-300 ${tile.object?.blocking ? 'border-red-500/50' : 'border-transparent hover:border-white/30'}`}></div>
             </div>
           );
         })}
 
+        {/* Possible Move Indicators */}
+        {possibleMoves.map((move, i) => {
+          const { x, y } = hexToPixel(move.q, move.r);
+          return (
+             <div
+                key={`move-${i}`}
+                className="absolute hex-clip flex items-center justify-center cursor-pointer opacity-30 hover:opacity-60 transition-opacity bg-white border-2 border-white border-dashed"
+                style={{
+                    width: `${HEX_SIZE * 2}px`,
+                    height: `${HEX_SIZE * 1.732}px`,
+                    left: `${x - HEX_SIZE}px`,
+                    top: `${y - HEX_SIZE * 0.866}px`,
+                }}
+                onClick={() => {
+                   if (!hasDragged.current) onTileClick(move.q, move.r);
+                }}
+             />
+          );
+        })}
+
+        {/* PLAYERS */}
+        {players.map(player => {
+            if (player.isDead) return null;
+            const { x, y } = hexToPixel(player.position.q, player.position.r);
+            return (
+                <div
+                    key={player.id}
+                    className="absolute w-12 h-12 rounded-full border-2 border-white shadow-[0_0_15px_rgba(255,255,255,0.6)] flex items-center justify-center bg-[#1a1a2e] z-30 transition-all duration-500 ease-in-out"
+                    style={{
+                        left: `${x - 24}px`,
+                        top: `${y - 24}px`,
+                    }}
+                >
+                    {player.imageUrl ? (
+                        <img src={player.imageUrl} alt={player.name} className="w-full h-full object-cover rounded-full" />
+                    ) : (
+                        <User className="text-white" size={20} />
+                    )}
+                    {/* Lantern Light Source */}
+                    <div className="absolute inset-0 bg-amber-200/20 rounded-full animate-lantern pointer-events-none blur-xl scale-[3]"></div>
+                    {/* Sanity Ring */}
+                    <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none">
+                        <circle cx="22" cy="22" r="21" fill="none" stroke="#7e22ce" strokeWidth="2" strokeDasharray="132" strokeDashoffset={132 * (1 - player.sanity/player.maxSanity)} className="transition-all duration-500" />
+                    </svg>
+                </div>
+            );
+        })}
+
+        {/* ENEMIES */}
         {enemies.map(enemy => {
-          const { x, y } = hexToPixel(enemy.position.q, enemy.position.r);
-          const isVisible = visibleTiles.has(`${enemy.position.q},${enemy.position.r}`);
-          const isSelected = selectedEnemyId === enemy.id;
-          
-          if (!isVisible) return null;
+            if (!visibleTiles.has(`${enemy.position.q},${enemy.position.r}`)) return null;
+            const { x, y } = hexToPixel(enemy.position.q, enemy.position.r);
+            const MonsterVisual = getMonsterIcon(enemy.type);
+            const isSelected = selectedEnemyId === enemy.id;
 
-          const { Icon, color } = getMonsterIcon(enemy.type);
+            return (
+                <div
+                    key={enemy.id}
+                    className={`absolute w-14 h-14 transition-all duration-500 ease-in-out z-40 cursor-pointer group ${enemy.isDying ? 'death-dissolve pointer-events-none' : ''}`}
+                    style={{
+                        left: `${x - 28}px`,
+                        top: `${y - 28}px`,
+                        transform: isSelected ? 'scale(1.2)' : 'scale(1)'
+                    }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (!hasDragged.current && onEnemyClick) onEnemyClick(enemy.id);
+                    }}
+                    onMouseEnter={() => onEnemyHover && onEnemyHover(enemy.id)}
+                    onMouseLeave={() => onEnemyHover && onEnemyHover(null)}
+                >
+                     {/* Selection Ring */}
+                     {isSelected && <div className="absolute inset-[-4px] border-2 border-red-500 rounded-full animate-ping opacity-50"></div>}
 
-          return (
-            <div 
-              key={enemy.id} 
-              className={`
-                 absolute -translate-x-1/2 -translate-y-1/2 z-20 cursor-crosshair group 
-                 ${enemy.isDying ? 'death-dissolve pointer-events-none' : ''}
-              `}
-              style={{ left: x, top: y + 25 }}
-              onClick={(e) => { e.stopPropagation(); onEnemyClick?.(enemy.id); }}
-              onMouseEnter={() => onEnemyHover?.(enemy.id)}
-              onMouseLeave={() => onEnemyHover?.(null)}
-            >
-               {/* ELDRITCH AURA LIGHT */}
-               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-purple-600/20 rounded-full blur-xl pointer-events-none mix-blend-screen animate-pulse -z-10"></div>
-
-               <div className={`
-                 w-14 h-14 bg-black/90 rounded-full flex items-center justify-center border-2 transition-all duration-300 overflow-hidden
-                 ${isSelected ? 'border-purple-400 scale-125 shadow-[0_0_30px_rgba(168,85,247,0.8)]' : 'border-purple-600/60 shadow-[0_0_20px_rgba(168,85,247,0.4)] group-hover:scale-110 group-hover:border-purple-400'}
-                 ${!enemy.isDying && 'animate-spooky-pulse'}
-               `}>
-                  {enemy.imageUrl ? (
-                      <img src={enemy.imageUrl} alt={enemy.name} className="w-full h-full object-cover" />
-                  ) : (
-                      <Icon size={24} className={`${isSelected ? 'text-white' : color}`} />
-                  )}
-                  
-                  {isSelected && !enemy.isDying && (
-                    <div className="absolute -top-1 -right-1 bg-purple-500 rounded-full p-1 border border-white shadow-lg animate-bounce">
-                      <Target size={12} className="text-white" />
-                    </div>
-                  )}
-               </div>
-               {!enemy.isDying && (
-                <div className={`absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1 bg-black/80 border border-purple-500/30 rounded text-[9px] uppercase tracking-widest text-purple-300 font-bold transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                    {enemy.name}
+                     <div className={`w-full h-full rounded-full bg-[#1a0505] border-2 ${isSelected ? 'border-red-500' : 'border-red-900'} flex items-center justify-center overflow-hidden shadow-[0_0_20px_rgba(220,38,38,0.4)] relative`}>
+                         {enemy.imageUrl ? (
+                             <img src={enemy.imageUrl} alt={enemy.name} className="w-full h-full object-cover" />
+                         ) : (
+                             <MonsterVisual.Icon className={`${MonsterVisual.color}`} size={24} />
+                         )}
+                         
+                         {/* Health Bar */}
+                         <div className="absolute bottom-0 left-0 right-0 h-1 bg-black">
+                             <div className="h-full bg-red-600 transition-all duration-300" style={{ width: `${(enemy.hp / enemy.maxHp) * 100}%` }}></div>
+                         </div>
+                     </div>
                 </div>
-               )}
-            </div>
-          );
+            );
         })}
 
-        {players.map((player) => {
-          const { x, y } = hexToPixel(player.position.q, player.position.r);
-          const isCurrent = player.actions > 0 && !player.isDead;
-          return (
-            <div key={player.id} className="absolute -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-700 pointer-events-none" style={{ left: x, top: y }}>
-              
-              {/* LANTERN LIGHT - Dynamic Lighting Source */}
-              {!player.isDead && (
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-orange-400/20 rounded-full blur-2xl pointer-events-none mix-blend-screen animate-lantern -z-10"></div>
-              )}
-
-              <div className="relative flex flex-col items-center">
-                <div className={`
-                  w-14 h-14 rounded-full flex items-center justify-center border-4 shadow-2xl transition-all overflow-hidden bg-slate-800
-                  ${player.isDead ? 'border-slate-700 grayscale opacity-40 scale-75 shadow-none' : 
-                    isCurrent ? 'border-[#e94560] scale-110 shadow-[0_0_30px_rgba(233,69,96,0.6)]' : 
-                    'border-slate-500 scale-90 opacity-80'}
-                `}>
-                  {player.imageUrl ? (
-                      <img src={player.imageUrl} alt={player.name} className="w-full h-full object-cover" />
-                  ) : (
-                      player.isDead ? <Skull size={24} className="text-slate-600" /> : <User size={30} className="text-white" />
-                  )}
-                </div>
-                {!player.isDead && (
-                  <div className="mt-1 flex gap-0.5 w-12">
-                     <div className="h-1 bg-red-600 rounded-full flex-1" style={{ width: `${(player.hp/player.maxHp)*100}%` }}></div>
-                     <div className="h-1 bg-purple-600 rounded-full flex-1" style={{ width: `${(player.sanity/player.maxSanity)*100}%` }}></div>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
+        {/* FLOATING TEXTS */}
         {floatingTexts.map(ft => {
             const { x, y } = hexToPixel(ft.q, ft.r);
             return (
                 <div 
-                    key={ft.id} 
-                    className="absolute z-50 pointer-events-none animate-float-up"
-                    style={{ 
-                        left: x + (ft.randomOffset?.x || 0), 
-                        top: y + (ft.randomOffset?.y || 0) 
+                    key={ft.id}
+                    className={`absolute z-50 pointer-events-none font-bold text-sm md:text-lg animate-float-up text-stroke-sm whitespace-nowrap ${ft.colorClass}`}
+                    style={{
+                        left: `${x + ft.randomOffset.x}px`,
+                        top: `${y - 40 + ft.randomOffset.y}px`
                     }}
                 >
-                    <div className={`text-3xl font-bold ${ft.colorClass} drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] font-display stroke-black text-stroke-sm`}>
-                        {ft.content}
-                    </div>
+                    {ft.content}
                 </div>
             );
         })}
+
+      </div>
+      
+      {/* Zoom Controls (Mobile Friendly Overlay) */}
+      <div className="absolute bottom-24 right-4 flex flex-col gap-2 z-50 md:hidden">
+          <button onClick={() => setScale(s => Math.min(s + 0.2, 1.5))} className="p-3 bg-slate-800/80 rounded-full text-white border border-slate-600">+</button>
+          <button onClick={() => setScale(s => Math.max(s - 0.2, 0.3))} className="p-3 bg-slate-800/80 rounded-full text-white border border-slate-600">-</button>
       </div>
     </div>
   );

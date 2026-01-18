@@ -38,12 +38,13 @@ import JournalModal from './components/JournalModal';
 import TurnNotification from './components/TurnNotification'; 
 import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary } from './utils/AssetLibrary';
 import { loadSettings, DEFAULT_SETTINGS } from './utils/Settings';
+import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const SETUP_CONFIG_KEY = 'shadows_1920s_setup_config_v1';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.9.11";
+const APP_VERSION = "3.9.16";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -66,81 +67,20 @@ const DEFAULT_STATE: GameState = {
     activeScenario: null,
     activeModifiers: [],
     floatingTexts: [],
-    screenShake: false
+    screenShake: false,
+    activeSpell: null
 };
-
-// --- HEX MATH HELPERS ---
-const hexDistance = (a: {q: number, r: number}, b: {q: number, r: number}) => {
-  return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
-};
-
-const cubeLerp = (a: {x: number, y: number, z: number}, b: {x: number, y: number, z: number}, t: number) => {
-  return {
-    x: a.x + (b.x - a.x) * t,
-    y: a.y + (b.y - a.y) * t,
-    z: a.z + (b.z - a.z) * t
-  };
-};
-
-const cubeRound = (cube: {x: number, y: number, z: number}) => {
-  let rx = Math.round(cube.x);
-  let ry = Math.round(cube.y);
-  let rz = Math.round(cube.z);
-
-  const x_diff = Math.abs(rx - cube.x);
-  const y_diff = Math.abs(ry - cube.y);
-  const z_diff = Math.abs(rz - cube.z);
-
-  if (x_diff > y_diff && x_diff > z_diff) {
-    rx = -ry - rz;
-  } else if (y_diff > z_diff) {
-    ry = -rx - rz;
-  } else {
-    rz = -rx - ry;
-  }
-  return { q: rx, r: rz };
-};
-
-const getHexLine = (start: {q: number, r: number}, end: {q: number, r: number}) => {
-  const N = hexDistance(start, end);
-  const a_nudge = { x: start.q + 1e-6, z: start.r + 1e-6, y: -start.q - start.r - 2e-6 };
-  const b_nudge = { x: end.q + 1e-6, z: end.r + 1e-6, y: -end.q - end.r - 2e-6 };
-  
-  const results = [];
-  for (let i = 0; i <= N; i++) {
-    const t = N === 0 ? 0.0 : i / N;
-    results.push(cubeRound(cubeLerp(a_nudge, b_nudge, t)));
-  }
-  return results;
-};
-
-const hasLineOfSight = (start: {q: number, r: number}, end: {q: number, r: number}, board: Tile[], range: number) => {
-  const dist = hexDistance(start, end);
-  if (dist > range) return false;
-  
-  const line = getHexLine(start, end);
-  for (let i = 0; i < line.length; i++) {
-    const p = line[i];
-    const tile = board.find(t => t.q === p.q && t.r === p.r);
-    if (!tile) return false;
-    if (i > 0 && i < line.length - 1) {
-        if (tile.object?.blocking) return false;
-    }
-  }
-  return true;
-};
-// ------------------------
 
 // --- LOG PARSER ---
 const formatLogEntry = (entry: string) => {
     // Basic regex for keywords
     const keywords = [
         { regex: /(skade|damage)/gi, color: 'text-red-400 font-bold' },
-        { regex: /(død|dead|die)/gi, color: 'text-red-600 font-black uppercase' },
+        { regex: /(død|dead|die|beseiret|overvant)/gi, color: 'text-red-600 font-black uppercase' },
         { regex: /(sanity|sinnslidelse|madness)/gi, color: 'text-purple-400 font-bold' },
         { regex: /(insight|clue|hint)/gi, color: 'text-blue-400 font-bold' },
         { regex: /(heal|hp|liv)/gi, color: 'text-green-400 font-bold' },
-        { regex: /(suksess|success|unlocked|klarte)/gi, color: 'text-green-300 font-bold uppercase' },
+        { regex: /(suksess|success|unlocked|klarte|traff)/gi, color: 'text-green-300 font-bold uppercase' },
         { regex: /(failed|mislyktes|bommet)/gi, color: 'text-orange-400 font-bold' },
         { regex: /(item|gjenstand|found)/gi, color: 'text-amber-400 font-bold' },
         { regex: /(doom|dommedag)/gi, color: 'text-[#e94560] font-black uppercase' },
@@ -190,7 +130,8 @@ const App: React.FC = () => {
             ...parsed, 
             hoveredEnemyId: null, 
             floatingTexts: [], 
-            screenShake: false 
+            screenShake: false,
+            activeSpell: null
         };
       } catch (e) {
         console.error("Failed to load save", e);
@@ -475,7 +416,7 @@ const App: React.FC = () => {
     let sound: 'madness' | undefined = undefined;
     let updatedPlayer = { ...player };
     if (actualAmount > 0) {
-        triggerFloatingText(player.position.q, player.position.r, `-${actualAmount} SAN`, 'text-purple-400');
+        triggerFloatingText(player.position.q, player.position.r, `-${actualAmount} SAN`, 'text-purple-400 font-bold drop-shadow-md');
         triggerShake();
     } else if (amount > 0 && actualAmount === 0) triggerFloatingText(player.position.q, player.position.r, `RESIST`, 'text-blue-300');
     if (newSanity <= 0) {
@@ -484,7 +425,7 @@ const App: React.FC = () => {
         } else {
             const madness = MADNESS_CONDITIONS[Math.floor(Math.random() * MADNESS_CONDITIONS.length)];
             updatedPlayer.activeMadness = madness; updatedPlayer.sanity = player.maxSanity; logMsg = `SINNSSYKDOM! ${player.name} knekker sammen og utvikler: ${madness.name}.`; sound = 'madness';
-            triggerFloatingText(player.position.q, player.position.r, "MADNESS!", 'text-fuchsia-500');
+            triggerFloatingText(player.position.q, player.position.r, "MADNESS!", 'text-fuchsia-500 font-black text-xl');
         }
     } else updatedPlayer.sanity = newSanity;
     return { player: updatedPlayer, log: logMsg, sound };
@@ -497,7 +438,10 @@ const App: React.FC = () => {
       const actualAmount = Math.max(0, (amount + modifierDmg) - mitigation);
       const newHp = Math.max(0, player.hp - actualAmount);
       let logMsg = '';
-      if (actualAmount > 0) { triggerFloatingText(player.position.q, player.position.r, `-${actualAmount} HP`, 'text-red-500'); triggerShake(); } 
+      if (actualAmount > 0) { 
+          triggerFloatingText(player.position.q, player.position.r, `-${actualAmount} HP`, 'text-red-500 font-bold drop-shadow-md'); 
+          triggerShake(); 
+      } 
       else if (amount > 0 && actualAmount === 0) triggerFloatingText(player.position.q, player.position.r, `BLOCKED`, 'text-slate-400');
       if (newHp <= 0) logMsg = `${player.name} har omkommet av sine skader.`;
       return { player: { ...player, hp: newHp, isDead: newHp <= 0 }, log: logMsg };
@@ -678,7 +622,116 @@ const App: React.FC = () => {
              } else { addToLog(`Mislyktes.`); triggerFloatingText(selTile.q, selTile.r, "FAILED", 'text-red-500'); setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) })); }
           }
           break;
-        default: break;
+        
+      case 'attack':
+          let targetId = state.selectedEnemyId;
+          const enemiesInRange = state.enemies.filter(e => !e.isDying && hexDistance(activePlayer.position, e.position) <= 1);
+          
+          if (!targetId) {
+              if (enemiesInRange.length === 1) targetId = enemiesInRange[0].id;
+              else if (enemiesInRange.length > 1) { addToLog("Flere fiender i nærheten. Velg en å angripe."); return; }
+              else { addToLog("Ingen fiender i nærheten."); return; }
+          }
+          
+          const target = state.enemies.find(e => e.id === targetId);
+          if (!target) return;
+          
+          if (hexDistance(activePlayer.position, target.position) > 1) { addToLog("Fienden er for langt unna."); return; }
+
+          playStinger('roll');
+          const baseCombat = 2 + (activePlayer.id === 'veteran' ? 1 : 0);
+          const combatDice = getDiceCount(baseCombat, 'combat');
+          const attackRoll = Array.from({ length: combatDice }, () => Math.floor(Math.random() * 6) + 1);
+          const hits = attackRoll.filter(v => v >= 4).length;
+          
+          setState(prev => ({ ...prev, lastDiceRoll: attackRoll }));
+          
+          if (hits > 0) {
+              playStinger('combat');
+              triggerFloatingText(target.position.q, target.position.r, `-${hits} HP`, 'text-red-500 text-3xl font-black drop-shadow-md');
+              if (hits >= 3) triggerShake(); // Impact shake on big hits
+
+              const newHp = target.hp - hits;
+              if (newHp <= 0) {
+                  addToLog(`Kritisk treff! ${target.name} er beseiret.`);
+                  playStinger('horror');
+                  setState(prev => ({
+                      ...prev,
+                      enemies: prev.enemies.map(e => e.id === targetId ? { ...e, hp: 0, isDying: true } : e),
+                      players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
+                      selectedEnemyId: null
+                  }));
+                  setTimeout(() => {
+                      setState(prev => ({ ...prev, enemies: prev.enemies.filter(e => e.id !== targetId) }));
+                  }, 1000);
+              } else {
+                  addToLog(`Angrep traff ${target.name} for ${hits} skade.`);
+                  setState(prev => ({
+                      ...prev,
+                      enemies: prev.enemies.map(e => e.id === targetId ? { ...e, hp: newHp } : e),
+                      players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p)
+                  }));
+              }
+          } else {
+              triggerFloatingText(target.position.q, target.position.r, "MISS", 'text-slate-500 font-bold');
+              addToLog(`${activePlayer.name} bommet.`);
+              setState(prev => ({ ...prev, players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) }));
+          }
+          break;
+
+      case 'cast':
+          const spell = payload as Spell;
+          if (activePlayer.insight < spell.cost) {
+              addToLog("Not enough Insight to cast this spell.");
+              playStinger('block');
+              return;
+          }
+
+          // Case 1: Targeted Spells (Requires Enemy Selection)
+          if (spell.range > 0) {
+              setState(prev => ({ ...prev, activeSpell: spell, selectedEnemyId: null }));
+              addToLog(`Casting ${spell.name}. Select a target within ${spell.range} tiles.`);
+              playStinger('click');
+              return;
+          }
+
+          // Case 2: Self/Global Spells (Instant)
+          let spellLog = `Casting ${spell.name}...`;
+          let updatedPlayerState = { ...activePlayer, insight: activePlayer.insight - spell.cost, actions: activePlayer.actions - 1 };
+          let clueGain = 0;
+
+          playStinger('spell');
+
+          if (spell.effectType === 'heal') {
+              const healedHp = Math.min(activePlayer.maxHp, activePlayer.hp + spell.value);
+              updatedPlayerState.hp = healedHp;
+              spellLog += ` Healed for ${spell.value} HP.`;
+              triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `+${spell.value} HP`, 'text-green-400');
+          } 
+          else if (spell.effectType === 'reveal') {
+              clueGain = spell.value;
+              spellLog += ` Revealed hidden truths! +${clueGain} Insight.`;
+              updatedPlayerState.insight += clueGain; // Refund/Bonus? Or CluesFound? Let's say CluesFound for victory?
+              // Actually 'reveal' usually finds clues for the scenario goal.
+              // Let's increment cluesFound in state, but also give visual feedback.
+              triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `CLUE FOUND`, 'text-cyan-400 font-bold');
+          }
+
+          addToLog(spellLog);
+          setState(prev => ({
+              ...prev,
+              players: prev.players.map((p, i) => i === prev.activePlayerIndex ? updatedPlayerState : p),
+              cluesFound: prev.cluesFound + clueGain
+          }));
+          break;
+
+      case 'cancel_cast':
+          setState(prev => ({ ...prev, activeSpell: null }));
+          addToLog("Spellcasting cancelled.");
+          playStinger('click');
+          break;
+
+      default: break;
     }
   };
 
@@ -703,74 +756,166 @@ const App: React.FC = () => {
     playStinger('click');
   }, [state.activeEvent, state.activePlayerIndex]);
 
+  // MYTHOS PHASE LOGIC - UPDATED AI (v3.9.15 Pathfinding)
   useEffect(() => {
     if (state.phase === GamePhase.MYTHOS) {
       const timer = setTimeout(() => {
         playStinger('horror');
         addToLog('Mythos-fase: Verden skjelver...');
+        
         setState(prev => {
           let newDoom = prev.doom - 1;
           const updatedEnemies: Enemy[] = [];
+          const players = [...prev.players]; 
+          let logMessages: string[] = [];
+
+          // Helper to deal damage inside the reducer
+          const damagePlayer = (pId: string, type: 'hp' | 'sanity' | 'doom', amount: number) => {
+              const pIdx = players.findIndex(p => p.id === pId || p.instanceId === pId);
+              if (pIdx === -1) return;
+              if (players[pIdx].isDead) return;
+
+              if (type === 'doom') {
+                  newDoom = Math.max(0, newDoom - 1);
+                  logMessages.push("The Ritual advances! Doom increases.");
+                  triggerFloatingText(players[pIdx].position.q, players[pIdx].position.r, "DOOM!", "text-red-600 font-black");
+                  return;
+              }
+
+              if (type === 'sanity') {
+                  const res = applySanityDamage(players[pIdx], amount);
+                  players[pIdx] = res.player;
+                  if (res.log) logMessages.push(res.log);
+                  if (res.sound) playStinger('madness');
+              } else {
+                  const res = applyPhysicalDamage(players[pIdx], amount);
+                  players[pIdx] = res.player;
+                  if (res.log) logMessages.push(res.log);
+              }
+          };
+
           for (const enemy of prev.enemies) { 
               let currentEnemy = { ...enemy };
+              
+              // Regeneration
               if (currentEnemy.traits?.includes('regenerate') && currentEnemy.hp < currentEnemy.maxHp) {
                   currentEnemy.hp = Math.min(currentEnemy.maxHp, currentEnemy.hp + 1);
               }
 
-              const alivePlayers = prev.players.filter(p => !p.isDead);
-              let targetPlayer: Player | null = null;
-              let minDist = Infinity;
+              const alivePlayers = players.filter(p => !p.isDead);
               
-              alivePlayers.forEach(p => {
-                const dist = hexDistance(currentEnemy.position, p.position);
-                if (dist < minDist) {
-                  minDist = dist;
-                  targetPlayer = p;
-                }
-              });
+              // AI STEP 1: Find best target via Pathfinding
+              // We do a BFS from enemy to find nearest reachable player
+              const enemyBlockers = new Set([
+                  ...updatedEnemies.map(e => `${e.position.q},${e.position.r}`),
+                  ...prev.enemies.filter(e => e.id !== enemy.id && !updatedEnemies.find(ue => ue.id === e.id)).map(e => `${e.position.q},${e.position.r}`)
+              ]);
 
-              const hasLOS = targetPlayer && hasLineOfSight(currentEnemy.position, targetPlayer.position, prev.board, currentEnemy.visionRange);
-              const inAttackRange = minDist <= currentEnemy.attackRange;
+              const playerPositions = alivePlayers.map(p => p.position);
+              const path = findPath(
+                  currentEnemy.position, 
+                  playerPositions, 
+                  prev.board, 
+                  enemyBlockers, 
+                  currentEnemy.traits?.includes('flying') || false
+              );
 
-              if (hasLOS && inAttackRange) {
-                  updatedEnemies.push(currentEnemy);
-                  continue; 
+              // Ambusher Logic: If no path found or path is too long, try teleport
+              if ((!path || path.length > 8) && currentEnemy.traits?.includes('ambusher') && Math.random() > 0.6) {
+                   const targetPlayer = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+                   if (targetPlayer) {
+                       const neighbors = [
+                           {q: targetPlayer.position.q + 1, r: targetPlayer.position.r}, 
+                           {q: targetPlayer.position.q - 1, r: targetPlayer.position.r}, 
+                           {q: targetPlayer.position.q, r: targetPlayer.position.r + 1}, 
+                           {q: targetPlayer.position.q, r: targetPlayer.position.r - 1}, 
+                           {q: targetPlayer.position.q + 1, r: targetPlayer.position.r - 1}, 
+                           {q: targetPlayer.position.q - 1, r: targetPlayer.position.r + 1}
+                       ];
+                       const validAmbushSpot = neighbors.find(n => {
+                           const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
+                           const isOccupied = players.some(p => p.position.q === n.q && p.position.r === n.r) || enemyBlockers.has(`${n.q},${n.r}`);
+                           return tile && !tile.object?.blocking && !isOccupied;
+                       });
+
+                       if (validAmbushSpot) {
+                           currentEnemy.position = validAmbushSpot;
+                           logMessages.push(`${currentEnemy.name} emerges from the angles of space!`);
+                           playStinger('trap');
+                           updatedEnemies.push(currentEnemy);
+                           continue; // End turn after ambush
+                       }
+                   }
               }
 
-              let bestMove = currentEnemy.position;
-              const neighborCoords = [
-                  {q: currentEnemy.position.q + 1, r: currentEnemy.position.r}, 
-                  {q: currentEnemy.position.q - 1, r: currentEnemy.position.r}, 
-                  {q: currentEnemy.position.q, r: currentEnemy.position.r + 1}, 
-                  {q: currentEnemy.position.q, r: currentEnemy.position.r - 1}, 
-                  {q: currentEnemy.position.q + 1, r: currentEnemy.position.r - 1}, 
-                  {q: currentEnemy.position.q - 1, r: currentEnemy.position.r + 1}
-              ];
+              // Normal Movement / Attack Loop
+              let remainingMoves = currentEnemy.speed || 1;
+              let currentPathIndex = 0; // The path includes start -> ... -> end. index 0 is start.
 
-              const validMoves = neighborCoords.filter(n => {
-                  const tile = prev.board.find(t => t.q === n.q && t.r === n.r);
-                  if (!tile) return false;
-                  if (tile.object?.blocking && !currentEnemy.traits?.includes('flying')) return false;
-                  if (updatedEnemies.some(e => e.position.q === n.q && e.position.r === n.r)) return false; 
-                  return true;
-              });
+              // If no path found, we can't move to target. Just sit tight (or wander randomly if we implemented that).
+              // If path found, try to move along it.
+              if (path && path.length > 1) {
+                  // Identify which player is at the end of the path
+                  const targetPos = path[path.length - 1];
+                  const targetPlayer = alivePlayers.find(p => p.position.q === targetPos.q && p.position.r === targetPos.r);
 
-              if (validMoves.length > 0) {
-                  if (hasLOS && targetPlayer) {
-                      validMoves.sort((a, b) => {
-                          const distA = hexDistance(a, targetPlayer!.position);
-                          const distB = hexDistance(b, targetPlayer!.position);
-                          return distA - distB;
-                      });
-                      bestMove = validMoves[0];
-                  } else {
-                      bestMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                  // Move loop
+                  while (remainingMoves > 0) {
+                      // Check for Attack Opportunity BEFORE moving further?
+                      // Ranged units check if they have LOS and are in range.
+                      if (targetPlayer) {
+                          const dist = hexDistance(currentEnemy.position, targetPlayer.position);
+                          const hasLOS = hasLineOfSight(currentEnemy.position, targetPlayer.position, prev.board, currentEnemy.visionRange);
+                          
+                          if (hasLOS && dist <= currentEnemy.attackRange) {
+                              // Stop moving and attack
+                              remainingMoves = 0;
+                              logMessages.push(`${currentEnemy.name} attacks ${targetPlayer.name}!`);
+                              
+                              if (currentEnemy.attackType === 'doom') {
+                                  damagePlayer(targetPlayer.instanceId || targetPlayer.id, 'doom', 1);
+                              } else if (currentEnemy.attackType === 'sanity') {
+                                  damagePlayer(targetPlayer.instanceId || targetPlayer.id, 'sanity', currentEnemy.horror);
+                              } else {
+                                  damagePlayer(targetPlayer.instanceId || targetPlayer.id, 'hp', currentEnemy.damage);
+                              }
+                              break; // Turn over
+                          }
+                      }
+
+                      // Move one step if not attacking
+                      // Path[0] is current pos. Path[1] is next step.
+                      if (currentPathIndex < path.length - 1) { // Ensure we don't step ONTO the player
+                          const nextStep = path[currentPathIndex + 1];
+                          // Check if next step is the player (don't move onto player)
+                          if (players.some(p => p.position.q === nextStep.q && p.position.r === nextStep.r)) {
+                              remainingMoves = 0; // Reached melee range, but didn't attack yet? 
+                              // Actually if we are here, it means we are adjacent (path length 2: start -> player).
+                              // The loop continues, next iteration checks range/LOS, which will be true for melee.
+                          } else {
+                              currentEnemy.position = nextStep;
+                              currentPathIndex++;
+                              remainingMoves--;
+                          }
+                      } else {
+                          remainingMoves = 0;
+                      }
                   }
               }
-              updatedEnemies.push({ ...currentEnemy, position: bestMove });
+
+              updatedEnemies.push(currentEnemy);
           } 
           
-          return { ...prev, doom: newDoom, round: prev.round + 1, enemies: updatedEnemies, phase: (newDoom <= 0) ? GamePhase.GAME_OVER : GamePhase.INVESTIGATOR, activePlayerIndex: 0 };
+          return { 
+              ...prev, 
+              doom: newDoom, 
+              round: prev.round + 1, 
+              enemies: updatedEnemies, 
+              players: players,
+              log: [...logMessages, ...prev.log],
+              phase: (newDoom <= 0) ? GamePhase.GAME_OVER : GamePhase.INVESTIGATOR, 
+              activePlayerIndex: 0 
+          };
         });
       }, 2000);
       return () => clearTimeout(timer);
@@ -829,7 +974,8 @@ const App: React.FC = () => {
         activePlayerIndex: nextIndex, 
         phase: nextPhase,
         selectedEnemyId: null,
-        selectedTileId: null
+        selectedTileId: null,
+        activeSpell: null // Clear spell selection on end turn
       };
     });
   };
@@ -1138,7 +1284,51 @@ const App: React.FC = () => {
         enemies={state.enemies} 
         selectedEnemyId={state.selectedEnemyId} 
         onTileClick={(q, r) => handleAction('move', { q, r })} 
-        onEnemyClick={(id) => setState(prev => ({...prev, selectedEnemyId: id}))} 
+        onEnemyClick={(id) => {
+            if (state.activeSpell) {
+                const target = state.enemies.find(e => e.id === id);
+                if (target && hexDistance(activePlayer.position, target.position) <= state.activeSpell.range) {
+                    playStinger('spell');
+                    let spellLog = `${activePlayer.name} casts ${state.activeSpell.name} on ${target.name}!`;
+                    let updatedEnemies = [...state.enemies];
+                    
+                    if (state.activeSpell.effectType === 'damage') {
+                        const newHp = Math.max(0, target.hp - state.activeSpell.value);
+                        spellLog += ` Dealt ${state.activeSpell.value} damage.`;
+                        triggerFloatingText(target.position.q, target.position.r, `-${state.activeSpell.value} HP`, 'text-purple-400 font-bold drop-shadow-md');
+                        
+                        if (newHp === 0) {
+                            spellLog += ` The target is destroyed!`;
+                            updatedEnemies = updatedEnemies.map(e => e.id === id ? { ...e, hp: 0, isDying: true } : e);
+                            setTimeout(() => {
+                                setState(prev => ({ ...prev, enemies: prev.enemies.filter(e => e.id !== id) }));
+                            }, 1000);
+                        } else {
+                            updatedEnemies = updatedEnemies.map(e => e.id === id ? { ...e, hp: newHp } : e);
+                        }
+                    } else if (state.activeSpell.effectType === 'banish') {
+                        spellLog += ` The entity is banished to the void!`;
+                        triggerFloatingText(target.position.q, target.position.r, `BANISHED!`, 'text-cyan-400 font-bold drop-shadow-md');
+                        updatedEnemies = updatedEnemies.filter(e => e.id !== id);
+                        playStinger('horror');
+                    }
+
+                    addToLog(spellLog);
+                    setState(prev => ({
+                        ...prev,
+                        enemies: updatedEnemies,
+                        players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, insight: p.insight - prev.activeSpell!.cost, actions: p.actions - 1 } : p),
+                        activeSpell: null,
+                        selectedEnemyId: null
+                    }));
+                } else {
+                    addToLog("Target is out of range or invalid.");
+                    playStinger('block');
+                }
+            } else {
+                setState(prev => ({...prev, selectedEnemyId: id}));
+            }
+        }} 
         onEnemyHover={setHoveredEnemyId} 
         floatingTexts={state.floatingTexts} 
         doom={state.doom}
@@ -1270,7 +1460,8 @@ const App: React.FC = () => {
                 }
                 return null;
             })()} 
-            hasSpells={activePlayer?.spells && activePlayer.spells.length > 0} 
+            spells={activePlayer?.spells || []}
+            activeSpell={state.activeSpell}
           />
           <div className="w-px h-8 md:h-12 bg-slate-800 mx-1 md:mx-2 shrink-0"></div>
           <button onClick={handleEndTurn} className="px-4 py-3 md:px-8 md:py-4 bg-[#e94560] text-white font-bold hover:bg-[#c9354d] transition-all flex items-center gap-2 md:gap-3 uppercase text-[9px] md:text-[10px] tracking-[0.2em] rounded-xl shadow-[0_0_20px_rgba(233,69,96,0.3)] group shrink-0">

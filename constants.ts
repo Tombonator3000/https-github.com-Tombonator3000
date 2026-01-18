@@ -1,5 +1,5 @@
 
-import { Character, CharacterType, Item, EventCard, Tile, Scenario, Madness, Spell, BestiaryEntry, EnemyType, Trait, ScenarioModifier } from './types';
+import { Character, CharacterType, Item, EventCard, Tile, Scenario, Madness, Spell, BestiaryEntry, EnemyType, Trait, ScenarioModifier, TileObjectType } from './types';
 
 export const SPELLS: Spell[] = [
     {
@@ -172,7 +172,10 @@ export const MADNESS_CONDITIONS: Madness[] = [
 export const INDOOR_CONNECTORS = [
     'Narrow Hallway', 'Dark Corridor', 'Grand Staircase', 
     'Servant Passage', 'Dusty Landing', 'Maintenance Shaft',
-    'Basement Tunnel', 'Service Elevator', 'Covered Walkway'
+    'Basement Tunnel', 'Service Elevator', 'Covered Walkway',
+    'Dumbwaiter Shaft', 'Laundry Chute', 'Ventilation Duct',
+    'Spiral Staircase', 'Secret Bookshelf Passage', 'Crawlspace',
+    'Attic Hatch', 'Fire Pole', 'Service Lift', 'Catacomb Tunnel'
 ];
 
 export const INDOOR_LOCATIONS = [
@@ -189,13 +192,20 @@ export const INDOOR_LOCATIONS = [
   'Dining Hall', 'Portrait Gallery', 'Smoking Room', 'Sunroom',
   'Hidden Passage', 'Coal Chute', 'Seance Room', 'Clock Tower', 'Bell Tower',
   'Warden\'s Office', 'Evidence Locker', 'Holding Cell', 'Archivist\'s Office',
-  'Speakeasy', 'Bank Vault', 'Pawn Shop', 'Antique Store', 'Hotel Lobby', 'Radio Station'
+  'Speakeasy', 'Bank Vault', 'Pawn Shop', 'Antique Store', 'Hotel Lobby', 'Radio Station',
+  'Cold Storage', 'Furnace Room', 'Taxidermy Studio', 'Map Room', 'Telegraph Office',
+  'Projection Booth', 'Costume Dept', 'Dressing Room', 'Wine Press', 'Root Cellar',
+  'Opium Den', 'Hidden Shrine', 'Morgue Drawer', 'Incinerator', 'Chantry', 'Organ Loft',
+  'Confessional', 'Sacristy', 'Vestry', 'Mausoleum Interior'
 ];
 
 export const OUTDOOR_CONNECTORS = [
     'Narrow Alley', 'Cobblestone Path', 'Foggy Bridge', 
     'Tram Track', 'Dark Tunnel', 'Stone Steps', 
-    'River Crossing', 'Overpass', 'Dirt Trail'
+    'River Crossing', 'Overpass', 'Dirt Trail',
+    'Rickety Bridge', 'Muddy Trail', 'Sewer Entrance', 
+    'Fire Escape', 'Rooftop Walkway', 'Wooden Plank', 
+    'Suspension Bridge', 'Gravel Road', 'Deer Path'
 ];
 
 export const OUTDOOR_LOCATIONS = [
@@ -209,7 +219,12 @@ export const OUTDOOR_LOCATIONS = [
   'Tidal Pool', 'Cliffside Path', 'Tenement Row', 'Gas Station', 
   'Tram Stop', 'Theater District', 'Slums', 'Cornfield', 'Old Well', 
   'Stone Circle', 'Ritual Site', 'Cave Entrance',
-  'Broad Avenue', 'Railway Crossing', 'Bus Stop'
+  'Broad Avenue', 'Railway Crossing', 'Bus Stop',
+  'Bandstand', 'Monument', 'Gallows Hill', 'Whaling Ship Deck',
+  'Cargo Hold', 'Crow\'s Nest', 'Jagged Reef', 'Sandbar',
+  'Driftwood Pile', 'Burned Church Ruins', 'Potter\'s Field',
+  'Open Grave', 'Gargoyle Perch', 'Water Tower', 'Chimney Stack',
+  'Boxcar', 'Ticket Booth', 'Newsstand', 'Shoeshine Stand'
 ];
 
 export const LOCATION_NAMES = [...INDOOR_LOCATIONS, ...OUTDOOR_LOCATIONS, ...INDOOR_CONNECTORS, ...OUTDOOR_CONNECTORS];
@@ -221,6 +236,13 @@ export const ALL_LOCATIONS_FULL = [
     ...OUTDOOR_LOCATIONS, 
     ...INDOOR_CONNECTORS, 
     ...OUTDOOR_CONNECTORS
+];
+
+// Available object types for procedural generation logic
+export const TILE_INTERACTABLES: TileObjectType[] = [
+    'bookshelf', 'crate', 'chest', 'cabinet', 'radio', 
+    'switch', 'mirror', 'statue', 'altar', 'rubble',
+    'locked_door', 'barricade', 'fog_wall', 'trap', 'fire'
 ];
 
 export const START_TILE: Tile = {
@@ -294,7 +316,8 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     description: 'A brainwashed servant of the Outer Gods.',
     visualPrompt: 'A cloaked cultist in dark robes with a hood obscuring their face, holding a jagged dagger. Dark, gritty, 1920s noir style.',
     lore: 'Often recruited from the desperate and the mad, these individuals have traded their humanity for forbidden knowledge.',
-    defeatFlavor: 'The cultist collapses, clutching a dark amulet.'
+    defeatFlavor: 'The cultist collapses, clutching a dark amulet.',
+    traits: []
   },
   sniper: {
     name: 'Cult Sniper',
@@ -303,16 +326,18 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     description: 'An assassin striking from the shadows.',
     visualPrompt: 'A menacing figure in a trench coat and fedora, holding a long rifle, hiding in the shadows of a brick building. Film noir aesthetic.',
     lore: 'Armed with stolen military rifles, they guard the ritual sites from a distance, prioritizing targets who know too much.',
-    defeatFlavor: 'The sniper falls, their rifle clattering to the ground.'
+    defeatFlavor: 'The sniper falls, their rifle clattering to the ground.',
+    traits: ['ranged']
   },
   priest: {
     name: 'Dark Priest',
     type: 'priest',
-    hp: 3, damage: 0, horror: 2,
+    hp: 3, damage: 1, horror: 2,
     description: 'A chanter of doom.',
     visualPrompt: 'An insane priest in tattered ceremonial vestments, eyes glowing with madness, chanting from a forbidden tome. Eldritch energy around them.',
     lore: 'Their very voice warps reality. They do not fight with weapons, but with words that accelerate the coming of the end.',
-    defeatFlavor: 'The chanting stops abruptly as the priest exhales their last breath.'
+    defeatFlavor: 'The chanting stops abruptly as the priest exhales their last breath.',
+    traits: [] // Attack type is checked in code
   },
   ghoul: {
     name: 'Ghoul',
@@ -321,7 +346,8 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     description: 'A flesh-eating subterranean dweller.',
     visualPrompt: 'A hunched, canine-like humanoid with rubbery skin, hoof-like feet, and a face like a dog, crouching in a graveyard. Lovecraftian horror art.',
     lore: 'Canine-like humanoids that dwell in crypts and tunnels beneath the city. They are strangely intelligent and bargain with terrible secrets.',
-    defeatFlavor: 'It collapses into a pile of dust and grave-dirt!'
+    defeatFlavor: 'It collapses into a pile of dust and grave-dirt!',
+    traits: ['scavenger']
   },
   deepone: {
     name: 'Deep One',
@@ -330,7 +356,8 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     description: 'An immortal amphibious humanoid.',
     visualPrompt: 'A fish-frog hybrid humanoid with glistening gray-green scales, a white belly, bulging unblinking eyes, and gills on the neck. Wet and slimy atmosphere.',
     lore: 'Servants of Dagon who dwell in underwater cities. They seek to breed with humans to extend their lineage onto land.',
-    defeatFlavor: 'The creature dissolves into a foul-smelling puddle of brine.'
+    defeatFlavor: 'The creature dissolves into a foul-smelling puddle of brine.',
+    traits: ['aquatic']
   },
   shoggoth: {
     name: 'Shoggoth',
@@ -339,7 +366,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     description: 'A protoplasmic mass of eyes and mouths.',
     visualPrompt: 'A massive, shapeless monstrosity of iridescent black slime, covered in thousands of forming and unforming eyes and mouths. Protoplasmic horror.',
     lore: 'Created as slave labor by the Elder Things eons ago. They are shifting, amorphous mountains of slime that crush everything in their path.',
-    traits: ['massive'],
+    traits: ['massive', 'slow'],
     defeatFlavor: 'The massive form loses cohesion, becoming a lifeless pool of slime.'
   },
   'mi-go': {
@@ -369,7 +396,7 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     description: 'A predator from the angles of time.',
     visualPrompt: 'A lean, emaciated beast emerging from a sharp angle in the room. It looks made of smoke and blue ichor, with a long tongue. Non-euclidean horror.',
     lore: 'They enter our reality through sharp angles in a room. Once they catch a scent, they pursue their prey across time itself.',
-    traits: ['fast'],
+    traits: ['fast', 'ambusher'],
     defeatFlavor: 'The beast recedes back into the angles of reality.'
   },
   dark_young: {
