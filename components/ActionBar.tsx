@@ -88,12 +88,26 @@ const ActionBar: React.FC<ActionBarProps> = ({ onAction, actionsRemaining, isInv
           </div>
       )}
       
-      <div className="ml-2 pl-4 border-l border-slate-800 flex flex-col justify-center">
-        <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">Actions Left</div>
-        <div className="flex gap-1">
-          {[1, 2].map(i => (
-            <div key={i} className={`w-4 h-4 rounded-sm rotate-45 border ${i <= actionsRemaining ? 'bg-[#e94560] border-white' : 'bg-slate-900 border-slate-800'}`}></div>
-          ))}
+      {/* Action Points Visualizer */}
+      <div className="ml-2 pl-4 border-l border-slate-800 flex flex-col justify-center items-center gap-2">
+        <div className="text-[9px] text-slate-500 uppercase font-bold tracking-[0.2em] mb-1">Actions</div>
+        <div className="flex gap-2">
+          {[1, 2].map(i => {
+            const isActive = i <= actionsRemaining;
+            return (
+                <div 
+                    key={i} 
+                    className={`
+                        w-5 h-5 rounded-full border-2 transition-all duration-500 flex items-center justify-center
+                        ${isActive 
+                            ? 'bg-[#e94560] border-white shadow-[0_0_15px_#e94560] scale-110' 
+                            : 'bg-transparent border-slate-800 scale-90 opacity-40'}
+                    `}
+                >
+                    {isActive && <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>}
+                </div>
+            );
+          })}
         </div>
       </div>
     </div>

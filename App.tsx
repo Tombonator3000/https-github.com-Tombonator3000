@@ -36,6 +36,7 @@ import OptionsMenu from './components/OptionsMenu';
 import PuzzleModal from './components/PuzzleModal';
 import MerchantShop from './components/MerchantShop';
 import JournalModal from './components/JournalModal';
+import TurnNotification from './components/TurnNotification'; // Imported new component
 import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary } from './utils/AssetLibrary';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
@@ -140,6 +141,7 @@ const App: React.FC = () => {
   const [isMainMenuOpen, setIsMainMenuOpen] = useState(true);
   const [showOptions, setShowOptions] = useState(false);
   const [showJournal, setShowJournal] = useState(false);
+  const [showTurnNotification, setShowTurnNotification] = useState(false); // New state
 
   const [state, setState] = useState<GameState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -219,6 +221,15 @@ const App: React.FC = () => {
         console.warn("Roster save failed: Storage quota exceeded.", e);
     }
   }, [roster]);
+
+  // TURN NOTIFICATION TRIGGER
+  useEffect(() => {
+      if (state.phase === GamePhase.INVESTIGATOR || state.phase === GamePhase.MYTHOS) {
+          setShowTurnNotification(true);
+          const timer = setTimeout(() => setShowTurnNotification(false), 2000);
+          return () => clearTimeout(timer);
+      }
+  }, [state.activePlayerIndex, state.phase]);
 
   // Update visuals if assets change (e.g. from Options menu generation)
   const refreshBoardVisuals = () => {
@@ -898,7 +909,7 @@ const App: React.FC = () => {
                 id: `enemy-${Date.now()}`, 
                 position: { q: spawnGate.q, r: spawnGate.r }, 
                 visionRange: 3,
-                attackRange: 1,
+                attackRange: 1, 
                 attackType: 'melee',
                 maxHp: template.hp,
                 speed: 2,
@@ -1606,6 +1617,11 @@ const App: React.FC = () => {
     <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative transition-all duration-1000 ${activeMadnessClass} ${shakeClass}`}>
       <div className="absolute inset-0 pointer-events-none z-50 shadow-[inset_0_0_200px_rgba(0,0,0,0.9)] opacity-60"></div>
       
+      {/* TURN NOTIFICATION OVERLAY */}
+      {showTurnNotification && (
+          <TurnNotification player={activePlayer} phase={state.phase} />
+      )}
+
       <GameBoard 
         tiles={state.board} 
         players={state.players} 
@@ -1698,4 +1714,36 @@ const App: React.FC = () => {
            <div className="text-center max-w-2xl">
              <h2 className="text-9xl font-display text-[#e94560] italic mb-10 uppercase tracking-tighter">FINIS</h2>
              <p className="text-xl text-slate-400 mb-16 italic font-serif px-10">
-               {state.cluesFound >= requiredClues ? "Portalen er forseglet. Skyggene trekker seg tilbake..." : state.players.every(p => p.isDead) ? "Alle etterforskere er tapt. Mørket har seiret."
+               {state.cluesFound >= requiredClues ? "Portalen er forseglet. Skyggene trekker seg tilbake..." : state.players.every(p => p.isDead) ? "Alle etterforskere er tapt. Mørket har seiret." : "Tiden rant ut. Dommedag er her."}
+             </p>
+             {state.players.some(p => !p.isDead) && (
+                 <div className="mb-10">
+                     <p className="text-sm uppercase tracking-widest text-slate-500 mb-4 font-bold">Overlevende (Klikk for å lagre)</p>
+                     <div className="flex justify-center gap-4 flex-wrap">
+                         {state.cluesFound >= requiredClues && (
+                             <button onClick={goToMerchant} className="flex items-center gap-2 px-6 py-3 border border-amber-600 rounded bg-[#1a120b] hover:bg-amber-900/40 hover:border-amber-400 transition-all text-amber-500 font-bold uppercase text-xs tracking-wider shadow-[0_0_20px_rgba(245,158,11,0.2)] animate-pulse">
+                                 <ShoppingBag size={16} /> Visit Black Market
+                             </button>
+                         )}
+                         {state.players.map(p => {
+                             if (p.isDead) return null;
+                             const isSaved = roster.some(v => v.instanceId === p.instanceId);
+                             return (
+                                 <button key={p.id} onClick={() => saveToRoster(p)} disabled={isSaved} className={`flex items-center gap-2 px-6 py-3 border border-slate-700 rounded bg-[#1a1a2e] hover:border-amber-500 transition-all ${isSaved ? 'opacity-50 cursor-default' : ''}`}>
+                                     <Save size={16} className="text-amber-500" /><span className="text-amber-100 font-bold uppercase text-xs tracking-wider">{p.name}</span>
+                                     {isSaved && <span className="text-[8px] text-green-500 ml-1">(SAVED)</span>}
+                                 </button>
+                             );
+                         })}
+                     </div>
+                 </div>
+             )}
+             <button onClick={handleResetGame} className="px-16 py-5 border-2 border-[#e94560] text-[#e94560] font-bold hover:bg-[#e94560] hover:text-white transition-all text-sm uppercase tracking-[0.4em]">AVSLUTT</button>
+           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;

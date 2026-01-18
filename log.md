@@ -140,3 +140,9 @@ Track all major milestones, feature additions, and bug fixes here.
 *   **Fix:** Modified the save logic in `App.tsx` to strip `imageUrl` data from the board tiles before saving to `localStorage`.
 *   **Hydration:** Modified the load logic to re-inject images from the `AssetLibrary` into the board state upon initialization.
 *   **Safety:** Wrapped all storage operations in `try-catch` blocks to prevent white-screen crashes if the quota is hit during gameplay.
+
+## [v3.4 Update - Bestiary & Polish]
+*   **Bestiary System:** Implemented `JournalModal` allowing players to view lore and stats for encountered enemies.
+*   **Enemy Expansion:** Added diverse enemies (Shoggoths, Mi-Go, Hounds of Tindalos) with unique traits (Flying, Regenerate, Massive).
+*   **UX - Turn Notifications:** Added cinematic "Turn Start" banners to clarify game flow in hot-seat mode.
+*   **UX - Action Juice:** Redesigned the Action Point indicators in `ActionBar` to be glowing orbs that shatter upon use, improving feedback on resource expenditure.
