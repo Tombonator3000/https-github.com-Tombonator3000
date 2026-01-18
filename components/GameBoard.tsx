@@ -17,6 +17,7 @@ interface GameBoardProps {
   onEnemyHover?: (id: string | null) => void;
   enemySightMap?: Set<string>;
   floatingTexts?: FloatingText[];
+  doom: number;
 }
 
 const HEX_SIZE = 95;
@@ -131,6 +132,38 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
   };
 };
 
+// DOOM LIGHTING CONFIG
+const getDoomLighting = (doom: number) => {
+    // 0 is dead, 12 is safe.
+    // Inverse scale: 0 is safe, 1.0 is danger.
+    const danger = Math.max(0, 1 - (doom / 12)); 
+
+    let overlayColor = 'rgba(10, 20, 40, 0.4)'; // Default cool blue
+    let vignetteStrength = '60%'; // Open
+    let animation = 'none';
+    let contrast = 1;
+
+    if (doom <= 3) {
+        // Critical
+        overlayColor = 'rgba(60, 0, 0, 0.2)'; 
+        vignetteStrength = '90%'; // Tight
+        animation = 'doom-flicker 4s infinite, doom-pulse-red 2s infinite';
+        contrast = 1.2;
+    } else if (doom <= 6) {
+        // Warning
+        overlayColor = 'rgba(40, 10, 40, 0.3)';
+        vignetteStrength = '75%';
+        animation = 'none';
+        contrast = 1.1;
+    }
+
+    // Dynamic gradient
+    const gradient = `radial-gradient(circle, transparent 30%, ${overlayColor} ${vignetteStrength}, #000 100%)`;
+
+    return { gradient, animation, contrast, danger };
+};
+
+
 const GameBoard: React.FC<GameBoardProps> = ({ 
   tiles, 
   players, 
@@ -140,7 +173,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
   onEnemyClick,
   onEnemyHover,
   enemySightMap,
-  floatingTexts = []
+  floatingTexts = [],
+  doom
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -218,6 +252,9 @@ const GameBoard: React.FC<GameBoardProps> = ({
     return moves;
   }, [tiles, visibleTiles]);
 
+  // Calculate dynamic lighting based on Doom
+  const lighting = getDoomLighting(doom);
+
   return (
     <div 
       ref={containerRef} 
@@ -229,6 +266,16 @@ const GameBoard: React.FC<GameBoardProps> = ({
       onWheel={handleWheel}
     >
       <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]"></div>
+
+      {/* DYNAMIC LIGHTING OVERLAY */}
+      <div 
+          className="absolute inset-0 pointer-events-none z-[60] transition-all duration-1000 mix-blend-overlay"
+          style={{
+              background: lighting.gradient,
+              animation: lighting.animation,
+              filter: `contrast(${lighting.contrast})`
+          }}
+      />
 
       <div 
         className="absolute transition-transform duration-100 ease-out"

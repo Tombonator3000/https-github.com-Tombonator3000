@@ -134,3 +134,9 @@ Track all major milestones, feature additions, and bug fixes here.
 *   **Asset Management System:** Implemented `utils/AssetLibrary.ts` to manage game graphics.
 *   **Persistent Graphics:** Generated images are now stored permanently in `localStorage`. Once a tile (e.g., "Library") is generated, it remains consistent across all future games.
 *   **Generator Tool:** Added a **"Generate All Assets"** tool in the Options menu. This iterates through all defined locations and pre-generates the graphics using the AI model, effectively "finishing" the game's art assets for the user.
+
+## [v3.3.1 Hotfix - Storage Crash]
+*   **Bug:** Game was crashing with `QuotaExceededError` due to storing duplicate Base64 images in `localStorage` (inside both the `AssetLibrary` and the main save file).
+*   **Fix:** Modified the save logic in `App.tsx` to strip `imageUrl` data from the board tiles before saving to `localStorage`.
+*   **Hydration:** Modified the load logic to re-inject images from the `AssetLibrary` into the board state upon initialization.
+*   **Safety:** Wrapped all storage operations in `try-catch` blocks to prevent white-screen crashes if the quota is hit during gameplay.

@@ -39,7 +39,7 @@ import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.3.0";
+const APP_VERSION = "3.3.1-hotfix";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -139,9 +139,22 @@ const App: React.FC = () => {
 
   const [state, setState] = useState<GameState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
+    // Load asset library synchronously to hydrate state immediately
+    const lib = loadAssetLibrary();
+    
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        
+        // Hydrate board images from Asset Library
+        // This compensates for stripping them during save
+        if (parsed.board && Array.isArray(parsed.board)) {
+            parsed.board = parsed.board.map((t: Tile) => ({
+                ...t,
+                imageUrl: lib[t.name] || t.imageUrl
+            }));
+        }
+
         return { 
             ...parsed, 
             hoveredEnemyId: null, 
@@ -179,11 +192,28 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try {
+        // Optimized Save: Strip heavy images from board to prevent QuotaExceededError
+        const stateToSave = {
+            ...state,
+            board: state.board.map(t => {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { imageUrl, ...rest } = t; 
+                return rest;
+            })
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    } catch (e) {
+        console.warn("Save failed: Storage quota exceeded. Game progress may not persist.", e);
+    }
   }, [state]);
 
   useEffect(() => {
-    localStorage.setItem(ROSTER_KEY, JSON.stringify(roster));
+    try {
+        localStorage.setItem(ROSTER_KEY, JSON.stringify(roster));
+    } catch (e) {
+        console.warn("Roster save failed: Storage quota exceeded.", e);
+    }
   }, [roster]);
 
   // Update visuals if assets change (e.g. from Options menu generation)
@@ -1437,7 +1467,18 @@ const App: React.FC = () => {
     <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative transition-all duration-1000 ${activeMadnessClass} ${shakeClass}`}>
       <div className="absolute inset-0 pointer-events-none z-50 shadow-[inset_0_0_200px_rgba(0,0,0,0.9)] opacity-60"></div>
       
-      <GameBoard tiles={state.board} players={state.players} enemies={state.enemies} selectedEnemyId={state.selectedEnemyId} onTileClick={(q, r) => handleAction('move', { q, r })} onEnemyClick={(id) => handleEnemyInteraction(id, 'click')} onEnemyHover={(id) => handleEnemyInteraction(id, 'hover')} enemySightMap={enemySightMap} floatingTexts={state.floatingTexts} />
+      <GameBoard 
+        tiles={state.board} 
+        players={state.players} 
+        enemies={state.enemies} 
+        selectedEnemyId={state.selectedEnemyId} 
+        onTileClick={(q, r) => handleAction('move', { q, r })} 
+        onEnemyClick={(id) => handleEnemyInteraction(id, 'click')} 
+        onEnemyHover={(id) => handleEnemyInteraction(id, 'hover')} 
+        enemySightMap={enemySightMap} 
+        floatingTexts={state.floatingTexts} 
+        doom={state.doom}
+      />
 
       <header className="fixed top-4 left-1/2 -translate-x-1/2 flex items-center gap-6 bg-[#16213e]/80 backdrop-blur-xl border-2 border-[#e94560]/30 px-8 py-3 rounded-full shadow-2xl z-40">
           <div className="flex items-center gap-4 border-r border-slate-700 pr-4">
