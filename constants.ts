@@ -92,14 +92,14 @@ export const CHARACTERS: Record<CharacterType, Character> = {
 };
 
 export const ITEMS: Item[] = [
-  { id: 'rev', name: 'Revolver', type: 'weapon', effect: '+1 Combat Die', bonus: 1 },
-  { id: 'shot', name: 'Shotgun', type: 'weapon', effect: '+2 Combat Dice', bonus: 2 },
-  { id: 'knife', name: 'Dagger', type: 'weapon', effect: '+1 Combat Die', bonus: 1 },
-  { id: 'med', name: 'Medical Kit', type: 'tool', effect: 'Heal 2 HP', bonus: 2 },
-  { id: 'flash', name: 'Flashlight', type: 'tool', effect: '+1 Investigation Die', bonus: 1 },
-  { id: 'map', name: 'Old Map', type: 'tool', effect: 'Explore further' },
-  { id: 'amulet', name: 'Elder Sign', type: 'relic', effect: 'Ignore 1 Sanity damage' },
-  { id: 'book', name: 'Necronomicon', type: 'relic', effect: '+3 Insight, -1 Sanity', bonus: 3 }
+  { id: 'rev', name: 'Revolver', type: 'weapon', effect: '+1 Combat Die', bonus: 1, cost: 3 },
+  { id: 'shot', name: 'Shotgun', type: 'weapon', effect: '+2 Combat Dice', bonus: 2, cost: 5 },
+  { id: 'knife', name: 'Dagger', type: 'weapon', effect: '+1 Combat Die', bonus: 1, cost: 2 },
+  { id: 'med', name: 'Medical Kit', type: 'tool', effect: 'Heal 2 HP', bonus: 2, cost: 3 },
+  { id: 'flash', name: 'Flashlight', type: 'tool', effect: '+1 Investigation Die', bonus: 1, cost: 2 },
+  { id: 'map', name: 'Old Map', type: 'tool', effect: 'Explore further', cost: 2 },
+  { id: 'amulet', name: 'Elder Sign', type: 'relic', effect: 'Ignore 1 Sanity damage', cost: 6 },
+  { id: 'book', name: 'Necronomicon', type: 'relic', effect: '+3 Insight, -1 Sanity', bonus: 3, cost: 8 }
 ];
 
 export const EVENTS: EventCard[] = [

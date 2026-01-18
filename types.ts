@@ -5,6 +5,7 @@ export enum GamePhase {
   MYTHOS = 'mythos',
   COMBAT = 'combat',
   GAME_OVER = 'gameOver',
+  MERCHANT = 'merchant', // New phase
   INVEST_LOGIC_BRIDGE = 'investLogicBridge'
 }
 
@@ -63,6 +64,7 @@ export interface Item {
   type: 'weapon' | 'tool' | 'relic';
   effect: string;
   bonus?: number;
+  cost?: number; // New: Price in Insight
 }
 
 export type EnemyAttackType = 'melee' | 'ranged' | 'sanity' | 'doom';

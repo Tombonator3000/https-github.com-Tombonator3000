@@ -118,3 +118,10 @@ Track all major milestones, feature additions, and bug fixes here.
     *   *Mechanic:* A "Memory Sequence" puzzle where players must replicate a pattern of glowing runes.
     *   *Outcome:* Success unlocks the door instantly. Failure causes Sanity damage and keeps the door locked.
     *   *Visuals:* Created `PuzzleModal.tsx` with immersive rune graphics and status feedback.
+
+## [v3.1 Update - The Black Market]
+*   **Progression System:** Implemented a `MERCHANT` phase that triggers after a successful investigation.
+    *   *Economy:* Players can spend accumulated `Insight` to buy rare items before archiving their characters.
+    *   *Shop UI:* Created `MerchantShop.tsx`, an immersive "Fence" interface for purchasing gear.
+    *   *Continuity:* Saving to the Roster now happens *after* the shopping phase, ensuring veterans start their next case fully equipped.
+*   **Item Costs:** Updated the item database with Insight costs to support the economy.

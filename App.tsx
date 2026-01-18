@@ -19,7 +19,8 @@ import {
   Briefcase,
   Star,
   Trash2,
-  Edit2
+  Edit2,
+  ShoppingBag
 } from 'lucide-react';
 import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator, FloatingText, Item, Spell } from './types';
 import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS } from './constants';
@@ -32,11 +33,12 @@ import EventModal from './components/EventModal';
 import MainMenu from './components/MainMenu';
 import OptionsMenu from './components/OptionsMenu';
 import PuzzleModal from './components/PuzzleModal';
+import MerchantShop from './components/MerchantShop';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.0.0";
+const APP_VERSION = "3.1.0";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -199,7 +201,7 @@ const App: React.FC = () => {
     }
   };
 
-  const playStinger = (type: 'roll' | 'event' | 'click' | 'horror' | 'search' | 'combat' | 'heal' | 'madness' | 'block' | 'trap' | 'spell' | 'unlock') => {
+  const playStinger = (type: 'roll' | 'event' | 'click' | 'horror' | 'search' | 'combat' | 'heal' | 'madness' | 'block' | 'trap' | 'spell' | 'unlock' | 'coin') => {
     if (!audioInit.current) return;
     if (type === 'roll') new Tone.MembraneSynth().toDestination().triggerAttackRelease("C1", "8n");
     if (type === 'horror') new Tone.MembraneSynth().toDestination().triggerAttackRelease("G0", "1n");
@@ -224,6 +226,9 @@ const App: React.FC = () => {
     }
     if (type === 'unlock') {
          new Tone.MetalSynth({ harmonicity: 200, resonance: 100 }).toDestination().triggerAttackRelease(800, "16n");
+    }
+    if (type === 'coin') {
+        new Tone.MetalSynth({ harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }).toDestination().triggerAttackRelease("C6", "16n");
     }
   };
 
@@ -450,6 +455,35 @@ const App: React.FC = () => {
       log: [`SAKSFIL: ${scenario.title}`, `MÅL: ${scenario.goal}`, ...prev.log]
     }));
     addToLog("Etterforskningen starter. Mørket senker seg over byen.");
+  };
+
+  const goToMerchant = () => {
+      setState(prev => ({ ...prev, phase: GamePhase.MERCHANT }));
+  };
+
+  const saveAllAndExit = () => {
+      const survivors = state.players.filter(p => !p.isDead);
+      
+      setRoster(prev => {
+          const newRoster = [...prev];
+          survivors.forEach(survivor => {
+              const newVet: SavedInvestigator = {
+                  ...survivor,
+                  instanceId: survivor.instanceId || `${survivor.id}-${Date.now()}`,
+                  saveDate: Date.now(),
+                  scenariosSurvived: (prev.find(v => v.instanceId === survivor.instanceId)?.scenariosSurvived || 0) + 1
+              };
+              // Replace existing if updated, or add new
+              const existingIdx = newRoster.findIndex(p => p.instanceId === newVet.instanceId);
+              if (existingIdx !== -1) {
+                  newRoster[existingIdx] = newVet;
+              } else {
+                  newRoster.push(newVet);
+              }
+          });
+          return newRoster;
+      });
+      handleResetGame();
   };
 
   const saveToRoster = (player: Player) => {
@@ -1121,6 +1155,23 @@ const App: React.FC = () => {
     }
   };
 
+  const handleBuyItem = (playerId: string, item: Item) => {
+      setState(prev => {
+          const newPlayers = [...prev.players];
+          const idx = newPlayers.findIndex(p => (p.instanceId || p.id) === playerId);
+          
+          if (idx !== -1 && newPlayers[idx].insight >= (item.cost || 0)) {
+              playStinger('coin');
+              newPlayers[idx] = {
+                  ...newPlayers[idx],
+                  insight: newPlayers[idx].insight - (item.cost || 0),
+                  inventory: [...newPlayers[idx].inventory, item]
+              };
+          }
+          return { ...prev, players: newPlayers };
+      });
+  };
+
   const handleEnemyInteraction = (id: string | null, type: 'click' | 'hover') => {
     if (type === 'click') {
       playStinger('click');
@@ -1299,6 +1350,10 @@ const App: React.FC = () => {
     );
   }
 
+  if (state.phase === GamePhase.MERCHANT) {
+      return <MerchantShop players={state.players.filter(p => !p.isDead)} onBuy={handleBuyItem} onFinish={() => saveAllAndExit()} />
+  }
+
   return (
     <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative transition-all duration-1000 ${activeMadnessClass} ${shakeClass}`}>
       <div className="absolute inset-0 pointer-events-none z-50 shadow-[inset_0_0_200px_rgba(0,0,0,0.9)] opacity-60"></div>
@@ -1386,6 +1441,11 @@ const App: React.FC = () => {
                  <div className="mb-10">
                      <p className="text-sm uppercase tracking-widest text-slate-500 mb-4 font-bold">Overlevende (Klikk for å lagre)</p>
                      <div className="flex justify-center gap-4 flex-wrap">
+                         {state.cluesFound >= requiredClues && (
+                             <button onClick={goToMerchant} className="flex items-center gap-2 px-6 py-3 border border-amber-600 rounded bg-[#1a120b] hover:bg-amber-900/40 hover:border-amber-400 transition-all text-amber-500 font-bold uppercase text-xs tracking-wider shadow-[0_0_20px_rgba(245,158,11,0.2)] animate-pulse">
+                                 <ShoppingBag size={16} /> Visit Black Market
+                             </button>
+                         )}
                          {state.players.map(p => {
                              if (p.isDead) return null;
                              const isSaved = roster.some(v => v.instanceId === p.instanceId);
