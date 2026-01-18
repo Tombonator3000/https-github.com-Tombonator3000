@@ -21,10 +21,12 @@ import {
   Trash2,
   Edit2,
   ShoppingBag,
-  Book
+  Book,
+  CloudFog,
+  Zap
 } from 'lucide-react';
-import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator, FloatingText, Item, Spell, EnemyType } from './types';
-import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS, BESTIARY, INDOOR_CONNECTORS, OUTDOOR_CONNECTORS } from './constants';
+import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, Madness, ContextAction, SavedInvestigator, FloatingText, Item, Spell, EnemyType, Trait } from './types';
+import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS, BESTIARY, INDOOR_CONNECTORS, OUTDOOR_CONNECTORS, SCENARIO_MODIFIERS, TRAIT_POOL } from './constants';
 import GameBoard from './components/GameBoard';
 import CharacterPanel from './components/CharacterPanel';
 import EnemyPanel from './components/EnemyPanel';
@@ -43,7 +45,7 @@ const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const SETUP_CONFIG_KEY = 'shadows_1920s_setup_config_v1';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.4.1";
+const APP_VERSION = "3.4.2";
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -64,6 +66,7 @@ const DEFAULT_STATE: GameState = {
     selectedEnemyId: null,
     selectedTileId: null,
     activeScenario: null,
+    activeModifiers: [],
     floatingTexts: [],
     screenShake: false
 };
@@ -479,7 +482,10 @@ const App: React.FC = () => {
           .filter(i => i.statModifier === 'physical_defense')
           .reduce((sum, item) => sum + (item.bonus || 0), 0);
 
-      const actualAmount = Math.max(0, amount - mitigation);
+      // Check for 'Blood Moon' modifier (Global Damage Increase)
+      const modifierDmg = state.activeModifiers.some(m => m.effect === 'strong_enemies') ? 1 : 0;
+
+      const actualAmount = Math.max(0, (amount + modifierDmg) - mitigation);
       const newHp = Math.max(0, player.hp - actualAmount);
       let logMsg = '';
       
@@ -547,7 +553,8 @@ const App: React.FC = () => {
           actions: 2, 
           isDead: false, 
           madness: [], 
-          activeMadness: null 
+          activeMadness: null,
+          traits: [] // New Recruit
       };
       generateCharacterPortrait(newPlayer);
       return { ...prev, players: [...prev.players, newPlayer] };
@@ -619,6 +626,9 @@ const App: React.FC = () => {
     const startTile: Tile = { ...START_TILE, name: scenario.startLocation };
     generateTileVisual(startTile);
 
+    // Apply Roguelite Modifier
+    const randomModifier = SCENARIO_MODIFIERS[Math.floor(Math.random() * SCENARIO_MODIFIERS.length)];
+
     setState(prev => ({ 
       ...prev, 
       phase: GamePhase.INVESTIGATOR, 
@@ -626,7 +636,12 @@ const App: React.FC = () => {
       doom: scenario.startDoom,
       board: [startTile],
       cluesFound: 0,
-      log: [`SAKSFIL: ${scenario.title}`, `MÅL: ${scenario.goal}`, ...prev.log]
+      activeModifiers: [randomModifier],
+      log: [
+          `SAKSFIL: ${scenario.title}`, 
+          `GLOBAL EFFEKT: ${randomModifier.name} - ${randomModifier.description}`,
+          ...prev.log
+      ]
     }));
     addToLog("Etterforskningen starter. Mørket senker seg over byen.");
   };
@@ -641,12 +656,28 @@ const App: React.FC = () => {
       setRoster(prev => {
           const newRoster = [...prev];
           survivors.forEach(survivor => {
+              // ROGUELITE: Award Trait
+              const newTrait = TRAIT_POOL[Math.floor(Math.random() * TRAIT_POOL.length)];
+              const existingTraits = survivor.traits || [];
+              // Avoid duplicate traits
+              const updatedTraits = existingTraits.some(t => t.id === newTrait.id) 
+                ? existingTraits 
+                : [...existingTraits, newTrait];
+
               const newVet: SavedInvestigator = {
                   ...survivor,
+                  traits: updatedTraits,
                   instanceId: survivor.instanceId || `${survivor.id}-${Date.now()}`,
                   saveDate: Date.now(),
                   scenariosSurvived: (prev.find(v => v.instanceId === survivor.instanceId)?.scenariosSurvived || 0) + 1
               };
+              
+              // Apply Permanent Trait Effects if just gained
+              if (!existingTraits.some(t => t.id === newTrait.id)) {
+                  if (newTrait.effect === 'max_hp_down') newVet.maxHp = Math.max(1, newVet.maxHp - 1);
+                  if (newTrait.effect === 'combat_bonus') newVet.maxHp = newVet.maxHp + 1; // "Hardened" gives health
+              }
+
               // Replace existing if updated, or add new
               const existingIdx = newRoster.findIndex(p => p.instanceId === newVet.instanceId);
               if (existingIdx !== -1) {
@@ -665,6 +696,7 @@ const App: React.FC = () => {
       playStinger('click');
       const newVet: SavedInvestigator = {
           ...player,
+          traits: player.traits || [],
           instanceId: player.instanceId || `${player.id}-${Date.now()}`,
           saveDate: Date.now(),
           scenariosSurvived: (roster.find(v => v.instanceId === player.instanceId)?.scenariosSurvived || 0) + 1
@@ -839,6 +871,12 @@ const App: React.FC = () => {
         setState(prev => {
           let newDoom = prev.doom - 1;
           
+          // Roguelite Mod: Extra Doom?
+          if (prev.activeModifiers.some(m => m.effect === 'extra_doom')) {
+              newDoom -= 1;
+              triggerFloatingText(0,0, "DOOM ACCELERATES", 'text-purple-600');
+          }
+
           // SEQUENTIAL ENEMY MOVEMENT (Anti-Stacking)
           const updatedEnemies: Enemy[] = [];
           
@@ -1046,7 +1084,9 @@ const App: React.FC = () => {
             .filter(i => i.statModifier === skill)
             .reduce((max, item) => Math.max(max, item.bonus || 0), 0);
         
-        return Math.max(1, count + itemBonus);
+        count += itemBonus;
+
+        return Math.max(1, count);
     };
 
     switch (actionType) {
@@ -1213,7 +1253,9 @@ const App: React.FC = () => {
         }
 
         playStinger('roll');
-        const fleeDice = getDiceCount(2 + (activePlayer.id === 'journalist' ? 1 : 0), 'agility');
+        // Trait: Runner
+        const runnerBonus = activePlayer.traits?.some(t => t.effect === 'runner') ? 1 : 0;
+        const fleeDice = getDiceCount(2 + (activePlayer.id === 'journalist' ? 1 : 0) + runnerBonus, 'agility');
         const fleeRoll = Array.from({ length: fleeDice }, () => Math.floor(Math.random() * 6) + 1);
         const fleeSuccess = fleeRoll.filter(v => v >= 4).length > 0;
         
@@ -1501,7 +1543,15 @@ const App: React.FC = () => {
              if (searchSuccess > 0) {
                  playStinger('search');
                  const rewardRng = Math.random();
-                 if (rewardRng > 0.4) {
+                 
+                 // Trait: Scavenger (Better odds)
+                 const scavengerBonus = activePlayer.traits?.some(t => t.effect === 'scavenger') ? 0.2 : 0;
+                 const threshold = 0.4 - scavengerBonus; // Lower threshold = better odds
+
+                 // Trait: Occult Scholar (Sanity Regen)
+                 const scholarBonus = activePlayer.traits?.some(t => t.effect === 'sanity_regen');
+
+                 if (rewardRng > threshold) {
                      const item = ITEMS[Math.floor(Math.random() * ITEMS.length)];
                      setState(prev => ({ 
                          ...prev, 
@@ -1515,10 +1565,20 @@ const App: React.FC = () => {
                          ...prev, 
                          cluesFound: prev.cluesFound + 1,
                          board: prev.board.map(t => t.id === curTile.id ? { ...t, object: { ...t.object!, searched: true } } : t),
-                         players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p) 
+                         players: prev.players.map((p, i) => {
+                             if (i === prev.activePlayerIndex) {
+                                 let newP = { ...p, actions: p.actions - 1 };
+                                 if (scholarBonus) {
+                                     newP.sanity = Math.min(newP.maxSanity, newP.sanity + 1);
+                                 }
+                                 return newP;
+                             }
+                             return p;
+                         }) 
                      }));
                      addToLog(`Du fant et viktig spor gjemt i ${curTile.object.type}!`);
                      triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `CLUE FOUND!`, 'text-green-400');
+                     if (scholarBonus) triggerFloatingText(activePlayer.position.q, activePlayer.position.r, `+1 SAN`, 'text-purple-400');
                  }
              } else {
                  addToLog(`Du fant ingenting av verdi i ${curTile.object.type}.`);
@@ -1851,6 +1911,13 @@ const App: React.FC = () => {
                                 <div className="flex items-center gap-1 text-red-400"><Skull size={12} /> {vet.hp}</div>
                                 <div className="flex items-center gap-1 text-purple-400"><RotateCcw size={12} /> {vet.sanity}</div>
                               </div>
+                              {vet.traits && vet.traits.length > 0 && (
+                                  <div className="flex gap-1 mt-2">
+                                      {vet.traits.map(t => (
+                                          <div key={t.id} title={t.name} className={`w-2 h-2 rounded-full ${t.type === 'positive' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                      ))}
+                                  </div>
+                              )}
                               {isSelected && <div className="absolute top-3 right-8 w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>}
                             </button>
                         );
@@ -1903,6 +1970,20 @@ const App: React.FC = () => {
               ))}
             </div>
           </div>
+          {/* Active Modifiers Display */}
+          {state.activeModifiers.length > 0 && (
+              <div className="flex items-center gap-2 border-l border-slate-700 pl-4">
+                  {state.activeModifiers.map(mod => (
+                      <div key={mod.id} className="group relative">
+                          <CloudFog size={18} className="text-purple-400 cursor-help" />
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-48 bg-black/90 p-2 text-[10px] border border-purple-500 rounded hidden group-hover:block">
+                              <div className="font-bold text-purple-300 uppercase">{mod.name}</div>
+                              <div className="text-slate-400">{mod.description}</div>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          )}
           <button onClick={() => setShowJournal(true)} className="text-slate-500 hover:text-amber-500 transition-colors" title="Bestiary">
             <Book size={18} />
           </button>

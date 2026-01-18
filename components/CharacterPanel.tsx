@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Player, Item } from '../types';
-import { Heart, Brain, Eye, Star, AlertCircle, RefreshCw, Trash2, Gift } from 'lucide-react';
+import { Heart, Brain, Eye, Star, AlertCircle, RefreshCw, Trash2, Gift, ShieldCheck } from 'lucide-react';
 
 interface CharacterPanelProps {
   player: Player;
@@ -74,6 +74,20 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
              <p className="text-lg font-display text-white italic mb-1">{player.activeMadness.name}</p>
              <p className="text-[10px] text-purple-200/70 italic leading-relaxed">{player.activeMadness.description}</p>
           </div>
+        )}
+
+        {/* Veteran Traits (New) */}
+        {player.traits && player.traits.length > 0 && (
+            <div className="bg-slate-900/50 p-3 rounded border border-slate-700">
+                <h3 className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-2"><ShieldCheck size={14} /> Veteran Traits</h3>
+                <div className="flex flex-wrap gap-2">
+                    {player.traits.map(trait => (
+                        <div key={trait.id} className={`px-2 py-1 rounded border text-[10px] uppercase font-bold ${trait.type === 'positive' ? 'border-green-800 bg-green-900/20 text-green-400' : 'border-red-800 bg-red-900/20 text-red-400'}`}>
+                            {trait.name}
+                        </div>
+                    ))}
+                </div>
+            </div>
         )}
 
         {/* Stats Grid */}

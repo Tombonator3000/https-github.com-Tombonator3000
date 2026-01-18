@@ -41,6 +41,14 @@ export interface Madness {
   visualClass: string; // CSS class for visual distortion
 }
 
+export interface Trait {
+    id: string;
+    name: string;
+    description: string;
+    type: 'positive' | 'negative';
+    effect: 'combat_bonus' | 'sanity_regen' | 'max_hp_down' | 'fragile_mind' | 'scavenger' | 'runner';
+}
+
 export interface Player extends Character {
   position: { q: number; r: number };
   inventory: Item[];
@@ -50,12 +58,14 @@ export interface Player extends Character {
   madness: string[]; // Deprecated, keeping for safety
   activeMadness: Madness | null;
   instanceId?: string; // Unique ID for veterans to distinguish multiple of same class
+  traits: Trait[]; // New: Permanent traits from previous runs
 }
 
 // Data structure for a saved character in the roster
 export interface SavedInvestigator extends Player {
     saveDate: number;
     scenariosSurvived: number;
+    traits: Trait[];
 }
 
 export interface Item {
@@ -173,6 +183,13 @@ export interface ActivePuzzle {
     targetTileId: string;
 }
 
+export interface ScenarioModifier {
+    id: string;
+    name: string;
+    description: string;
+    effect: 'reduced_vision' | 'extra_doom' | 'strong_enemies' | 'less_items';
+}
+
 export interface GameState {
   phase: GamePhase;
   doom: number;
@@ -191,6 +208,7 @@ export interface GameState {
   selectedEnemyId: string | null;
   selectedTileId: string | null; // New: For selecting tiles to interact with
   activeScenario: Scenario | null;
+  activeModifiers: ScenarioModifier[]; // New: Roguelite run modifiers
   floatingTexts: FloatingText[];
   screenShake: boolean;
 }

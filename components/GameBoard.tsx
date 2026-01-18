@@ -22,7 +22,7 @@ interface GameBoardProps {
 }
 
 const HEX_SIZE = 95;
-const VISIBILITY_RANGE = 2;
+const VISIBILITY_RANGE = 2; // Default range
 
 // --- ICON MAPPER FOR MONSTERS ---
 const getMonsterIcon = (type: EnemyType) => {

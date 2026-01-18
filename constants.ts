@@ -1,5 +1,5 @@
 
-import { Character, CharacterType, Item, EventCard, Tile, Scenario, Madness, Spell, BestiaryEntry, EnemyType } from './types';
+import { Character, CharacterType, Item, EventCard, Tile, Scenario, Madness, Spell, BestiaryEntry, EnemyType, Trait, ScenarioModifier } from './types';
 
 export const SPELLS: Spell[] = [
     {
@@ -90,6 +90,22 @@ export const CHARACTERS: Record<CharacterType, Character> = {
     special: 'Can heal HP or Sanity'
   }
 };
+
+export const TRAIT_POOL: Trait[] = [
+    { id: 't1', name: 'Hardened', description: '+1 Max HP', type: 'positive', effect: 'combat_bonus' }, // Implemented as stat boost on generation
+    { id: 't2', name: 'Shell-Shocked', description: 'Starts with 1 less Sanity', type: 'negative', effect: 'fragile_mind' },
+    { id: 't3', name: 'Scavenger', description: 'Better chance to find items', type: 'positive', effect: 'scavenger' },
+    { id: 't4', name: 'Adrenaline Junkie', description: '+1 Movement Speed', type: 'positive', effect: 'runner' },
+    { id: 't5', name: 'Old Wound', description: '-1 Max HP', type: 'negative', effect: 'max_hp_down' },
+    { id: 't6', name: 'Occult Scholar', description: 'Regenerate 1 Sanity when finding a clue', type: 'positive', effect: 'sanity_regen' }
+];
+
+export const SCENARIO_MODIFIERS: ScenarioModifier[] = [
+    { id: 'mod1', name: 'Thick Fog', description: 'Vision range reduced by 1.', effect: 'reduced_vision' },
+    { id: 'mod2', name: 'Blood Moon', description: 'Enemies deal +1 Damage.', effect: 'strong_enemies' },
+    { id: 'mod3', name: 'Dwindling Supplies', description: 'Items are harder to find.', effect: 'less_items' },
+    { id: 'mod4', name: 'The Stars Align', description: 'Doom advances faster (+1 per Mythos phase).', effect: 'extra_doom' }
+];
 
 export const ITEMS: Item[] = [
   { id: 'rev', name: 'Revolver', type: 'weapon', effect: '+1 Combat Die', bonus: 1, cost: 3, statModifier: 'combat' },
