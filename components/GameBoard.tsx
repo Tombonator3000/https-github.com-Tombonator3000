@@ -7,6 +7,7 @@ import {
   Library, Archive, FileText, Radio, Zap, Gem, CloudFog, Milestone,
   Fish, PawPrint, Biohazard, Crown, Crosshair, Bug, Smile
 } from 'lucide-react';
+import { hasLineOfSight } from '../utils/hexUtils';
 
 interface GameBoardProps {
   tiles: Tile[];
@@ -47,7 +48,7 @@ const getMonsterIcon = (type: EnemyType) => {
             return { Icon: Biohazard, color: 'text-green-500' };
         case 'mi-go':
         case 'byakhee':
-            return { Icon: Bug, color: 'text-pink-400' }; // Use Bug if available, or fallback
+            return { Icon: Bug, color: 'text-pink-400' }; 
         case 'nightgaunt':
         case 'hunting_horror':
             return { Icon: Ghost, color: 'text-slate-400' };
@@ -58,7 +59,7 @@ const getMonsterIcon = (type: EnemyType) => {
         case 'sniper':
             return { Icon: Crosshair, color: 'text-red-400' };
         case 'moon_beast':
-            return { Icon: Smile, color: 'text-slate-300' }; // Creepy smile
+            return { Icon: Smile, color: 'text-slate-300' }; 
         default:
             return { Icon: Skull, color: 'text-red-500' };
     }
@@ -68,14 +69,13 @@ const getMonsterIcon = (type: EnemyType) => {
 const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
   const n = name.toLowerCase();
   
-  // 0. CONNECTORS (Hallways/Alleys)
   if (n.includes('hallway') || n.includes('corridor') || n.includes('passage') || n.includes('shaft')) {
       return {
           bg: 'bg-[#1c1917]',
           style: {
               backgroundImage: 'repeating-linear-gradient(90deg, #292524 0, #292524 1px, transparent 1px, transparent 10px)'
           },
-          strokeColor: '#78716c', // Stone 500
+          strokeColor: '#78716c', 
           Icon: DoorOpen,
           iconColor: 'text-stone-400'
       };
@@ -86,26 +86,24 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
           style: {
               backgroundImage: 'radial-gradient(circle, transparent 20%, #000 90%), repeating-radial-gradient(circle at 50% 100%, #334155 0, transparent 2px, transparent 6px)'
           },
-          strokeColor: '#475569', // Slate 600
+          strokeColor: '#475569', 
           Icon: Milestone,
           iconColor: 'text-slate-500'
       };
   }
 
-  // 1. WOOD FLOOR (Manors, Libraries, Old Houses)
   if (n.includes('library') || n.includes('study') || n.includes('manor') || n.includes('hall') || n.includes('attic') || n.includes('servant') || n.includes('ballroom') || n.includes('billiard') || n.includes('bedroom') || n.includes('nursery') || n.includes('trophy') || n.includes('staircase')) {
     return {
       bg: 'bg-[#451a03]',
       style: {
         backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 10px)'
       },
-      strokeColor: '#b45309', // Amber 700
+      strokeColor: '#b45309', 
       Icon: BookOpen,
       iconColor: 'text-amber-500'
     };
   }
 
-  // 2. COLD TILES (Hospitals, Asylums, Labs)
   if (n.includes('hospital') || n.includes('asylum') || n.includes('sanitarium') || n.includes('morgue') || n.includes('lab') || n.includes('operating') || n.includes('padded')) {
     return {
       bg: 'bg-[#334155]', 
@@ -113,65 +111,60 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
         backgroundImage: 'linear-gradient(0deg, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
         backgroundSize: '20px 20px',
       },
-      strokeColor: '#94a3b8', // Slate 400
+      strokeColor: '#94a3b8', 
       Icon: Archive,
       iconColor: 'text-slate-300'
     };
   }
 
-  // 3. RITUAL / RELIGIOUS (Church, Crypt, Altar)
   if (n.includes('church') || n.includes('crypt') || n.includes('ritual') || n.includes('temple') || n.includes('altar')) {
     return {
       bg: 'bg-[#450a0a]',
       style: {
         backgroundImage: 'radial-gradient(circle at center, #7f1d1d 0%, transparent 80%)'
       },
-      strokeColor: '#ef4444', // Red 500
+      strokeColor: '#ef4444', 
       Icon: Church,
       iconColor: 'text-red-400'
     };
   }
 
-  // 4. INDUSTRIAL / STORAGE (Warehouse, Boiler Room, Factory, Cellar)
   if (n.includes('warehouse') || n.includes('boiler') || n.includes('factory') || n.includes('station') || n.includes('cellar')) {
     return {
       bg: 'bg-[#292524]',
       style: {
         backgroundImage: 'repeating-linear-gradient(-45deg, #44403c 0, #44403c 2px, transparent 2px, transparent 8px)'
       },
-      strokeColor: '#a8a29e', // Stone 400
+      strokeColor: '#a8a29e', 
       Icon: Box,
       iconColor: 'text-stone-400'
     };
   }
 
-  // 5. NATURE / SWAMP (Swamp, Forest, Park, Garden, Greenhouse)
   if (n.includes('swamp') || n.includes('forest') || n.includes('park') || n.includes('garden') || n.includes('graveyard') || n.includes('greenhouse') || n.includes('conservatory') || n.includes('gazebo') || n.includes('overgrown')) {
     return {
       bg: 'bg-[#064e3b]',
       style: {
         backgroundImage: 'radial-gradient(circle at 20% 80%, rgba(255,255,255,0.1) 0%, transparent 20%)'
       },
-      strokeColor: '#4ade80', // Green 400
+      strokeColor: '#4ade80', 
       Icon: n.includes('graveyard') ? Skull : Trees,
       iconColor: 'text-green-400'
     };
   }
 
-  // 6. WATER / DOCKS (Docks, River, Pier, Bridge)
   if (n.includes('dock') || n.includes('river') || n.includes('pier') || n.includes('bridge')) {
     return {
       bg: 'bg-[#172554]',
       style: {
         backgroundImage: 'repeating-radial-gradient(circle at 50% 100%, rgba(255,255,255,0.05) 0, transparent 5px)'
       },
-      strokeColor: '#60a5fa', // Blue 400
+      strokeColor: '#60a5fa', 
       Icon: Anchor,
       iconColor: 'text-blue-400'
     };
   }
 
-  // 7. STREET / URBAN (Street, Square, Alley, Junction)
   if (type === 'street' || n.includes('street') || n.includes('square') || n.includes('alley') || n.includes('dead end') || n.includes('junction') || n.includes('roundabout') || n.includes('crossroads') || n.includes('site')) {
     return {
       bg: 'bg-[#1e293b]',
@@ -179,64 +172,55 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
         backgroundImage: 'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
         backgroundSize: '20px 20px'
       },
-      strokeColor: '#cbd5e1', // Slate 300
+      strokeColor: '#cbd5e1', 
       Icon: Building2,
       iconColor: 'text-slate-400'
     };
   }
 
-  // 8. GENERIC ROOM
   return {
     bg: 'bg-[#262626]',
     style: {},
-    strokeColor: '#737373', // Neutral 500
-    Icon: Ghost, // Generic mysterious icon
+    strokeColor: '#737373', 
+    Icon: Ghost, 
     iconColor: 'text-neutral-500'
   };
 };
 
-// DOOM LIGHTING CONFIG
 const getDoomLighting = (doom: number, activeModifiers: ScenarioModifier[] = []) => {
-    // 0 is dead, 12 is safe.
     const danger = Math.max(0, 1 - (doom / 12)); 
 
-    let overlayColor = 'rgba(10, 20, 40, 0.4)'; // Default cool blue
-    let vignetteStrength = '60%'; // Open
+    let overlayColor = 'rgba(10, 20, 40, 0.4)'; 
+    let vignetteStrength = '60%'; 
     let animation = 'none';
     let contrast = 1;
 
-    // Modifiers affect base lighting
     const isBloodMoon = activeModifiers.some(m => m.effect === 'strong_enemies');
     if (isBloodMoon) {
         overlayColor = 'rgba(60, 10, 10, 0.3)';
     }
 
     if (doom <= 3) {
-        // Critical
         overlayColor = isBloodMoon ? 'rgba(80, 0, 0, 0.5)' : 'rgba(60, 0, 0, 0.3)'; 
-        vignetteStrength = '90%'; // Tight
+        vignetteStrength = '90%'; 
         animation = isBloodMoon ? 'doom-pulse-red 3s infinite' : 'doom-flicker 4s infinite';
         contrast = 1.2;
     } else if (doom <= 6) {
-        // Warning
         overlayColor = isBloodMoon ? 'rgba(60, 20, 20, 0.4)' : 'rgba(40, 10, 40, 0.3)';
         vignetteStrength = '75%';
         animation = 'none';
         contrast = 1.1;
     }
 
-    // Dynamic gradient
     const gradient = `radial-gradient(circle, transparent 30%, ${overlayColor} ${vignetteStrength}, #000 100%)`;
 
     return { gradient, animation, contrast, danger };
 };
 
-// WEATHER CONFIG
 const getWeatherVisuals = (activeModifiers: ScenarioModifier[] = []) => {
     const isFoggy = activeModifiers.some(m => m.effect === 'reduced_vision');
     const isBloodMoon = activeModifiers.some(m => m.effect === 'strong_enemies');
     
-    // Default Atmosphere
     let bgImage = 'url("https://www.transparenttextures.com/patterns/foggy-birds.png")';
     let opacity = 0.3;
     let blendMode = 'screen';
@@ -244,14 +228,13 @@ const getWeatherVisuals = (activeModifiers: ScenarioModifier[] = []) => {
     let animation = 'animate-fog';
 
     if (isFoggy) {
-        bgImage = 'url("https://www.transparenttextures.com/patterns/foggy-birds.png")'; // Thicker fog texture if available, or just increase opacity
-        opacity = 0.6; // Much thicker
+        opacity = 0.6; 
         filter = 'blur(4px) contrast(1.2)';
     } else if (isBloodMoon) {
         bgImage = 'url("https://www.transparenttextures.com/patterns/dark-matter.png")';
         opacity = 0.4;
         blendMode = 'color-dodge';
-        filter = 'sepia(1) hue-rotate(-50deg)'; // Red tint
+        filter = 'sepia(1) hue-rotate(-50deg)'; 
     }
 
     return { bgImage, opacity, blendMode, filter, animation };
@@ -279,7 +262,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [dragStartRaw, setDragStartRaw] = useState({ x: 0, y: 0 }); // For threshold check
+  const [dragStartRaw, setDragStartRaw] = useState({ x: 0, y: 0 }); 
 
   useEffect(() => {
     if (containerRef.current) {
@@ -288,7 +271,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, []);
 
-  // --- MOUSE HANDLERS ---
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     setIsDragging(true);
@@ -300,7 +282,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
     
-    // Check threshold to avoid micro-movements counting as drags
     const dx = e.clientX - dragStartRaw.x;
     const dy = e.clientY - dragStartRaw.y;
     if (Math.hypot(dx, dy) > DRAG_THRESHOLD) {
@@ -315,9 +296,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
   const handleMouseUp = () => setIsDragging(false);
 
-  // --- TOUCH HANDLERS ---
   const handleTouchStart = (e: React.TouchEvent) => {
-      // If 1 finger, treat as Drag/Pan start
       if (e.touches.length === 1) {
           setIsDragging(true);
           const t = e.touches[0];
@@ -325,9 +304,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
           setDragStartRaw({ x: t.clientX, y: t.clientY });
           hasDragged.current = false;
       } 
-      // If 2 fingers, treat as Zoom start
       else if (e.touches.length === 2) {
-          setIsDragging(false); // Stop dragging if we are now pinching
+          setIsDragging(false); 
           const dist = Math.hypot(
               e.touches[0].clientX - e.touches[1].clientX,
               e.touches[0].clientY - e.touches[1].clientY
@@ -337,7 +315,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-      // Pan
       if (e.touches.length === 1 && isDragging) {
           const t = e.touches[0];
           const dx = t.clientX - dragStartRaw.x;
@@ -352,7 +329,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
               y: t.clientY - dragStart.y
           });
       } 
-      // Zoom
       else if (e.touches.length === 2) {
           const dist = Math.hypot(
               e.touches[0].clientX - e.touches[1].clientX,
@@ -361,7 +337,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
           if (lastTouchDistance.current !== null) {
               const delta = dist - lastTouchDistance.current;
-              const sensitivity = 0.005; // Zoom speed
+              const sensitivity = 0.005; 
               setScale(prev => Math.min(Math.max(prev + delta * sensitivity, 0.3), 1.5));
           }
           lastTouchDistance.current = dist;
@@ -403,6 +379,23 @@ const GameBoard: React.FC<GameBoardProps> = ({
     return visible;
   }, [players, tiles, activeModifiers]);
 
+  // LINE OF SIGHT VISUALIZATION FOR SELECTED ENEMY
+  const selectedEnemyVisionTiles = useMemo(() => {
+      if (!selectedEnemyId) return new Set<string>();
+      const enemy = enemies.find(e => e.id === selectedEnemyId);
+      if (!enemy) return new Set<string>();
+
+      const vision = new Set<string>();
+      const range = enemy.visionRange;
+
+      tiles.forEach(t => {
+          if (hasLineOfSight(enemy.position, t, tiles, range)) {
+              vision.add(`${t.q},${t.r}`);
+          }
+      });
+      return vision;
+  }, [selectedEnemyId, enemies, tiles]);
+
   const possibleMoves = useMemo(() => {
     const moves: { q: number, r: number }[] = [];
     tiles.forEach(tile => {
@@ -422,7 +415,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
     return moves;
   }, [tiles, visibleTiles]);
 
-  // Calculate dynamic visuals
   const lighting = getDoomLighting(doom, activeModifiers);
   const weather = getWeatherVisuals(activeModifiers);
 
@@ -439,7 +431,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
       onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
     >
-      {/* 1. Dynamic Lighting Overlay (Vignette & Color Grading) */}
       <div 
         className="absolute inset-0 pointer-events-none z-20 transition-all duration-1000"
         style={{
@@ -449,7 +440,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
         }}
       />
 
-      {/* 2. Atmospheric Clouds / Weather Layer */}
       <div 
         className={`absolute inset-0 pointer-events-none z-25 transition-opacity duration-1000 ${weather.animation}`}
         style={{
@@ -461,10 +451,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
         }}
       />
       
-      {/* 3. Darker Void Background for Depth (Behind everything) */}
       <div className="absolute inset-0 pointer-events-none z-0 bg-[radial-gradient(circle_at_center,_transparent_0%,_#000_100%)] opacity-80" />
       
-      {/* Game Content Container - z-10 puts it between Void and Atmosphere */}
       <div 
         style={{ 
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
@@ -472,10 +460,10 @@ const GameBoard: React.FC<GameBoardProps> = ({
         }}
         className="absolute top-0 left-0 will-change-transform z-10"
       >
-        {/* TILES */}
         {tiles.map(tile => {
           const { x, y } = hexToPixel(tile.q, tile.r);
           const isVisible = visibleTiles.has(`${tile.q},${tile.r}`);
+          const isInEnemySight = selectedEnemyVisionTiles.has(`${tile.q},${tile.r}`);
           const visual = getTileVisuals(tile.name, tile.type);
           
           if (!isVisible && !tile.explored) return null;
@@ -494,16 +482,13 @@ const GameBoard: React.FC<GameBoardProps> = ({
                 if (!hasDragged.current) onTileClick(tile.q, tile.r);
               }}
             >
-              {/* Inner Hex (Clipped Content) */}
               <div 
                 className={`absolute inset-0 hex-clip transition-all duration-500 ${visual.bg} relative overflow-hidden`}
               >
-                 {/* Generated AI Image */}
                  {tile.imageUrl && (
                      <img src={tile.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-overlay" />
                  )}
 
-                 {/* CSS Pattern Fallback - Simple Opacity */}
                  {!tile.imageUrl && (
                     <div 
                         className="absolute inset-0 opacity-20" 
@@ -511,12 +496,15 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     ></div>
                  )}
 
-                 {/* Tile Icon */}
+                 {/* Enemy Vision Overlay */}
+                 {isInEnemySight && (
+                     <div className="absolute inset-0 bg-red-600/20 mix-blend-color animate-pulse pointer-events-none z-10"></div>
+                 )}
+
                  <div className="relative z-10 flex flex-col items-center opacity-80 pointer-events-none">
                      <visual.Icon size={24} className={visual.iconColor} />
                  </div>
 
-                 {/* Objects on Tile */}
                  {tile.object && (
                      <div className="absolute bottom-4 z-20 flex flex-col items-center animate-in zoom-in duration-300">
                          {tile.object.type === 'fire' && <Flame className="text-orange-500 animate-pulse" size={20} />}
@@ -534,21 +522,19 @@ const GameBoard: React.FC<GameBoardProps> = ({
                      </div>
                  )}
 
-                 {/* Fog of War / Exploration Tint (z-30 to cover contents) */}
                  <div className={`absolute inset-0 transition-all duration-1000 backdrop-blur-[2px] z-30 pointer-events-none ${isVisible ? 'opacity-0' : 'opacity-80 bg-black'}`}></div>
               </div>
 
-              {/* SVG BORDER OVERLAY (True visible borders) */}
               <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full pointer-events-none overflow-visible z-10">
                   <polygon 
                      points={HEX_POLY_POINTS} 
                      fill="none" 
-                     stroke={visual.strokeColor} 
-                     strokeWidth="2.5"
+                     stroke={isInEnemySight ? '#ef4444' : visual.strokeColor} 
+                     strokeWidth={isInEnemySight ? "3.5" : "2.5"}
                      strokeLinecap="round"
                      strokeLinejoin="round"
+                     className="transition-all duration-300"
                   />
-                  {/* Selection Highlight */}
                   {tile.object?.blocking && (
                       <polygon 
                          points={HEX_POLY_POINTS} 
@@ -563,7 +549,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
           );
         })}
 
-        {/* Possible Move Indicators (Red Dashed Lines) */}
         {possibleMoves.map((move, i) => {
           const { x, y } = hexToPixel(move.q, move.r);
           return (
@@ -580,7 +565,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
                    if (!hasDragged.current) onTileClick(move.q, move.r);
                 }}
              >
-                 {/* Dashed SVG Border */}
                  <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full overflow-visible">
                     <polygon 
                         points={HEX_POLY_POINTS} 
@@ -595,7 +579,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
           );
         })}
 
-        {/* PLAYERS */}
         {players.map(player => {
             if (player.isDead) return null;
             const { x, y } = hexToPixel(player.position.q, player.position.r);
@@ -613,10 +596,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     ) : (
                         <User className="text-white" size={20} />
                     )}
-                    {/* Lantern Light Source - Pulse breathing animation */}
                     <div className="absolute inset-0 bg-amber-200/20 rounded-full animate-lantern pointer-events-none blur-xl scale-[3]"></div>
                     
-                    {/* Sanity Ring */}
                     <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none">
                         <circle cx="22" cy="22" r="21" fill="none" stroke="#7e22ce" strokeWidth="2" strokeDasharray="132" strokeDashoffset={132 * (1 - player.sanity/player.maxSanity)} className="transition-all duration-500" />
                     </svg>
@@ -624,7 +605,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
             );
         })}
 
-        {/* ENEMIES */}
         {enemies.map(enemy => {
             if (!visibleTiles.has(`${enemy.position.q},${enemy.position.r}`)) return null;
             const { x, y } = hexToPixel(enemy.position.q, enemy.position.r);
@@ -647,7 +627,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     onMouseEnter={() => onEnemyHover && onEnemyHover(enemy.id)}
                     onMouseLeave={() => onEnemyHover && onEnemyHover(null)}
                 >
-                     {/* Selection Ring */}
                      {isSelected && <div className="absolute inset-[-4px] border-2 border-red-500 rounded-full animate-ping opacity-50"></div>}
 
                      <div className={`w-full h-full rounded-full bg-[#1a0505] border-2 ${isSelected ? 'border-red-500' : 'border-red-900'} flex items-center justify-center overflow-hidden shadow-[0_0_20px_rgba(220,38,38,0.4)] relative`}>
@@ -657,7 +636,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
                              <MonsterVisual.Icon className={`${MonsterVisual.color}`} size={24} />
                          )}
                          
-                         {/* Health Bar */}
                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black">
                              <div className="h-full bg-red-600 transition-all duration-300" style={{ width: `${(enemy.hp / enemy.maxHp) * 100}%` }}></div>
                          </div>
@@ -666,7 +644,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
             );
         })}
 
-        {/* FLOATING TEXTS */}
         {floatingTexts.map(ft => {
             const { x, y } = hexToPixel(ft.q, ft.r);
             return (
@@ -685,7 +662,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
 
       </div>
       
-      {/* Zoom Controls (Mobile Friendly Overlay) */}
       <div className="absolute bottom-24 right-4 flex flex-col gap-2 z-50 md:hidden">
           <button onClick={() => setScale(s => Math.min(s + 0.2, 1.5))} className="p-3 bg-slate-800/80 rounded-full text-white border border-slate-600">+</button>
           <button onClick={() => setScale(s => Math.max(s - 0.2, 0.3))} className="p-3 bg-slate-800/80 rounded-full text-white border border-slate-600">-</button>

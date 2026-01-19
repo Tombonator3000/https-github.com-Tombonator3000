@@ -27,7 +27,7 @@ import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.10.16"; 
+const APP_VERSION = "3.10.17"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -66,7 +66,8 @@ const formatLogEntry = (entry: string) => {
         { regex: /(failed|mislyktes|bommet)/gi, color: 'text-orange-400 font-bold' },
         { regex: /(item|gjenstand|found)/gi, color: 'text-amber-400 font-bold' },
         { regex: /(doom|dommedag)/gi, color: 'text-[#e94560] font-black uppercase' },
-        { regex: /(ENTERED:|LOCATION:)/gi, color: 'text-[#eecfa1] font-bold tracking-widest' }
+        { regex: /(ENTERED:|LOCATION:)/gi, color: 'text-[#eecfa1] font-bold tracking-widest' },
+        { regex: /(VISIBLE|SIGHT|EYES)/gi, color: 'text-red-300 font-bold' }
     ];
 
     const parts = entry.split(/(\s+)/);
@@ -183,6 +184,13 @@ const App: React.FC = () => {
                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p) 
              }));
         }
+
+        // Check if now in line of sight of any enemy
+        state.enemies.forEach(enemy => {
+            if (hasLineOfSight(enemy.position, { q, r }, state.board, enemy.visionRange)) {
+                addToLog(`The eyes of a ${enemy.name} fall upon you! You are VISIBLE!`);
+            }
+        });
         break;
 
       case 'rest':
@@ -205,6 +213,13 @@ const App: React.FC = () => {
               addToLog("No target selected for attack!");
               return;
           }
+          // Simple Range Check for Combat
+          const dist = hexDistance(activePlayer.position, targetEnemy.position);
+          if (dist > 1) { // Melee range default
+              addToLog("Target is too far away to attack!");
+              return;
+          }
+
           const combatDice = 1 + (activePlayer.id === 'veteran' ? 1 : 0);
           const combatRoll = Array.from({ length: combatDice }, () => Math.floor(Math.random() * 6) + 1);
           setState(prev => ({ ...prev, lastDiceRoll: combatRoll, activeCombat: { playerId: activePlayer.id, enemyId: targetEnemy.id } }));
@@ -278,7 +293,6 @@ const App: React.FC = () => {
           const nextIndex = prev.activePlayerIndex + 1;
           const isEndOfRound = nextIndex >= prev.players.length;
           if (isEndOfRound) {
-              // Mythos Phase Logic (Simplified)
               return { 
                   ...prev, 
                   phase: GamePhase.MYTHOS, 
@@ -291,6 +305,16 @@ const App: React.FC = () => {
       });
 
       if (state.phase === GamePhase.MYTHOS) {
+          // Basic AI Awareness for Mythos Phase
+          state.enemies.forEach(enemy => {
+              const visiblePlayers = state.players.filter(p => !p.isDead && hasLineOfSight(enemy.position, p.position, state.board, enemy.visionRange));
+              if (visiblePlayers.length > 0) {
+                  const nearest = visiblePlayers.sort((a, b) => hexDistance(enemy.position, a.position) - hexDistance(enemy.position, b.position))[0];
+                  addToLog(`The ${enemy.name} begins stalking ${nearest.name}...`);
+                  // AI logic would go here: move or attack if in range
+              }
+          });
+
           setTimeout(() => {
               setState(prev => ({ ...prev, phase: GamePhase.INVESTIGATOR, players: prev.players.map(p => ({ ...p, actions: 2 })) }));
               addToLog("The sun sets. The investigator's resolve is tested.");

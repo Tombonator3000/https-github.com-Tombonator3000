@@ -1,21 +1,13 @@
 # Project Log - Shadows of the 1920s
 
-## [v3.10.16 - Core Mechanics Restoration] - 2024-05-24 15:30
+## [v3.10.17 - Line of Sight Implementation] - 2024-05-24 16:15
 ### 🔍 Status Report:
-- **AUDIT:** Identifisert at kampsystem og etterforskning var deaktivert i `App.tsx` etter UI-refaktorering.
-- **FIXED:** Implementert `handleInvestigation` for å finne items/ledetråder.
-- **FIXED:** Implementert `handleAttack` for å skade monstre.
-- **FIXED:** Lagt til spawn-logikk for fiender slik at brettet ikke forblir tomt.
-- **FIXED:** Gjeninnført sjekk for quest-items i scenario-steg.
-
-### 🚩 REMOVAL AUDIT (Hva som var fjernet/manglet):
-1. **Combat Engine:** `attack` i `handleAction` var tom. Spiller kunne ikke skade monstre.
-2. **Investigation Loot:** Ingen kobling mellom `investigate` og `ITEMS` tabellen.
-3. **Enemy AI:** Monstre stod stille og angrep aldri (Mythos-fasen manglet iterasjon).
-4. **Victory/Loss Conditions:** Sjekk for om alle spillere er døde eller Doom har nådd 0 manglet.
-5. **Quest State:** `questItemsCollected` ble aldri oppdatert.
+- **NEW MECHANIC:** Line of Sight (LoS). Enemies now have a vision range (default 3) and cannot see through blocking objects (walls, rubble).
+- **VISUALIZATION:** When an enemy is selected on the game board, their field of vision is highlighted with a red spectral overlay.
+- **AI ENHANCEMENT:** The Mythos phase now includes a check for player visibility. Enemies will focus on players they can "see" through clear paths.
+- **AUDIT:** Ensured `hasLineOfSight` utility is correctly integrated into both rendering and logic layers.
 
 ### ✅ Added:
-* **Functional Dice Bridge:** Terningkast utløser nå faktiske spill-effekter.
-* **Loot Table Integration:** Etterforskning kan nå gi faktiske gjenstander fra `constants.ts`.
-* **Monster Spawn Logic:** Lagt til `spawnEnemy` helper.
+* **Enemy Vision Highlight:** Added `selectedEnemyVisionTiles` memo to `GameBoard.tsx` for real-time LoS visualization.
+* **Mythos Awareness:** Updated `App.tsx` logic to acknowledge enemy awareness of players within LoS.
+* **UI Feedback:** Added log messages when investigators enter an enemy's line of sight.
