@@ -1,14 +1,14 @@
 # Project Log - Shadows of the 1920s
 
-## [v3.10.20 - Magic Restoration & Phase Logic Fix] - 2024-05-24 20:30
+## [v3.10.21 - AI & Narrative Foundation] - 2024-05-24 21:45
 ### 🔍 Status Report:
-- **FIXED:** Gjeninnført magisystemet. `handleAction` manglet 'cast' og 'cancel_cast'. Magiske angrep og healing kan nå utføres ved å velge en trylleformel og klikke på et mål.
-- **FIXED:** "End Round"-knappen fungerer nå stabilt. Problemet skyldtes en "race condition" der Mythos-logikken ble sjekket før state-oppdateringen var ferdig. Dette er nå flyttet til en `useEffect`.
-- **RESTORED:** Occultisten starter nå med en tilfeldig trylleformel fra `SPELLS` ved rekruttering.
-- **RESTORED:** Item-logikk for Medkit og Whiskey er lagt til i `handleAction('item')`.
-- **AI IMPROVEMENT:** Mythos-fasen prosesserer nå fiendens bevegelser (stalking) mer pålitelig før den gir turen tilbake til etterforskerne.
+- **NEW: Monster AI Movement:** Fiender beveger seg nå fysisk på brettet i Mythos-fasen. De bruker `findPath` (BFS) for å jakte på den nærmeste etterforskeren.
+- **NEW: Tactical Combat (Enemy Turn):** Fiender som starter sin tur i kontakt med en spiller vil nå angripe automatisk, noe som reduserer etterforskerens HP og Sanity (Horror).
+- **NEW: Gemini Narrative Foundation:** Lagt til `generateNarrative`-funksjonalitet som bruker `gemini-3-flash-preview` for å generere atmosfærisk "flavor text" når nye rom oppdages eller monstre dukker opp.
+- **AUDIT: Enemy Panel:** Verifisert at `EnemyPanel` korrekt viser alle vitale stats (HP, Damage, Horror, Lore) og er fullt integrert i UI.
+- **FIX: Phase Transition:** Sikret at "End Round" trigger `MYTHOS`-fasen korrekt og at AI-prosesserings-logikken kjører ferdig før turen går tilbake til spillerne.
 
 ### ✅ Added:
-* **Spell Targeting:** Klikk på en fiende eller tile mens en spell er aktiv vil nå utløse effekten (skade, healing, reveal).
-* **Mythos Processor:** En dedikert `useEffect` som håndterer overgangen fra mørke til lys.
-* **Consumable Usage:** Spilleren kan nå bruke gjenstander i inventory for å heale seg selv.
+* **AI Pathfinding:** Fiender navigerer rundt hindringer for å nå spillere.
+* **Combat Feedback:** Loggføring av fiendtlige angrep og visuelle effekter (floating text) for skade på spillere.
+* **Narrative Integration:** Automatiske kall til Gemini ved rom-oppdagelse for å forbedre innlevelsen.

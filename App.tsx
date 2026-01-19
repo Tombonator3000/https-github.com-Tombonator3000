@@ -27,7 +27,7 @@ import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.10.20"; 
+const APP_VERSION = "3.10.21"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -123,30 +123,78 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  // Mythos Phase Controller
+  const generateNarrative = async (context: string) => {
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: `Write a short, chilling 1920s Lovecraftian horror flavor text for: ${context}. Keep it under 15 words.`,
+        });
+        if (response.text) {
+            addToLog(`NARRATIVE: ${response.text}`);
+        }
+    } catch (e) {
+        console.warn("Narrative generation failed", e);
+    }
+  };
+
+  // Mythos Phase Controller (Active Monster AI & Combat)
   useEffect(() => {
     if (state.phase === GamePhase.MYTHOS) {
         addToLog("The Mythos awakens. Ancient gears turn in the darkness.");
         
-        // Execute AI movements for all enemies
-        state.enemies.forEach(enemy => {
-            const visiblePlayers = state.players.filter(p => !p.isDead && hasLineOfSight(enemy.position, p.position, state.board, enemy.visionRange));
-            if (visiblePlayers.length > 0) {
-                const nearest = visiblePlayers.sort((a, b) => hexDistance(enemy.position, a.position) - hexDistance(enemy.position, b.position))[0];
-                addToLog(`The ${enemy.name} begins stalking ${nearest.name}...`);
-            }
-        });
+        const processEnemyAI = async () => {
+            let updatedEnemies = [...state.enemies];
+            let updatedPlayers = [...state.players];
 
-        const timer = setTimeout(() => {
-            setState(prev => ({ 
-                ...prev, 
-                phase: GamePhase.INVESTIGATOR, 
-                activePlayerIndex: 0,
-                players: prev.players.map(p => ({ ...p, actions: 2 })) 
-            }));
-            addToLog("A new day breaks... or perhaps just a thinner shroud.");
-        }, 2000);
-        return () => clearTimeout(timer);
+            for (let i = 0; i < updatedEnemies.length; i++) {
+                const enemy = updatedEnemies[i];
+                const alivePlayers = updatedPlayers.filter(p => !p.isDead);
+                if (alivePlayers.length === 0) continue;
+
+                const nearestPlayer = alivePlayers.sort((a, b) => 
+                    hexDistance(enemy.position, a.position) - hexDistance(enemy.position, b.position)
+                )[0];
+
+                const dist = hexDistance(enemy.position, nearestPlayer.position);
+
+                // 1. TACTICAL COMBAT: If in attack range, attack the nearest player
+                if (dist <= enemy.attackRange) {
+                    addToLog(`The ${enemy.name} strikes ${nearestPlayer.name}!`);
+                    addFloatingText(nearestPlayer.position.q, nearestPlayer.position.r, `-${enemy.damage} HP`, "text-red-500");
+                    if (enemy.horror > 0) addFloatingText(nearestPlayer.position.q, nearestPlayer.position.r, `-${enemy.horror} SAN`, "text-purple-500");
+                    triggerScreenShake();
+
+                    updatedPlayers = updatedPlayers.map(p => 
+                        (p.id === nearestPlayer.id) ? { ...p, hp: Math.max(0, p.hp - enemy.damage), sanity: Math.max(0, p.sanity - enemy.horror), isDead: (p.hp - enemy.damage <= 0) } : p
+                    );
+                } 
+                // 2. ACTIVE MOVEMENT: If not in range, move towards the nearest player
+                else {
+                    const enemyBlockers = new Set(updatedEnemies.filter(e => e.id !== enemy.id).map(e => `${e.position.q},${e.position.r}`));
+                    const path = findPath(enemy.position, [nearestPlayer.position], state.board, enemyBlockers, false);
+                    
+                    if (path && path.length > 1) {
+                        addToLog(`The ${enemy.name} stalks closer to ${nearestPlayer.name}...`);
+                        updatedEnemies[i] = { ...enemy, position: path[1] };
+                    }
+                }
+            }
+
+            // Apply updates
+            setTimeout(() => {
+                // FIXED: Removed duplicate 'players' property in the state update object.
+                setState(prev => ({ 
+                    ...prev, 
+                    enemies: updatedEnemies,
+                    phase: GamePhase.INVESTIGATOR, 
+                    activePlayerIndex: 0,
+                    players: updatedPlayers.map(p => ({ ...p, actions: p.isDead ? 0 : 2 })) 
+                }));
+                addToLog("A new day breaks... or perhaps just a thinner shroud.");
+            }, 1500);
+        };
+
+        processEnemyAI();
     }
   }, [state.phase]);
 
@@ -193,6 +241,7 @@ const App: React.FC = () => {
 
       setState(prev => ({ ...prev, enemies: [...prev.enemies, newEnemy] }));
       addToLog(`A ${bestiary.name} emerges from the shadows!`);
+      generateNarrative(`A ${bestiary.name} has appeared nearby.`);
   }, []);
 
   const spawnRoom = useCallback(async (startQ: number, startR: number, tileSet: 'indoor' | 'outdoor' | 'mixed') => {
@@ -236,6 +285,7 @@ const App: React.FC = () => {
               board: [...prev.board, ...newTiles]
           }));
           addToLog(`ROOM: ${roomName}. ${LOCATION_DESCRIPTIONS[roomName] || ""}`);
+          generateNarrative(`Entering the ${roomName}.`);
           
           if (Math.random() > 0.7 && !isConnector) {
               spawnEnemy('cultist', startQ, startR);
@@ -287,7 +337,6 @@ const App: React.FC = () => {
               }));
           } else if (spell.effectType === 'reveal') {
               addToLog(`${activePlayer.name} uses ${spell.name} to peel back the veil.`);
-              // Logic for reveal would go here (e.g. exploring adjacent tiles)
               setState(prev => ({
                 ...prev,
                 players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1, insight: p.insight - spell.cost } : p),
@@ -302,7 +351,6 @@ const App: React.FC = () => {
     if (!activePlayer || activePlayer.actions <= 0 || activePlayer.isDead || state.phase !== GamePhase.INVESTIGATOR) return;
 
     if (state.activeSpell && actionType !== 'cancel_cast') {
-        // Handle targeting for spells
         if (actionType === 'enemy_click') resolveSpell(payload.id, true);
         if (actionType === 'move') resolveSpell('self', false);
         return;
@@ -362,6 +410,10 @@ const App: React.FC = () => {
           const combatDice = 1 + (activePlayer.id === 'veteran' ? 1 : 0);
           const combatRoll = Array.from({ length: combatDice }, () => Math.floor(Math.random() * 6) + 1);
           setState(prev => ({ ...prev, lastDiceRoll: combatRoll, activeCombat: { playerId: activePlayer.id, enemyId: targetEnemy.id } }));
+          break;
+
+      case 'enemy_click':
+          setState(prev => ({...prev, selectedEnemyId: payload.id}));
           break;
 
       case 'cast':
