@@ -1,10 +1,8 @@
 
-import React, { useRef, useEffect, useState } from 'react';
-import { Tile, Player, Enemy, EnemyType, ScenarioModifier } from '../types';
+import React, { useRef, useState } from 'react';
+import { Tile, Player, Enemy, ScenarioModifier } from '../types';
 import { 
-  User, Skull, DoorOpen, Lock, Flame, Hammer, Sparkles, Ghost,
-  CloudFog, Zap, Fish, PawPrint, Biohazard, Bug, ShoppingBag, MapPin,
-  Building, Ghost as TrapIcon, BookOpen, Church, Anchor
+  User, MapPin, DoorOpen, BookOpen, Church, Anchor, Building 
 } from 'lucide-react';
 
 interface GameBoardProps {
@@ -16,7 +14,7 @@ interface GameBoardProps {
   activeModifiers?: ScenarioModifier[];
 }
 
-const HEX_SIZE = 100;
+const HEX_SIZE = 110;
 
 const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
   const n = name.toLowerCase();
@@ -30,9 +28,9 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
   return { bg: 'bg-[#262626]', stroke: '#525252', Icon: Building, color: 'text-stone-500' };
 };
 
-const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileClick, activeModifiers = [] }) => {
-  const [scale, setScale] = useState(0.8);
-  const [position, setPosition] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileClick }) => {
+  const [scale, setScale] = useState(0.85);
+  const [position, setPosition] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 - 50 });
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
 
@@ -54,6 +52,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileCl
         style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, transition: isDragging.current ? 'none' : 'transform 0.1s ease-out' }} 
         className="absolute top-0 left-0"
       >
+        {/* Render Tiles */}
         {tiles.map(tile => {
           const { x, y } = hexToPixel(tile.q, tile.r);
           const visuals = getTileVisuals(tile.name, tile.type);
@@ -62,23 +61,56 @@ const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileCl
               key={tile.id} 
               className="absolute flex items-center justify-center cursor-pointer group" 
               style={{ width: `${HEX_SIZE * 2}px`, height: `${HEX_SIZE * 1.732}px`, left: `${x - HEX_SIZE}px`, top: `${y - HEX_SIZE * 0.866}px` }} 
-              onClick={() => onTileClick(tile.q, tile.r)}
+              onClick={(e) => {
+                  e.stopPropagation();
+                  onTileClick(tile.q, tile.r);
+              }}
             >
               <div className={`absolute inset-0 hex-clip transition-all duration-300 ${visuals.bg} border-2 border-[${visuals.stroke}] group-hover:brightness-125 shadow-2xl`}>
-                 <div className="absolute inset-0 flex flex-col items-center justify-center opacity-30 group-hover:opacity-60 transition-opacity">
-                    <visuals.Icon className={visuals.color} size={40} />
-                    <span className="text-[8px] uppercase tracking-tighter text-white font-bold mt-1 text-center px-4 leading-none">{tile.name}</span>
+                 <div className="absolute inset-0 flex flex-col items-center justify-center opacity-40 group-hover:opacity-80 transition-opacity">
+                    <visuals.Icon className={visuals.color} size={44} />
+                    <span className="text-[10px] uppercase tracking-tighter text-white font-bold mt-2 text-center px-4 leading-none drop-shadow-md">{tile.name}</span>
                  </div>
               </div>
             </div>
           );
         })}
 
+        {/* Possible movement indicators (neighbor tiles) */}
+        {players.length > 0 && (
+            (() => {
+                const p = players[0].position;
+                const neighbors = [
+                    {q: p.q + 1, r: p.r}, {q: p.q - 1, r: p.r},
+                    {q: p.q, r: p.r + 1}, {q: p.q, r: p.r - 1},
+                    {q: p.q + 1, r: p.r - 1}, {q: p.q - 1, r: p.r + 1}
+                ];
+                return neighbors.map((n, i) => {
+                    const { x, y } = hexToPixel(n.q, n.r);
+                    const alreadyExists = tiles.find(t => t.q === n.q && t.r === n.r);
+                    if (alreadyExists) return null;
+                    return (
+                        <div 
+                            key={`neighbor-${i}`} 
+                            className="absolute flex items-center justify-center cursor-pointer group animate-pulse" 
+                            style={{ width: `${HEX_SIZE * 2}px`, height: `${HEX_SIZE * 1.732}px`, left: `${x - HEX_SIZE}px`, top: `${y - HEX_SIZE * 0.866}px` }} 
+                            onClick={() => onTileClick(n.q, n.r)}
+                        >
+                            <div className="absolute inset-0 hex-clip bg-white/5 border-2 border-dashed border-white/20 group-hover:bg-white/10 group-hover:border-white/40">
+                                <span className="text-white/20 uppercase text-[10px] font-bold">Utforsk</span>
+                            </div>
+                        </div>
+                    );
+                });
+            })()
+        )}
+
+        {/* Render Players */}
         {players.map(player => {
             const { x, y } = hexToPixel(player.position.q, player.position.r);
             return (
-                <div key={player.id} className="absolute w-14 h-14 rounded-full border-4 border-white shadow-[0_0_25px_rgba(255,255,255,0.6)] flex items-center justify-center bg-[#1a1a2e] z-50 transition-all duration-500" style={{ left: `${x - 28}px`, top: `${y - 28}px` }}>
-                    {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-cover rounded-full" /> : <User className="text-white" size={24} />}
+                <div key={player.id} className="absolute w-16 h-16 rounded-full border-4 border-white shadow-[0_0_30px_rgba(255,255,255,0.7)] flex items-center justify-center bg-[#1a1a2e] z-50 transition-all duration-500" style={{ left: `${x - 32}px`, top: `${y - 32}px` }}>
+                    {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-cover rounded-full" /> : <User className="text-white" size={32} />}
                 </div>
             );
         })}
