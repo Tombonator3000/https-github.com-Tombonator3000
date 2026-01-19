@@ -6,7 +6,7 @@ import {
   Skull, ChevronRight, ChevronLeft, RotateCcw, Minimize2, ScrollText, Target, FolderOpen, 
   ArrowLeft, Users, Star, Trash2, Edit2, ShoppingBag, Book, CloudFog, Zap, 
   User, Save, MapPin, CheckCircle, HelpCircle, FileText, History, Heart, Brain, Settings, Edit3,
-  Hammer, Wind, Lock, Flame
+  Hammer, Wind, Lock, Flame, Sparkles
 } from 'lucide-react';
 import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, ContextAction, SavedInvestigator, Item, Spell, Trait, GameSettings, ScenarioStep, DoomEvent, EnemyType, VictoryType, FloatingText, Madness } from './types';
 import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS, BESTIARY, INDOOR_CONNECTORS, OUTDOOR_CONNECTORS, SCENARIO_MODIFIERS, TRAIT_POOL, LOCATION_DESCRIPTIONS } from './constants';
@@ -28,7 +28,7 @@ import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.10.24"; 
+const APP_VERSION = "3.10.25"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -70,7 +70,7 @@ const formatLogEntry = (entry: string) => {
         { regex: /(sanity|sinnslidelse|madness|galskap)/gi, color: 'text-purple-400 font-bold' },
         { regex: /(insight|clue|hint)/gi, color: 'text-blue-400 font-bold' },
         { regex: /(heal|hp|liv)/gi, color: 'text-green-400 font-bold' },
-        { regex: /(suksess|success|unlocked|klarte|traff)/gi, color: 'text-green-300 font-bold uppercase' },
+        { regex: /(suksess|success|unlocked|klarte|traff|cleared)/gi, color: 'text-green-300 font-bold uppercase' },
         { regex: /(failed|mislyktes|bommet)/gi, color: 'text-orange-400 font-bold' },
         { regex: /(item|gjenstand|found)/gi, color: 'text-amber-400 font-bold' },
         { regex: /(doom|dommedag)/gi, color: 'text-[#e94560] font-black uppercase' },
@@ -226,7 +226,8 @@ const App: React.FC = () => {
       if (player.sanity <= 0 && !player.activeMadness) {
           const newMadness = MADNESS_CONDITIONS[Math.floor(Math.random() * MADNESS_CONDITIONS.length)];
           addToLog(`${player.name} has cracked. Madness sets in: ${newMadness.name}!`);
-          addFloatingText(player.position.q, player.position.r, "BROKEN MIND", "text-purple-600 font-black");
+          addFloatingText(player.position.q, player.position.r, "MENTAL BREAK", "text-purple-600 font-black");
+          triggerScreenShake();
           return { ...player, sanity: Math.floor(player.maxSanity / 2), activeMadness: newMadness, madness: [...player.madness, newMadness.id] };
       }
       return player;
@@ -270,20 +271,25 @@ const App: React.FC = () => {
       
       const newTiles: Tile[] = [];
 
-      // IMMEDIATE UPDATE: Add tiles to the board WITHOUT images first to prevent "void" exploration blocks
-      shape.forEach(offset => {
+      shape.forEach((offset, idx) => {
           const q = startQ + offset.q;
           const r = startR + offset.r;
           
           if (!state.board.some(t => t.q === q && t.r === r)) {
               let object: TileObjectType | undefined = undefined;
               let blocking = false;
+              let skill: 'strength' | 'insight' | 'agility' | undefined = undefined;
 
-              if (tileSet === 'indoor' && Math.random() > 0.6) {
+              // Tactical Obstacle logic: First tile of a cluster is often a "Gate"
+              if (idx === 0 && Math.random() > 0.4) {
                   const roll = Math.random();
-                  if (roll > 0.8) { object = 'locked_door'; blocking = true; }
-                  else if (roll > 0.6) { object = 'rubble'; blocking = true; }
-                  else if (roll > 0.5) { object = 'fire'; blocking = true; }
+                  if (roll > 0.7) { 
+                      object = 'locked_door'; blocking = true; skill = 'insight';
+                  } else if (roll > 0.4) { 
+                      object = 'rubble'; blocking = true; skill = 'strength';
+                  } else {
+                      object = 'fire'; blocking = true; skill = 'agility';
+                  }
               }
 
               newTiles.push({
@@ -296,7 +302,13 @@ const App: React.FC = () => {
                   explored: true,
                   searchable: !isConnector,
                   searched: false,
-                  object: object ? { type: object, searched: false, blocking, difficulty: 4 } : undefined
+                  object: object ? { 
+                      type: object, 
+                      searched: false, 
+                      blocking, 
+                      difficulty: 4, 
+                      reqSkill: skill 
+                  } : undefined
               });
           }
       });
@@ -307,7 +319,6 @@ const App: React.FC = () => {
           
           if (Math.random() > 0.8) spawnEnemy('cultist', startQ, startR);
 
-          // ASYNC ENHANCEMENT: Generate the image after the board is physically updated
           const imageUrl = await generateLocationAsset(roomName, isConnector ? 'street' : 'room');
           if (imageUrl) {
               setState(prev => ({
@@ -353,11 +364,14 @@ const App: React.FC = () => {
         const tile = state.board.find(t => t.id === state.selectedTileId);
         if (!tile || !tile.object) return;
 
-        const skillRoll = Array.from({ length: 1 + activePlayer.insight }, () => Math.floor(Math.random() * 6) + 1);
-        const successes = skillRoll.filter(v => v >= 4).length;
+        // Determine which skill to use
+        const skill = tile.object.reqSkill || 'insight';
+        const skillValue = skill === 'strength' ? 1 : activePlayer.insight; // Simplified logic
+        const skillRoll = Array.from({ length: 1 + skillValue }, () => Math.floor(Math.random() * 6) + 1);
+        const successes = skillRoll.filter(v => v >= (tile.object?.difficulty || 4)).length;
 
         if (successes >= 1) {
-            addToLog(`CLEARED: ${tile.object.type} removed!`);
+            addToLog(`SUCCESS: ${tile.object.type} cleared!`);
             addFloatingText(tile.q, tile.r, "CLEARED", "text-green-400 font-bold");
             setState(prev => ({
                 ...prev,
@@ -366,7 +380,7 @@ const App: React.FC = () => {
                 selectedTileId: null
             }));
         } else {
-            addToLog(`FAILURE: Path remains blocked.`);
+            addToLog(`FAILURE: The path remains firm. (-1 Sanity)`);
             setState(prev => ({
                 ...prev,
                 players: prev.players.map((p, i) => i === prev.activePlayerIndex ? checkMadness({ ...p, actions: p.actions - 1, sanity: Math.max(0, p.sanity - 1) }) : p),
@@ -376,6 +390,10 @@ const App: React.FC = () => {
         break;
 
       case 'rest':
+          if (activePlayer.activeMadness?.id === 'm2') { // Paranoia prevents resting
+              addToLog("The shadows won't stop whispering. You cannot rest!");
+              return;
+          }
           setState(prev => ({
               ...prev,
               players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, hp: Math.min(p.maxHp, p.hp + 1), sanity: Math.min(p.maxSanity, p.sanity + 1), actions: p.actions - 1 } : p)
@@ -532,6 +550,25 @@ const App: React.FC = () => {
   const selectedEnemy = state.enemies.find(e => e.id === state.selectedEnemyId);
   const selectedTile = state.board.find(t => t.id === state.selectedTileId);
 
+  // Helper to determine contextual action label and icon
+  const getContextAction = (): ContextAction | null => {
+      if (!selectedTile?.object?.blocking) return null;
+      const type = selectedTile.object.type;
+      const skill = selectedTile.object.reqSkill || 'insight';
+      
+      let label = "Clear Obstacle";
+      if (type === 'locked_door') label = "Pick Lock";
+      if (type === 'rubble') label = "Bash Debris";
+      if (type === 'fire') label = "Extinguish";
+
+      return {
+          id: 'interact',
+          label,
+          iconType: skill,
+          difficulty: selectedTile.object.difficulty || 4
+      };
+  };
+
   return (
     <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative transition-all duration-1000 ${state.screenShake ? 'animate-shake' : ''} ${activePlayer?.activeMadness?.visualClass || ''}`}>
       
@@ -648,7 +685,7 @@ const App: React.FC = () => {
                     onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} 
                     showInfo={showRightPanel} 
                     onToggleInfo={() => setShowRightPanel(!showRightPanel)} 
-                    contextAction={selectedTile?.object?.blocking ? { id: 'interact', label: `Break ${selectedTile.object.type}`, iconType: 'strength', difficulty: 4 } : null}
+                    contextAction={getContextAction()}
                 />
                 <button onClick={handleNextTurn} className="px-8 py-4 bg-[#e94560] text-white font-bold rounded-xl uppercase tracking-widest hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_#e94560]">
                     {state.activePlayerIndex === state.players.length - 1 ? "End Round" : "Next Turn"}
