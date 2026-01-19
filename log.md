@@ -1,5 +1,36 @@
 # Project Log - Shadows of the 1920s
 
+## [v3.10.28 - GitHub Pages Startup Fix] - 2026-01-19
+
+### Problem:
+Spillet viste tom/svart side pa GitHub Pages (tombonator3000.github.io/https-github.com-Tombonator3000/).
+Kun Tailwind CSS advarsel i konsollen.
+
+### Identifiserte Problemer:
+1. **Manglende script tag i index.html** - Vite trenger `<script type="module" src="/index.tsx">` for a laste appen
+2. **Manglende package-lock.json** - GitHub Actions `npm ci` feiler uten denne filen
+
+### Utforte Fikser:
+1. **index.html**: Lagt til `<script type="module" src="/index.tsx"></script>` i body
+2. **package-lock.json**: Generert via `npm install`
+3. **Vite build verifisert**: Bygger korrekt til `/dist` med riktig base URL
+
+### Build Output:
+```
+vite v6.4.1 building for production...
+✓ 1715 modules transformed
+dist/index.html                  8.11 kB
+dist/assets/index-BGqO6tu1.js  554.77 kB
+✓ built in 6.45s
+```
+
+### Neste Steg:
+1. Push endringer til main branch
+2. GitHub Actions vil automatisk bygge og deploye
+3. Verifiser at spillet laster pa tombonator3000.github.io
+
+---
+
 ## [v3.10.27 - GitHub Pages Deployment & Asset Pipeline] - 2026-01-19
 
 ### Dagens oppgaver:
