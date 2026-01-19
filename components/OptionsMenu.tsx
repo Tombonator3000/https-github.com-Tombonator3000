@@ -5,7 +5,10 @@ import {
     Download, RefreshCw, Volume2, Speaker, Zap, Eye, Grid, Activity, VolumeX, Save,
     Contrast, Wind, Sparkles, AlertOctagon
 } from 'lucide-react';
-import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary, getMissingAssets, downloadAssetsAsJSON } from '../utils/AssetLibrary';
+import { 
+    loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary, 
+    getMissingAssets, downloadAssetsAsJSON, getCharacterVisual, getEnemyVisual 
+} from '../utils/AssetLibrary';
 import { INDOOR_LOCATIONS, ALL_LOCATIONS_FULL, BESTIARY, CHARACTERS } from '../constants';
 import { GameSettings, EnemyType, CharacterType } from '../types';
 import { loadSettings, saveSettings } from '../utils/Settings';
@@ -21,10 +24,8 @@ type Tab = 'audio' | 'display' | 'gameplay' | 'assets' | 'data';
 const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdateSettings }) => {
   const [activeTab, setActiveTab] = useState<Tab>('audio');
   const [settings, setSettings] = useState<GameSettings>(loadSettings());
-  
   const [confirmReset, setConfirmReset] = useState(false);
   
-  // Asset Gen State
   const [isGenerating, setIsGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
   const [currentGenItem, setCurrentGenItem] = useState('');
@@ -71,14 +72,18 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
 
       for (let i = 0; i < totalToGen; i++) {
           const key = missing[i];
-          setCurrentGenItem(key);
           setGenProgress(Math.round(((i) / totalToGen) * 100));
           
           let img = null;
           try {
             if (Object.keys(BESTIARY).includes(key)) {
-                img = await generateLocationAsset(key, 'room'); 
+                setCurrentGenItem(`Monster: ${key}`);
+                img = await getEnemyVisual(key); 
+            } else if (Object.keys(CHARACTERS).includes(key)) {
+                setCurrentGenItem(`Investigator: ${key}`);
+                img = await getCharacterVisual(key);
             } else {
+                setCurrentGenItem(`Location: ${key}`);
                 const isIndoor = INDOOR_LOCATIONS.includes(key);
                 img = await generateLocationAsset(key, isIndoor ? 'room' : 'street');
             }
@@ -92,12 +97,13 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
           } else {
               setGenErrors(prev => prev + 1);
           }
-          await new Promise(r => setTimeout(r, 800)); // Slightly faster but safe delay
+          // Sequential delay to prevent rate limiting
+          await new Promise(r => setTimeout(r, 600)); 
       }
 
       setGenProgress(100);
       setIsGenerating(false);
-      setCurrentGenItem('Complete!');
+      setCurrentGenItem('Complete');
   };
 
   const TabButton = ({ id, label, icon: Icon }: { id: Tab, label: string, icon: any }) => (
@@ -245,7 +251,7 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
             {activeTab === 'assets' && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
                     <div className="flex justify-between items-end mb-4 border-b border-slate-800 pb-2">
-                        <h3 className="text-xl font-bold text-amber-500 uppercase tracking-widest">Generative Art Pipeline</h3>
+                        <h3 className="text-xl font-bold text-amber-500 uppercase tracking-widest">Asset Studio</h3>
                         <div className="text-right">
                           <span className="text-xs text-slate-400 block">{assetRegistry.generated} / {assetRegistry.total} Assets</span>
                           {genErrors > 0 && <span className="text-[10px] text-red-500 uppercase font-bold tracking-widest flex items-center gap-1 justify-end"><AlertOctagon size={10}/> {genErrors} Failures</span>}
@@ -256,7 +262,7 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
                         {isGenerating ? (
                             <div className="space-y-3">
                                 <div className="flex justify-between text-xs text-amber-400 font-bold uppercase">
-                                    <span className="flex items-center gap-2 animate-pulse"><Loader size={12} className="animate-spin"/> Painting: {currentGenItem}...</span>
+                                    <span className="flex items-center gap-2 animate-pulse"><Loader size={12} className="animate-spin"/> Painting {currentGenItem}...</span>
                                     <span>{genProgress}%</span>
                                 </div>
                                 <div className="h-4 bg-slate-900 rounded-full overflow-hidden border border-amber-900/50">
@@ -266,7 +272,7 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
                         ) : (
                             <div className="flex flex-col gap-4">
                                 <p className="text-xs text-slate-400 leading-relaxed">
-                                    Indexing Lokasjoner, Monstre og Karakterer. Assets lagres i nettleserens cache.
+                                    Generate high-quality 1920s Chiaroscuro oil-painted assets. Missing items will be rendered and cached in your browser.
                                 </p>
                                 <div className="flex gap-4">
                                     {assetRegistry.missing.length > 0 ? (
@@ -274,11 +280,11 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
                                             onClick={handleGenerateAssets}
                                             className="flex-1 py-3 bg-amber-700 hover:bg-amber-600 text-white uppercase tracking-widest font-bold text-xs rounded shadow-lg"
                                         >
-                                            <RefreshCw size={14} className="inline mr-2" /> Generate {assetRegistry.missing.length} Missing
+                                            <RefreshCw size={14} className="inline mr-2" /> Paint {assetRegistry.missing.length} Missing
                                         </button>
                                     ) : (
                                         <div className="flex-1 py-3 bg-green-900/20 border border-green-600/50 text-green-400 uppercase tracking-widest font-bold text-xs rounded text-center">
-                                            <CheckCircle size={14} className="inline mr-2" /> Library Complete
+                                            <CheckCircle size={14} className="inline mr-2" /> Gallery Complete
                                         </div>
                                     )}
                                     

@@ -29,10 +29,7 @@ const EnemyPanel: React.FC<EnemyPanelProps> = ({ enemy, onClose }) => {
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar relative">
-        {/* CSS leather texture pattern */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
-          background: 'repeating-linear-gradient(45deg, rgba(139,90,43,0.1) 0px, transparent 2px, transparent 4px)'
-        }}></div>
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/leather.png')] opacity-10 pointer-events-none"></div>
         
         {enemy.imageUrl && (
             <div className="w-full h-48 bg-black relative shrink-0">

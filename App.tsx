@@ -27,22 +27,6 @@ import { loadSettings, DEFAULT_SETTINGS } from './utils/Settings';
 import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
-const APP_VERSION = "3.10.32";
-
-// Lazy-initialize AI to prevent crash when API_KEY is undefined (e.g., on GitHub Pages)
-let _ai: GoogleGenAI | null = null;
-const getAI = (): GoogleGenAI | null => {
-    if (_ai) return _ai;
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) return null;
-    try {
-        _ai = new GoogleGenAI({ apiKey });
-        return _ai;
-    } catch (e) {
-        console.warn("Failed to initialize GoogleGenAI:", e);
-        return null;
-    }
-}; 
 const APP_VERSION = "3.10.26"; 
 
 const DEFAULT_STATE: GameState = {
