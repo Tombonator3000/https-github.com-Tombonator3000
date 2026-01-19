@@ -27,7 +27,7 @@ import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.10.19"; 
+const APP_VERSION = "3.10.20"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -74,7 +74,8 @@ const formatLogEntry = (entry: string) => {
         { regex: /(item|gjenstand|found)/gi, color: 'text-amber-400 font-bold' },
         { regex: /(doom|dommedag)/gi, color: 'text-[#e94560] font-black uppercase' },
         { regex: /(ENTERED:|LOCATION:|ROOM:)/gi, color: 'text-[#eecfa1] font-bold tracking-widest' },
-        { regex: /(VISIBLE|SIGHT|EYES)/gi, color: 'text-red-300 font-bold' }
+        { regex: /(VISIBLE|SIGHT|EYES)/gi, color: 'text-red-300 font-bold' },
+        { regex: /(SPELL|MAGI|ARCANE|GRIMOIRE)/gi, color: 'text-purple-300 font-bold' }
     ];
 
     const parts = entry.split(/(\s+)/);
@@ -121,6 +122,33 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  // Mythos Phase Controller
+  useEffect(() => {
+    if (state.phase === GamePhase.MYTHOS) {
+        addToLog("The Mythos awakens. Ancient gears turn in the darkness.");
+        
+        // Execute AI movements for all enemies
+        state.enemies.forEach(enemy => {
+            const visiblePlayers = state.players.filter(p => !p.isDead && hasLineOfSight(enemy.position, p.position, state.board, enemy.visionRange));
+            if (visiblePlayers.length > 0) {
+                const nearest = visiblePlayers.sort((a, b) => hexDistance(enemy.position, a.position) - hexDistance(enemy.position, b.position))[0];
+                addToLog(`The ${enemy.name} begins stalking ${nearest.name}...`);
+            }
+        });
+
+        const timer = setTimeout(() => {
+            setState(prev => ({ 
+                ...prev, 
+                phase: GamePhase.INVESTIGATOR, 
+                activePlayerIndex: 0,
+                players: prev.players.map(p => ({ ...p, actions: 2 })) 
+            }));
+            addToLog("A new day breaks... or perhaps just a thinner shroud.");
+        }, 2000);
+        return () => clearTimeout(timer);
+    }
+  }, [state.phase]);
 
   const addToLog = (message: string) => {
     setState(prev => ({ ...prev, log: [`[${new Date().toLocaleTimeString()}] ${message}`, ...prev.log].slice(0, 50) }));
@@ -215,9 +243,70 @@ const App: React.FC = () => {
       }
   }, [state.board, spawnEnemy]);
 
+  const resolveSpell = (targetId: string, isEnemy: boolean) => {
+      const activePlayer = state.players[state.activePlayerIndex];
+      const spell = state.activeSpell;
+      if (!activePlayer || !spell) return;
+
+      if (activePlayer.insight < spell.cost) {
+          addToLog("Not enough Insight to cast this spell!");
+          setState(prev => ({ ...prev, activeSpell: null }));
+          return;
+      }
+
+      if (isEnemy) {
+          const enemy = state.enemies.find(e => e.id === targetId);
+          if (!enemy) return;
+          const dist = hexDistance(activePlayer.position, enemy.position);
+          if (dist > spell.range && spell.range > 0) {
+              addToLog("Target is too far away for this spell!");
+              return;
+          }
+
+          if (spell.effectType === 'damage') {
+              addToLog(`${activePlayer.name} casts ${spell.name} on ${enemy.name}!`);
+              addFloatingText(enemy.position.q, enemy.position.r, `-${spell.value} (ARCANE)`, "text-purple-400");
+              triggerScreenShake();
+              setState(prev => ({
+                  ...prev,
+                  enemies: prev.enemies.map(e => e.id === enemy.id ? { ...e, hp: e.hp - spell.value } : e).filter(e => e.hp > 0),
+                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1, insight: p.insight - spell.cost } : p),
+                  activeSpell: null
+              }));
+              if (enemy.hp - spell.value <= 0) addToLog(`${enemy.name} was banished back to the void!`);
+          }
+      } else {
+          // Self or Tile targeting
+          if (spell.effectType === 'heal') {
+              addToLog(`${activePlayer.name} weaves ${spell.name}...`);
+              addFloatingText(activePlayer.position.q, activePlayer.position.r, `+${spell.value} HP`, "text-green-400");
+              setState(prev => ({
+                  ...prev,
+                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, hp: Math.min(p.maxHp, p.hp + spell.value), actions: p.actions - 1, insight: p.insight - spell.cost } : p),
+                  activeSpell: null
+              }));
+          } else if (spell.effectType === 'reveal') {
+              addToLog(`${activePlayer.name} uses ${spell.name} to peel back the veil.`);
+              // Logic for reveal would go here (e.g. exploring adjacent tiles)
+              setState(prev => ({
+                ...prev,
+                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1, insight: p.insight - spell.cost } : p),
+                activeSpell: null
+              }));
+          }
+      }
+  };
+
   const handleAction = (actionType: string, payload?: any) => {
     const activePlayer = state.players[state.activePlayerIndex];
     if (!activePlayer || activePlayer.actions <= 0 || activePlayer.isDead || state.phase !== GamePhase.INVESTIGATOR) return;
+
+    if (state.activeSpell && actionType !== 'cancel_cast') {
+        // Handle targeting for spells
+        if (actionType === 'enemy_click') resolveSpell(payload.id, true);
+        if (actionType === 'move') resolveSpell('self', false);
+        return;
+    }
 
     switch (actionType) {
       case 'move':
@@ -273,6 +362,35 @@ const App: React.FC = () => {
           const combatDice = 1 + (activePlayer.id === 'veteran' ? 1 : 0);
           const combatRoll = Array.from({ length: combatDice }, () => Math.floor(Math.random() * 6) + 1);
           setState(prev => ({ ...prev, lastDiceRoll: combatRoll, activeCombat: { playerId: activePlayer.id, enemyId: targetEnemy.id } }));
+          break;
+
+      case 'cast':
+          setState(prev => ({ ...prev, activeSpell: payload }));
+          addToLog(`Selecting target for ${payload.name}...`);
+          break;
+
+      case 'cancel_cast':
+          setState(prev => ({ ...prev, activeSpell: null }));
+          break;
+
+      case 'item':
+          const medkit = activePlayer.inventory.find(i => i.id === 'med');
+          const whiskey = activePlayer.inventory.find(i => i.id === 'whiskey');
+          if (medkit) {
+              addToLog(`${activePlayer.name} uses a Medical Kit.`);
+              setState(prev => ({
+                  ...prev,
+                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, hp: Math.min(p.maxHp, p.hp + 2), inventory: p.inventory.filter(item => item !== medkit), actions: p.actions - 1 } : p)
+              }));
+          } else if (whiskey) {
+              addToLog(`${activePlayer.name} takes a swig of Old Whiskey.`);
+              setState(prev => ({
+                  ...prev,
+                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, sanity: Math.min(p.maxSanity, p.sanity + 2), inventory: p.inventory.filter(item => item !== whiskey), actions: p.actions - 1 } : p)
+              }));
+          } else {
+              addToLog("No usable items in inventory.");
+          }
           break;
     }
   };
@@ -347,26 +465,12 @@ const App: React.FC = () => {
                   phase: GamePhase.MYTHOS, 
                   activePlayerIndex: 0,
                   doom: prev.doom - 1,
-                  round: prev.round + 1
+                  round: prev.round + 1,
+                  activeSpell: null
               };
           }
-          return { ...prev, activePlayerIndex: nextIndex };
+          return { ...prev, activePlayerIndex: nextIndex, activeSpell: null };
       });
-
-      if (state.phase === GamePhase.MYTHOS) {
-          state.enemies.forEach(enemy => {
-              const visiblePlayers = state.players.filter(p => !p.isDead && hasLineOfSight(enemy.position, p.position, state.board, enemy.visionRange));
-              if (visiblePlayers.length > 0) {
-                  const nearest = visiblePlayers.sort((a, b) => hexDistance(enemy.position, a.position) - hexDistance(enemy.position, b.position))[0];
-                  addToLog(`The ${enemy.name} begins stalking ${nearest.name}...`);
-              }
-          });
-
-          setTimeout(() => {
-              setState(prev => ({ ...prev, phase: GamePhase.INVESTIGATOR, players: prev.players.map(p => ({ ...p, actions: 2 })) }));
-              addToLog("The sun sets. The investigator's resolve is tested.");
-          }, 2000);
-      }
   };
 
   const selectScenario = (scenario: Scenario) => { 
@@ -387,7 +491,13 @@ const App: React.FC = () => {
       if (existing) return { ...prev, players: prev.players.filter(p => p !== existing) };
       if (prev.players.length >= 4) return prev;
       const char = CHARACTERS[type];
-      return { ...prev, players: [...prev.players, { ...char, position: { q: 0, r: 0 }, inventory: [], spells: [], actions: 2, isDead: false, madness: [], activeMadness: null, traits: [] }] };
+      
+      const startingSpells: Spell[] = [];
+      if (type === 'occultist') {
+          startingSpells.push(SPELLS[Math.floor(Math.random() * SPELLS.length)]);
+      }
+
+      return { ...prev, players: [...prev.players, { ...char, position: { q: 0, r: 0 }, inventory: [], spells: startingSpells, actions: 2, isDead: false, madness: [], activeMadness: null, traits: [] }] };
     });
   };
 
@@ -473,7 +583,7 @@ const App: React.FC = () => {
             </div>
 
             <div className="absolute inset-0 z-0">
-                <GameBoard tiles={state.board} players={state.players} enemies={state.enemies} selectedEnemyId={state.selectedEnemyId} onTileClick={(q, r) => handleAction('move', { q, r })} onEnemyClick={(id) => setState(prev => ({...prev, selectedEnemyId: id}))} floatingTexts={state.floatingTexts} doom={state.doom} activeModifiers={state.activeModifiers} />
+                <GameBoard tiles={state.board} players={state.players} enemies={state.enemies} selectedEnemyId={state.selectedEnemyId} onTileClick={(q, r) => handleAction('move', { q, r })} onEnemyClick={(id) => handleAction('enemy_click', { id })} floatingTexts={state.floatingTexts} doom={state.doom} activeModifiers={state.activeModifiers} />
             </div>
 
             {activePlayer && (
@@ -501,7 +611,7 @@ const App: React.FC = () => {
             <footer className="fixed bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black to-transparent z-50 flex items-center justify-center gap-4 px-4 pb-4">
                 <ActionBar onAction={handleAction} actionsRemaining={activePlayer?.actions || 0} isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} spells={activePlayer?.spells || []} activeSpell={state.activeSpell} showCharacter={showLeftPanel} onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} showInfo={showRightPanel} onToggleInfo={() => setShowRightPanel(!showRightPanel)} />
                 <button onClick={handleNextTurn} className="px-8 py-4 bg-[#e94560] text-white font-bold rounded-xl uppercase tracking-widest hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_#e94560]">
-                    {state.activePlayerIndex === state.players.length - 1 ? "End Round" : "Next"}
+                    {state.activePlayerIndex === state.players.length - 1 ? "End Round" : "Next Turn"}
                 </button>
             </footer>
           </>

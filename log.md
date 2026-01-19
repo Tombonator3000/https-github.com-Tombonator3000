@@ -1,16 +1,14 @@
 # Project Log - Shadows of the 1920s
 
-## [v3.10.19 - Atmospheric Restoration & Lighting Audit] - 2024-05-24 19:15
+## [v3.10.20 - Magic Restoration & Phase Logic Fix] - 2024-05-24 20:30
 ### 🔍 Status Report:
-- **AUDIT:** Deep dive into the rendering layers of `GameBoard.tsx`. Found that lighting effects were present but lacked "layer depth" and subtle animations that define the horror atmosphere.
-- **RESTORED:** Dynamic "Dark Clouds" layer that drifts across the board, scaling with the Doom level.
-- **ENHANCED:** The "Lantern Effect" for investigators is now more reactive and visually prominent, providing a small radius of warm light in the cold dark.
-- **ENHANCED:** Doom-based lighting now includes a tightening vignette. As Doom drops, the "darkness" physically encroaches on the screen.
-- **FIXED:** Screen shake logic integrated into combat resolution. Taking or dealing significant damage now triggers physical feedback.
-- **FIXED:** Restored "Spooky Pulse" and "Doom Flicker" to the board background for low-doom scenarios.
+- **FIXED:** Gjeninnført magisystemet. `handleAction` manglet 'cast' og 'cancel_cast'. Magiske angrep og healing kan nå utføres ved å velge en trylleformel og klikke på et mål.
+- **FIXED:** "End Round"-knappen fungerer nå stabilt. Problemet skyldtes en "race condition" der Mythos-logikken ble sjekket før state-oppdateringen var ferdig. Dette er nå flyttet til en `useEffect`.
+- **RESTORED:** Occultisten starter nå med en tilfeldig trylleformel fra `SPELLS` ved rekruttering.
+- **RESTORED:** Item-logikk for Medkit og Whiskey er lagt til i `handleAction('item')`.
+- **AI IMPROVEMENT:** Mythos-fasen prosesserer nå fiendens bevegelser (stalking) mer pålitelig før den gir turen tilbake til etterforskerne.
 
 ### ✅ Added:
-* **Cloud Drift System:** Multi-layered CSS animations for atmospheric fog and clouds.
-* **Tightening Vignette:** Procedural shadow overlay that reacts to `state.doom`.
-* **Combat Feedback:** `screenShake` triggers on combat events.
-* **Madness Visuals:** Verified and polished the connection between `activeMadness` and global CSS filters.
+* **Spell Targeting:** Klikk på en fiende eller tile mens en spell er aktiv vil nå utløse effekten (skade, healing, reveal).
+* **Mythos Processor:** En dedikert `useEffect` som håndterer overgangen fra mørke til lys.
+* **Consumable Usage:** Spilleren kan nå bruke gjenstander i inventory for å heale seg selv.
