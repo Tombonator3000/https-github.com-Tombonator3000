@@ -28,7 +28,7 @@ import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.10.23"; 
+const APP_VERSION = "3.10.24"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -171,7 +171,7 @@ const App: React.FC = () => {
                             const newSanity = Math.max(0, p.sanity - enemy.horror);
                             const isDead = newHp <= 0;
                             if (isDead) addToLog(`${p.name} has fallen to the darkness...`);
-                            return { ...p, hp: newHp, sanity: newSanity, isDead };
+                            return checkMadness({ ...p, hp: newHp, sanity: newSanity, isDead });
                         }
                         return p;
                     });
@@ -181,13 +181,11 @@ const App: React.FC = () => {
                     const path = findPath(enemy.position, [nearestPlayer.position], state.board, enemyBlockers, false);
                     
                     if (path && path.length > 1) {
-                        addToLog(`The ${enemy.name} stalks closer to ${nearestPlayer.name}...`);
                         updatedEnemies[i] = { ...enemy, position: path[1] };
                     }
                 }
             }
 
-            // Apply updates
             setTimeout(() => {
                 setState(prev => ({ 
                     ...prev, 
@@ -196,8 +194,8 @@ const App: React.FC = () => {
                     activePlayerIndex: 0,
                     players: updatedPlayers.map(p => ({ ...p, actions: p.isDead ? 0 : 2 })) 
                 }));
-                addToLog("A new day breaks... or perhaps just a thinner shroud.");
-            }, 1500);
+                addToLog("A new day breaks...");
+            }, 1000);
         };
 
         processEnemyAI();
@@ -228,7 +226,7 @@ const App: React.FC = () => {
       if (player.sanity <= 0 && !player.activeMadness) {
           const newMadness = MADNESS_CONDITIONS[Math.floor(Math.random() * MADNESS_CONDITIONS.length)];
           addToLog(`${player.name} has cracked. Madness sets in: ${newMadness.name}!`);
-          generateNarrative(`${player.name} is succumbing to ${newMadness.name}.`);
+          addFloatingText(player.position.q, player.position.r, "BROKEN MIND", "text-purple-600 font-black");
           return { ...player, sanity: Math.floor(player.maxSanity / 2), activeMadness: newMadness, madness: [...player.madness, newMadness.id] };
       }
       return player;
@@ -257,7 +255,6 @@ const App: React.FC = () => {
 
       setState(prev => ({ ...prev, enemies: [...prev.enemies, newEnemy] }));
       addToLog(`A ${bestiary.name} emerges from the shadows!`);
-      generateNarrative(`A ${bestiary.name} has appeared nearby.`);
   }, []);
 
   const spawnRoom = useCallback(async (startQ: number, startR: number, tileSet: 'indoor' | 'outdoor' | 'mixed') => {
@@ -272,8 +269,8 @@ const App: React.FC = () => {
       const shape = isConnector ? ROOM_SHAPES.LINEAR : ROOM_SHAPES.MEDIUM;
       
       const newTiles: Tile[] = [];
-      const imageUrl = await generateLocationAsset(roomName, isConnector ? 'street' : 'room');
 
+      // IMMEDIATE UPDATE: Add tiles to the board WITHOUT images first to prevent "void" exploration blocks
       shape.forEach(offset => {
           const q = startQ + offset.q;
           const r = startR + offset.r;
@@ -282,12 +279,11 @@ const App: React.FC = () => {
               let object: TileObjectType | undefined = undefined;
               let blocking = false;
 
-              // Obstacle spawning logic (40% chance in building)
               if (tileSet === 'indoor' && Math.random() > 0.6) {
                   const roll = Math.random();
                   if (roll > 0.8) { object = 'locked_door'; blocking = true; }
                   else if (roll > 0.6) { object = 'rubble'; blocking = true; }
-                  else if (roll > 0.4) { object = 'fire'; blocking = true; }
+                  else if (roll > 0.5) { object = 'fire'; blocking = true; }
               }
 
               newTiles.push({
@@ -300,70 +296,27 @@ const App: React.FC = () => {
                   explored: true,
                   searchable: !isConnector,
                   searched: false,
-                  imageUrl: imageUrl || undefined,
                   object: object ? { type: object, searched: false, blocking, difficulty: 4 } : undefined
               });
           }
       });
 
       if (newTiles.length > 0) {
-          setState(prev => ({
-              ...prev,
-              board: [...prev.board, ...newTiles]
-          }));
-          addToLog(`ROOM: ${roomName}. ${LOCATION_DESCRIPTIONS[roomName] || ""}`);
-          generateNarrative(`Entering the ${roomName}.`);
+          setState(prev => ({ ...prev, board: [...prev.board, ...newTiles] }));
+          addToLog(`ENTERED: ${roomName}.`);
           
-          if (Math.random() > 0.8) {
-              spawnEnemy('cultist', startQ, startR);
+          if (Math.random() > 0.8) spawnEnemy('cultist', startQ, startR);
+
+          // ASYNC ENHANCEMENT: Generate the image after the board is physically updated
+          const imageUrl = await generateLocationAsset(roomName, isConnector ? 'street' : 'room');
+          if (imageUrl) {
+              setState(prev => ({
+                  ...prev,
+                  board: prev.board.map(t => t.roomId === roomId ? { ...t, imageUrl } : t)
+              }));
           }
       }
   }, [state.board, spawnEnemy]);
-
-  const resolveSpell = (targetId: string, isEnemy: boolean) => {
-      const activePlayer = state.players[state.activePlayerIndex];
-      const spell = state.activeSpell;
-      if (!activePlayer || !spell) return;
-
-      if (activePlayer.insight < spell.cost) {
-          addToLog("Not enough Insight to cast this spell!");
-          setState(prev => ({ ...prev, activeSpell: null }));
-          return;
-      }
-
-      if (isEnemy) {
-          const enemy = state.enemies.find(e => e.id === targetId);
-          if (!enemy) return;
-          const dist = hexDistance(activePlayer.position, enemy.position);
-          if (dist > spell.range && spell.range > 0) {
-              addToLog("Target is too far away for this spell!");
-              return;
-          }
-
-          if (spell.effectType === 'damage') {
-              addToLog(`${activePlayer.name} casts ${spell.name} on ${enemy.name}!`);
-              addFloatingText(enemy.position.q, enemy.position.r, `-${spell.value} (ARCANE)`, "text-purple-400");
-              triggerScreenShake();
-              setState(prev => ({
-                  ...prev,
-                  enemies: prev.enemies.map(e => e.id === enemy.id ? { ...e, hp: e.hp - spell.value } : e).filter(e => e.hp > 0),
-                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? checkMadness({ ...p, actions: p.actions - 1, insight: p.insight - spell.cost }) : p),
-                  activeSpell: null
-              }));
-              if (enemy.hp - spell.value <= 0) addToLog(`${enemy.name} was banished back to the void!`);
-          }
-      } else {
-          if (spell.effectType === 'heal') {
-              addToLog(`${activePlayer.name} weaves ${spell.name}...`);
-              addFloatingText(activePlayer.position.q, activePlayer.position.r, `+${spell.value} HP`, "text-green-400");
-              setState(prev => ({
-                  ...prev,
-                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, hp: Math.min(p.maxHp, p.hp + spell.value), actions: p.actions - 1, insight: p.insight - spell.cost } : p),
-                  activeSpell: null
-              }));
-          }
-      }
-  };
 
   const handleAction = (actionType: string, payload?: any) => {
     const activePlayer = state.players[state.activePlayerIndex];
@@ -382,7 +335,7 @@ const App: React.FC = () => {
         
         if (targetTile?.object?.blocking) {
             setState(prev => ({ ...prev, selectedTileId: targetTile.id }));
-            addToLog(`A ${targetTile.object.type} blocks your path.`);
+            addToLog(`PATH BLOCKED: ${targetTile.object.type}.`);
             return;
         }
 
@@ -394,24 +347,18 @@ const App: React.FC = () => {
             ...prev, 
             players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p) 
         }));
-
-        state.enemies.forEach(enemy => {
-            if (hasLineOfSight(enemy.position, { q, r }, state.board, enemy.visionRange)) {
-                addToLog(`The eyes of a ${enemy.name} fall upon you! You are VISIBLE!`);
-            }
-        });
         break;
 
       case 'interact':
         const tile = state.board.find(t => t.id === state.selectedTileId);
         if (!tile || !tile.object) return;
 
-        // Skill check logic
-        const roll = Array.from({ length: 1 + activePlayer.insight }, () => Math.floor(Math.random() * 6) + 1);
-        const successes = roll.filter(v => v >= 4).length;
+        const skillRoll = Array.from({ length: 1 + activePlayer.insight }, () => Math.floor(Math.random() * 6) + 1);
+        const successes = skillRoll.filter(v => v >= 4).length;
 
         if (successes >= 1) {
-            addToLog(`SUCCESS! The ${tile.object.type} is no longer an obstacle.`);
+            addToLog(`CLEARED: ${tile.object.type} removed!`);
+            addFloatingText(tile.q, tile.r, "CLEARED", "text-green-400 font-bold");
             setState(prev => ({
                 ...prev,
                 board: prev.board.map(t => t.id === tile.id ? { ...t, object: { ...t.object!, blocking: false } } : t),
@@ -419,10 +366,10 @@ const App: React.FC = () => {
                 selectedTileId: null
             }));
         } else {
-            addToLog(`FAILED! The ${tile.object.type} remains firm.`);
+            addToLog(`FAILURE: Path remains blocked.`);
             setState(prev => ({
                 ...prev,
-                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1, sanity: Math.max(0, p.sanity - 1) } : p),
+                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? checkMadness({ ...p, actions: p.actions - 1, sanity: Math.max(0, p.sanity - 1) }) : p),
                 selectedTileId: null
             }));
         }
@@ -433,7 +380,7 @@ const App: React.FC = () => {
               ...prev,
               players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, hp: Math.min(p.maxHp, p.hp + 1), sanity: Math.min(p.maxSanity, p.sanity + 1), actions: p.actions - 1 } : p)
           }));
-          addToLog(`${activePlayer.name} rested to recover strength.`);
+          addToLog(`${activePlayer.name} rested.`);
           break;
 
       case 'investigate':
@@ -449,9 +396,13 @@ const App: React.FC = () => {
           setState(prev => ({ ...prev, lastDiceRoll: combatRoll, activeCombat: { playerId: activePlayer.id, enemyId: targetEnemy.id } }));
           break;
 
+      case 'enemy_click':
+          setState(prev => ({...prev, selectedEnemyId: payload.id}));
+          break;
+
       case 'cast':
           setState(prev => ({ ...prev, activeSpell: payload }));
-          addToLog(`Selecting target for ${payload.name}...`);
+          addToLog(`Targeting ${payload.name}...`);
           break;
 
       case 'cancel_cast':
@@ -472,19 +423,19 @@ const App: React.FC = () => {
           if (enemy) {
               if (successes > 0) {
                   const damage = successes;
-                  addToLog(`${activePlayer.name} hit ${enemy.name} for ${damage} damage!`);
-                  addFloatingText(enemy.position.q, enemy.position.r, `-${damage} HP`, "text-red-500");
+                  addToLog(`HIT: ${activePlayer.name} deals ${damage} damage.`);
+                  addFloatingText(enemy.position.q, enemy.position.r, `-${damage} HP`, "text-red-500 font-black");
                   triggerScreenShake();
                   
                   setState(prev => ({
                       ...prev,
                       enemies: prev.enemies.map(e => e.id === enemy.id ? { ...e, hp: e.hp - damage } : e).filter(e => e.hp > 0),
-                      players: prev.players.map((p, i) => i === prev.activePlayerIndex ? checkMadness({ ...p, actions: p.actions - 1 }) : p),
+                      players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
                       lastDiceRoll: null,
                       activeCombat: null
                   }));
               } else {
-                  addToLog(`${activePlayer.name} missed the attack!`);
+                  addToLog(`MISS! Attack failed.`);
                   setState(prev => ({
                       ...prev,
                       players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
@@ -496,8 +447,8 @@ const App: React.FC = () => {
       } else {
           if (successes > 0) {
               const randomItem = ITEMS[Math.floor(Math.random() * ITEMS.length)];
-              addToLog(`${activePlayer.name} discovered a ${randomItem.name}!`);
-              addFloatingText(activePlayer.position.q, activePlayer.position.r, `Found ${randomItem.name}`, "text-amber-400");
+              addToLog(`FOUND: ${randomItem.name}!`);
+              addFloatingText(activePlayer.position.q, activePlayer.position.r, "ITEM FOUND", "text-amber-400 font-bold");
               
               setState(prev => ({
                   ...prev,
@@ -505,7 +456,7 @@ const App: React.FC = () => {
                   lastDiceRoll: null
               }));
           } else {
-              addToLog(`${activePlayer.name} found nothing but dust.`);
+              addToLog(`NOTHING FOUND.`);
               setState(prev => ({
                   ...prev,
                   players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
@@ -533,8 +484,51 @@ const App: React.FC = () => {
       });
   };
 
+  const resolveSpell = (targetId: string, isEnemy: boolean) => {
+    const activePlayer = state.players[state.activePlayerIndex];
+    const spell = state.activeSpell;
+    if (!activePlayer || !spell) return;
+
+    if (activePlayer.insight < spell.cost) {
+        addToLog("INSIGHT INSUFFICIENT.");
+        setState(prev => ({ ...prev, activeSpell: null }));
+        return;
+    }
+
+    if (isEnemy) {
+        const enemy = state.enemies.find(e => e.id === targetId);
+        if (!enemy) return;
+        const dist = hexDistance(activePlayer.position, enemy.position);
+        if (dist > spell.range && spell.range > 0) {
+            addToLog("OUT OF RANGE.");
+            return;
+        }
+
+        if (spell.effectType === 'damage') {
+            addToLog(`CAST: ${spell.name} on ${enemy.name}.`);
+            addFloatingText(enemy.position.q, enemy.position.r, `-${spell.value} ARCANE`, "text-purple-400 font-black");
+            triggerScreenShake();
+            setState(prev => ({
+                ...prev,
+                enemies: prev.enemies.map(e => e.id === enemy.id ? { ...e, hp: e.hp - spell.value } : e).filter(e => e.hp > 0),
+                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? checkMadness({ ...p, actions: p.actions - 1, insight: p.insight - spell.cost }) : p),
+                activeSpell: null
+            }));
+        }
+    } else {
+        if (spell.effectType === 'heal') {
+            addToLog(`CAST: ${spell.name}.`);
+            addFloatingText(activePlayer.position.q, activePlayer.position.r, `+${spell.value} HP`, "text-green-400 font-bold");
+            setState(prev => ({
+                ...prev,
+                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, hp: Math.min(p.maxHp, p.hp + spell.value), actions: p.actions - 1, insight: p.insight - spell.cost } : p),
+                activeSpell: null
+            }));
+        }
+    }
+  };
+
   const activePlayer = state.players[state.activePlayerIndex] || state.players[0] || null;
-  const currentStep = state.activeScenario?.steps?.[state.currentStepIndex];
   const selectedEnemy = state.enemies.find(e => e.id === state.selectedEnemyId);
   const selectedTile = state.board.find(t => t.id === state.selectedTileId);
 
@@ -654,7 +648,7 @@ const App: React.FC = () => {
                     onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} 
                     showInfo={showRightPanel} 
                     onToggleInfo={() => setShowRightPanel(!showRightPanel)} 
-                    contextAction={selectedTile?.object?.blocking ? { id: 'interact', label: `Clear ${selectedTile.object.type}`, iconType: 'strength', difficulty: 4 } : null}
+                    contextAction={selectedTile?.object?.blocking ? { id: 'interact', label: `Break ${selectedTile.object.type}`, iconType: 'strength', difficulty: 4 } : null}
                 />
                 <button onClick={handleNextTurn} className="px-8 py-4 bg-[#e94560] text-white font-bold rounded-xl uppercase tracking-widest hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_#e94560]">
                     {state.activePlayerIndex === state.players.length - 1 ? "End Round" : "Next Turn"}
