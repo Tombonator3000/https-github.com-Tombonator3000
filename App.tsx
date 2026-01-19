@@ -14,7 +14,7 @@ import DiceRoller from './components/DiceRoller';
 import { loadSettings } from './utils/Settings';
 
 const STORAGE_KEY = 'shadows_1920s_save_v4';
-const APP_VERSION = "3.10.40"; 
+const APP_VERSION = "3.12.0"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -67,11 +67,48 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, log: [msg, ...prev.log].slice(0, 50) }));
   };
 
+  const spawnEnemy = useCallback((type: EnemyType, q: number, r: number) => {
+      const info = BESTIARY[type];
+      const newEnemy: Enemy = {
+          id: `enemy-${Date.now()}-${Math.random()}`,
+          name: info.name,
+          type: type,
+          hp: info.hp,
+          maxHp: info.hp,
+          damage: info.damage,
+          horror: info.horror,
+          speed: 1,
+          position: { q, r },
+          visionRange: 3,
+          attackRange: 1,
+          attackType: 'melee',
+          traits: info.traits
+      };
+      setState(prev => ({ ...prev, enemies: [...prev.enemies, newEnemy] }));
+  }, []);
+
   const spawnRoom = useCallback((q: number, r: number) => {
       const isConnector = Math.random() > 0.7; 
       const pool = isConnector ? OUTDOOR_CONNECTORS : OUTDOOR_LOCATIONS;
       const roomName = pool[Math.floor(Math.random() * pool.length)];
       
+      let object: TileObject | undefined = undefined;
+      const rand = Math.random();
+      
+      if (!isConnector) {
+          if (rand > 0.96) {
+              object = { type: 'radio', searched: false };
+          } else if (rand > 0.92) {
+              object = { type: 'switch', activated: false, searched: false };
+          } else if (rand > 0.88) {
+              object = { type: 'mirror', activated: false, searched: false };
+          } else if (rand > 0.82) {
+              object = { type: 'fog_wall', blocking: true, searched: false };
+          } else if (rand > 0.75) {
+              object = { type: 'locked_door', blocking: true, searched: false, puzzleType: 'sequence', difficulty: 3 };
+          }
+      }
+
       const newTile: Tile = {
           id: `tile-${Date.now()}-${Math.random()}`,
           q, r,
@@ -79,11 +116,12 @@ const App: React.FC = () => {
           type: isConnector ? 'street' : 'room',
           explored: true,
           searchable: !isConnector,
-          searched: false
+          searched: false,
+          object
       };
 
       setState(prev => ({ ...prev, board: [...prev.board, newTile] }));
-      addToLog(`Du oppdaget: ${roomName}`);
+      addToLog(`Utforsket: ${roomName}${object ? ' (Noe virker merkelig her...)' : ''}`);
   }, []);
 
   const handleAction = (actionType: string, payload?: any) => {
@@ -92,9 +130,14 @@ const App: React.FC = () => {
 
     if (actionType === 'move') {
         const { q, r } = payload;
-        // Sjekk om flisen finnes, hvis ikke generer den
-        const exists = state.board.find(t => t.q === q && t.r === r);
-        if (!exists) spawnRoom(q, r);
+        const targetTile = state.board.find(t => t.q === q && t.r === r);
+        
+        if (targetTile?.object?.blocking) {
+            addToLog(`Vei sperret av ${targetTile.object.type.replace('_', ' ')}! Du må fjerne den først.`);
+            return;
+        }
+
+        if (!targetTile) spawnRoom(q, r);
 
         setState(prev => ({
             ...prev,
@@ -104,6 +147,107 @@ const App: React.FC = () => {
                 actions: p.actions - 1
             } : p)
         }));
+    }
+
+    if (actionType === 'interact') {
+        const p = state.players[state.activePlayerIndex];
+        const tile = state.board.find(t => t.q === p.position.q && t.r === p.position.r);
+        
+        if (tile?.object) {
+            const obj = tile.object;
+            let hpChange = 0;
+            let sanChange = 0;
+            let insChange = 0;
+            let globalClearFog = false;
+            let removeObject = false;
+            let actionCost = 1;
+
+            const roll = Math.floor(Math.random() * 6) + 1;
+            setState(prev => ({ ...prev, lastDiceRoll: [roll] }));
+
+            switch(obj.type) {
+                case 'radio':
+                    if (roll === 6) {
+                        addToLog("Radioen fanger opp 'Sannheten'. Du hører stemmer fra det ytre rom.");
+                        insChange = 3;
+                        sanChange = -1;
+                    } else if (roll >= 3) {
+                        addToLog("Bunnløs statisk støy fyller rommet. Du føler deg uvel.");
+                        sanChange = -1;
+                    } else {
+                        addToLog("Radioen skriker av eldgammel smerte før den brenner ut.");
+                        sanChange = -2;
+                    }
+                    removeObject = true;
+                    break;
+
+                case 'switch':
+                    addToLog("Du legger over den tunge kobberbryteren. Strømmen suser gjennom veggene!");
+                    globalClearFog = true;
+                    // Hope restored
+                    sanChange = 1;
+                    removeObject = true; 
+                    break;
+
+                case 'mirror':
+                    if (roll === 6) {
+                        addToLog("Speilbildet ditt hvisker hemmeligheter om fremtiden.");
+                        insChange = 2;
+                        sanChange = 1;
+                    } else if (roll === 1) {
+                        addToLog("Noe kryper UT av speilet! En skygge tar form!");
+                        spawnEnemy('hound', p.position.q, p.position.r);
+                        sanChange = -2;
+                    } else {
+                        addToLog("Du ser deg selv råtne i speilet. Forstanden din vakler.");
+                        sanChange = -1;
+                    }
+                    removeObject = true;
+                    break;
+
+                case 'fog_wall':
+                    if (roll >= 4) {
+                        addToLog("Du klarer å mane bort tåken med ren viljestyrke.");
+                        removeObject = true;
+                    } else {
+                        addToLog("Tåken er for tett! Du mister orienteringen og blir skremt.");
+                        sanChange = -1;
+                        removeObject = false; // Stay blocking
+                    }
+                    break;
+
+                case 'locked_door':
+                    if (obj.puzzleType === 'sequence') {
+                        setState(prev => ({ ...prev, activePuzzle: { type: 'sequence', difficulty: obj.difficulty || 3, targetTileId: tile.id } }));
+                        return; 
+                    }
+                    break;
+
+                default:
+                    addToLog(`Du undersøker ${obj.type}, men ingenting skjer.`);
+                    actionCost = 0;
+            }
+
+            setState(prev => ({
+                ...prev,
+                board: prev.board.map(t => {
+                    if (globalClearFog && t.object?.type === 'fog_wall') {
+                        return { ...t, object: undefined };
+                    }
+                    if (t.id === tile.id && removeObject) {
+                        return { ...t, object: undefined };
+                    }
+                    return t;
+                }),
+                players: prev.players.map((pl, i) => i === prev.activePlayerIndex ? {
+                    ...pl,
+                    hp: Math.max(0, Math.min(pl.maxHp, pl.hp + hpChange)),
+                    sanity: Math.max(0, Math.min(pl.maxSanity, pl.sanity + sanChange)),
+                    insight: pl.insight + insChange,
+                    actions: pl.actions - actionCost
+                } : pl)
+            }));
+        }
     }
 
     if (actionType === 'investigate') {
@@ -158,7 +302,6 @@ const App: React.FC = () => {
         players: prev.players.map(p => ({ ...p, actions: 2 }))
     }));
 
-    // Mythos logic simulation
     setTimeout(() => {
         setState(prev => ({
             ...prev,
@@ -195,6 +338,8 @@ const App: React.FC = () => {
     setIsMainMenuOpen(false);
   };
 
+  const activeTile = state.board.find(t => t.q === state.players[state.activePlayerIndex]?.position.q && t.r === state.players[state.activePlayerIndex]?.position.r);
+
   return (
     <div className="h-full w-full bg-[#05050a] text-slate-200 overflow-hidden relative">
       {isMainMenuOpen && (
@@ -220,7 +365,6 @@ const App: React.FC = () => {
 
           <TurnNotification player={state.players[state.activePlayerIndex]} phase={state.phase} />
 
-          {/* Sidebar UI */}
           <div className={`fixed left-0 top-0 bottom-0 w-80 z-[60] transition-transform duration-500 shadow-2xl ${showLeftPanel ? 'translate-x-0' : '-translate-x-full'}`}>
             <CharacterPanel 
                 player={state.players[state.activePlayerIndex]} 
@@ -234,7 +378,6 @@ const App: React.FC = () => {
             <LogPanel logs={state.log} onClose={() => setShowRightPanel(false)} />
           </div>
 
-          {/* Action Bar */}
           <footer className="fixed bottom-0 left-0 right-0 h-24 flex items-center justify-center gap-4 z-50 bg-gradient-to-t from-black to-transparent">
               <ActionBar 
                   onAction={(type) => {
@@ -243,6 +386,12 @@ const App: React.FC = () => {
                   }} 
                   actionsRemaining={state.players[state.activePlayerIndex]?.actions || 0} 
                   isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} 
+                  contextAction={activeTile?.object ? { 
+                      id: 'obj', 
+                      label: activeTile.object.type.replace('_', ' '), 
+                      iconType: activeTile.object.type === 'switch' ? 'agility' : activeTile.object.type === 'fog_wall' ? 'strength' : 'insight', 
+                      difficulty: activeTile.object.difficulty || 4 
+                  } : null}
                   spells={[]} 
                   activeSpell={null} 
                   onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} 
@@ -261,6 +410,25 @@ const App: React.FC = () => {
           {state.lastDiceRoll && (
               <DiceRoller values={state.lastDiceRoll} onComplete={() => setState(prev => ({ ...prev, lastDiceRoll: null }))} />
           )}
+
+          {state.activePuzzle && (
+                <PuzzleModal 
+                    difficulty={state.activePuzzle.difficulty} 
+                    onSolve={(success) => {
+                        if (success) {
+                            addToLog("Låsen klikker opp! Hindringen er borte.");
+                            setState(prev => ({
+                                ...prev,
+                                activePuzzle: null,
+                                board: prev.board.map(t => t.id === prev.activePuzzle?.targetTileId ? { ...t, object: undefined } : t)
+                            }));
+                        } else {
+                            addToLog("Du klarte ikke å knekke koden.");
+                            setState(prev => ({ ...prev, activePuzzle: null }));
+                        }
+                    }}
+                />
+            )}
 
           {showOptions && (
               <OptionsMenu 

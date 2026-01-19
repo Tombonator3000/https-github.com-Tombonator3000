@@ -96,6 +96,7 @@ export const START_TILE: Tile = {
   id: 'start', q: 0, r: 0, name: 'Train Station', type: 'street', category: 'location', explored: true, searchable: true, searched: false
 };
 
+// Added missing 'shade' entry to fulfill Record<EnemyType, BestiaryEntry>
 export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
   cultist: {
     name: 'Cultist', type: 'cultist', hp: 2, damage: 1, horror: 1,
@@ -216,6 +217,14 @@ export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
     lore: 'Sadistic beings from the Dreamlands.',
     traits: ['ranged'],
     defeatFlavor: 'The abomination falls silent.'
+  },
+  shade: {
+    name: 'Shade', type: 'shade', hp: 2, damage: 1, horror: 3,
+    description: 'A flickering remnant of a soul, or something far worse.',
+    visualPrompt: 'A semi-transparent, elongated shadow reaching out from corners.',
+    lore: 'Some say they are the echoes of those taken by the void.',
+    traits: ['ethereal'],
+    defeatFlavor: 'The darkness loses its shape and vanishes.'
   },
   boss: {
     name: 'Ancient One', type: 'boss', hp: 10, damage: 4, horror: 6,

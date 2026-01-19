@@ -85,7 +85,7 @@ export type EnemyType =
   | 'cultist' | 'deepone' | 'ghoul' | 'shoggoth' | 'boss' 
   | 'sniper' | 'priest' | 'mi-go' | 'nightgaunt' | 'hound' 
   | 'dark_young' | 'byakhee' | 'star_spawn' | 'formless_spawn' 
-  | 'hunting_horror' | 'moon_beast';
+  | 'hunting_horror' | 'moon_beast' | 'shade';
 
 export interface Enemy {
   id: string;
@@ -127,6 +127,7 @@ export interface TileObject {
   type: TileObjectType;
   searched: boolean;
   blocking?: boolean;
+  activated?: boolean;
   health?: number;
   difficulty?: number;
   reqSkill?: 'strength' | 'insight' | 'agility';

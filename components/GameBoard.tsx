@@ -2,7 +2,8 @@
 import React, { useRef, useState } from 'react';
 import { Tile, Player, Enemy, ScenarioModifier } from '../types';
 import { 
-  User, MapPin, DoorOpen, BookOpen, Church, Anchor, Building 
+  User, MapPin, DoorOpen, BookOpen, Church, Anchor, Building, 
+  Radio, Power, Eye, CloudFog, Lock, ShieldAlert, Ghost
 } from 'lucide-react';
 
 interface GameBoardProps {
@@ -26,6 +27,17 @@ const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
   
   if (type === 'street') return { bg: 'bg-[#0f172a]', stroke: '#334155', Icon: MapPin, color: 'text-slate-600' };
   return { bg: 'bg-[#262626]', stroke: '#525252', Icon: Building, color: 'text-stone-500' };
+};
+
+const getObjectIcon = (type: string) => {
+    switch (type) {
+        case 'radio': return <Radio size={24} className="text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" />;
+        case 'switch': return <Power size={24} className="text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]" />;
+        case 'mirror': return <Eye size={24} className="text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />;
+        case 'fog_wall': return <CloudFog size={32} className="text-slate-200 opacity-80 animate-pulse" />;
+        case 'locked_door': return <Lock size={24} className="text-red-500" />;
+        default: return <ShieldAlert size={20} className="text-slate-400" />;
+    }
 };
 
 const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileClick }) => {
@@ -71,12 +83,21 @@ const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileCl
                     <visuals.Icon className={visuals.color} size={44} />
                     <span className="text-[10px] uppercase tracking-tighter text-white font-bold mt-2 text-center px-4 leading-none drop-shadow-md">{tile.name}</span>
                  </div>
+                 
+                 {/* Render Tile Object */}
+                 {tile.object && (
+                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                         <div className={`bg-black/40 p-2 rounded-full backdrop-blur-sm border border-white/10 ${tile.object.type === 'switch' ? 'animate-pulse' : ''}`}>
+                            {getObjectIcon(tile.object.type)}
+                         </div>
+                     </div>
+                 )}
               </div>
             </div>
           );
         })}
 
-        {/* Possible movement indicators (neighbor tiles) */}
+        {/* Possible movement indicators */}
         {players.length > 0 && (
             (() => {
                 const p = players[0].position;
@@ -104,6 +125,16 @@ const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileCl
                 });
             })()
         )}
+
+        {/* Render Enemies */}
+        {enemies.map(enemy => {
+            const { x, y } = hexToPixel(enemy.position.q, enemy.position.r);
+            return (
+                <div key={enemy.id} className="absolute w-12 h-12 rounded-full border-2 border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.7)] flex items-center justify-center bg-black z-40 transition-all duration-700" style={{ left: `${x - 24}px`, top: `${y - 24}px` }}>
+                    <Ghost size={24} className="text-red-500" />
+                </div>
+            );
+        })}
 
         {/* Render Players */}
         {players.map(player => {
