@@ -6,7 +6,7 @@ export enum GamePhase {
   COMBAT = 'combat',
   GAME_OVER = 'gameOver',
   MERCHANT = 'merchant',
-  VICTORY = 'victory' // New Phase
+  VICTORY = 'victory'
 }
 
 export type CharacterType = 'detective' | 'professor' | 'journalist' | 'veteran' | 'occultist' | 'doctor';
@@ -75,8 +75,8 @@ export interface Item {
   bonus?: number;
   cost?: number;
   statModifier?: 'combat' | 'investigation' | 'agility' | 'physical_defense' | 'mental_defense';
-  curse?: string; // New: Description of the curse
-  curseEffect?: 'drain_hp_on_kill' | 'cap_hp' | 'hallucinations' | 'sanity_cost_clue' | 'no_rest'; // New: Functional curse ID
+  curse?: string;
+  curseEffect?: 'drain_hp_on_kill' | 'cap_hp' | 'hallucinations' | 'sanity_cost_clue' | 'no_rest';
 }
 
 export type EnemyAttackType = 'melee' | 'ranged' | 'sanity' | 'doom';
@@ -140,7 +140,7 @@ export interface Tile {
   name: string;
   type: 'building' | 'room' | 'street';
   category?: 'connector' | 'location';
-  roomId?: string; // ID to group tiles belonging to the same room
+  roomId?: string;
   explored: boolean;
   hasWater?: boolean;
   searchable: boolean;
@@ -150,24 +150,22 @@ export interface Tile {
   imageUrl?: string;
 }
 
-// --- NEW SCENARIO TYPES (v3.10.0) ---
-
 export type VictoryType = 'escape' | 'assassination' | 'collection' | 'survival';
 
 export interface ScenarioStep {
     id: string;
     description: string;
     type: 'find_item' | 'find_tile' | 'kill_enemy' | 'survive' | 'interact';
-    targetId?: string; // Item ID (e.g. 'exit_key'), Enemy Type, or Tile Name
-    amount?: number; // Target amount (e.g. 10 rounds, 3 candles)
+    targetId?: string;
+    amount?: number;
     completed: boolean;
 }
 
 export interface DoomEvent {
-    threshold: number; // Triggers when Doom <= this number
+    threshold: number;
     triggered: boolean;
     type: 'spawn_enemy' | 'buff_enemies' | 'sanity_hit' | 'spawn_boss';
-    targetId?: string; // Enemy type or Boss ID
+    targetId?: string;
     amount?: number;
     message: string;
 }
@@ -181,8 +179,6 @@ export interface Scenario {
   specialRule: string;
   difficulty: 'Normal' | 'Hard' | 'Nightmare';
   tileSet: 'indoor' | 'outdoor' | 'mixed';
-  
-  // New Fields
   goal: string;
   victoryType: VictoryType;
   steps: ScenarioStep[];
@@ -211,11 +207,14 @@ export interface ActivePuzzle {
     targetTileId: string;
 }
 
+export type WeatherType = 'clear' | 'fog' | 'rain' | 'snow' | 'miasma' | 'void_storm';
+
 export interface ScenarioModifier {
     id: string;
     name: string;
     description: string;
-    effect: 'reduced_vision' | 'extra_doom' | 'strong_enemies' | 'less_items';
+    effect: 'reduced_vision' | 'extra_doom' | 'strong_enemies' | 'less_items' | 'hazardous_weather';
+    weatherType?: WeatherType;
 }
 
 export interface GameSettings {
@@ -258,10 +257,8 @@ export interface GameState {
   floatingTexts: FloatingText[];
   screenShake: boolean;
   activeSpell: Spell | null;
-  
-  // New State for v3.10.0
   currentStepIndex: number;
-  questItemsCollected: string[]; // IDs of quest items found (e.g. 'candle_red')
+  questItemsCollected: string[];
 }
 
 export interface EventCard {

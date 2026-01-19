@@ -1,33 +1,18 @@
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import * as Tone from 'tone';
-import { GoogleGenAI } from "@google/genai";
-import { 
-  Skull, ChevronRight, ChevronLeft, RotateCcw, Minimize2, ScrollText, Target, FolderOpen, 
-  ArrowLeft, Users, Star, Trash2, Edit2, ShoppingBag, Book, CloudFog, Zap, 
-  User, Save, MapPin, CheckCircle, HelpCircle, FileText, History, Heart, Brain, Settings, Edit3,
-  Hammer, Wind, Lock, Flame, Sparkles
-} from 'lucide-react';
-import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, ContextAction, SavedInvestigator, Item, Spell, Trait, GameSettings, ScenarioStep, DoomEvent, EnemyType, VictoryType, FloatingText, Madness } from './types';
-import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS, BESTIARY, INDOOR_CONNECTORS, OUTDOOR_CONNECTORS, SCENARIO_MODIFIERS, TRAIT_POOL, LOCATION_DESCRIPTIONS } from './constants';
+import React, { useState, useEffect, useCallback } from 'react';
+import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, EnemyType, GameSettings, TileObject, ScenarioModifier } from './types';
+import { CHARACTERS, START_TILE, BESTIARY, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, INDOOR_CONNECTORS, OUTDOOR_CONNECTORS, SCENARIO_MODIFIERS } from './constants';
 import GameBoard from './components/GameBoard';
-import CharacterPanel from './components/CharacterPanel';
-import EnemyPanel from './components/EnemyPanel';
 import ActionBar from './components/ActionBar';
-import DiceRoller from './components/DiceRoller';
-import EventModal from './components/EventModal';
 import MainMenu from './components/MainMenu';
 import OptionsMenu from './components/OptionsMenu';
-import PuzzleModal from './components/PuzzleModal';
-import MerchantShop from './components/MerchantShop';
-import JournalModal from './components/JournalModal';
 import TurnNotification from './components/TurnNotification'; 
-import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary, getCharacterVisual, getEnemyVisual } from './utils/AssetLibrary';
+import PuzzleModal from './components/PuzzleModal';
+import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, getEnemyVisual } from './utils/AssetLibrary';
 import { loadSettings, DEFAULT_SETTINGS } from './utils/Settings';
-import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
-const APP_VERSION = "3.10.30"; 
+const APP_VERSION = "3.10.33"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -63,108 +48,100 @@ const App: React.FC = () => {
   const [gameSettings, setGameSettings] = useState<GameSettings>(loadSettings());
 
   const [state, setState] = useState<GameState>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    const lib = loadAssetLibrary();
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.board && Array.isArray(parsed.board)) {
-            parsed.board = parsed.board.map((t: Tile) => ({
-                ...t,
-                imageUrl: lib[t.name] || t.imageUrl
-            }));
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        const lib = loadAssetLibrary();
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            const mergedState = { ...DEFAULT_STATE, ...parsed };
+            if (mergedState.board) {
+                mergedState.board = mergedState.board.map((t: Tile) => ({
+                    ...t,
+                    imageUrl: lib[t.name] || t.imageUrl
+                }));
+            }
+            return mergedState;
         }
-        return { ...parsed, hoveredEnemyId: null, floatingTexts: [], screenShake: false, activeSpell: null };
-      } catch (e) { console.error(e); }
-    }
+    } catch (e) { console.error(e); }
     return DEFAULT_STATE;
   });
 
-  useEffect(() => { setGameSettings(loadSettings()); }, []);
+  const addToLog = (msg: string) => {
+    setState(prev => ({ ...prev, log: [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.log].slice(0, 50) }));
+  };
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+  const handleAction = (actionType: string, payload?: any) => {
+    const activePlayer = state.players[state.activePlayerIndex];
+    if (!activePlayer || activePlayer.actions <= 0 || activePlayer.isDead || state.phase !== GamePhase.INVESTIGATOR) return;
+    
+    if (actionType === 'move') {
+        const { q, r } = payload;
+        const targetTile = state.board.find(t => t.q === q && t.r === r);
+        
+        if (targetTile?.object?.blocking) {
+            addToLog("Vei sperret! Du må fjerne hindringen først.");
+            return;
+        }
 
-  const refreshAssets = useCallback(() => {
-      const lib = loadAssetLibrary();
-      setState(prev => {
-          const newBoard = prev.board.map(t => ({
-              ...t,
-              imageUrl: lib[t.name] || t.imageUrl
-          }));
-          const newEnemies = prev.enemies.map(e => ({
-              ...e,
-              imageUrl: lib[e.type] || e.imageUrl
-          }));
-          const newPlayers = prev.players.map(p => ({
-              ...p,
-              imageUrl: lib[p.id] || p.imageUrl
-          }));
+        // Vær-effekt: Tåke begrenser bevegelse (kunne vært brukt her)
+        const isFoggy = state.activeModifiers.some(m => m.weatherType === 'fog');
+        
+        if (!targetTile) spawnRoom(q, r, state.activeScenario?.tileSet || 'mixed');
+        
+        let hpChange = 0;
+        if (targetTile?.object?.type === 'fire') {
+            hpChange = -1;
+            addToLog("AAARGH! Du brenner deg i flammene!");
+        } else if (targetTile?.object?.type === 'trap') {
+            hpChange = -1;
+            addToLog("KLIKK! En felle ble utløst!");
+        }
 
-          // Only update state if something actually changed to avoid cycles
-          const boardChanged = JSON.stringify(newBoard) !== JSON.stringify(prev.board);
-          if (!boardChanged && newEnemies.length === prev.enemies.length && newPlayers.length === prev.players.length) {
-              return prev;
-          }
+        setState(prev => ({ 
+            ...prev, 
+            screenShake: hpChange < 0,
+            players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { 
+                ...p, 
+                position: { q, r }, 
+                actions: p.actions - 1,
+                hp: Math.max(0, p.hp + hpChange)
+            } : p) 
+        }));
 
-          return {
-              ...prev,
-              board: newBoard,
-              enemies: newEnemies,
-              players: newPlayers
-          };
-      });
-  }, []);
+        setTimeout(() => setState(prev => ({ ...prev, screenShake: false })), 500);
+    }
 
-  const spawnEnemy = useCallback(async (type: EnemyType, q: number, r: number) => {
-      const bestiary = BESTIARY[type];
-      const lib = loadAssetLibrary();
-      if (!bestiary) return;
-
-      const newEnemy: Enemy = {
-          id: `enemy-${Date.now()}-${Math.random()}`,
-          name: bestiary.name,
-          type: type,
-          hp: bestiary.hp,
-          maxHp: bestiary.hp,
-          damage: bestiary.damage,
-          horror: bestiary.horror,
-          speed: 1,
-          position: { q, r },
-          visionRange: 3,
-          attackRange: 1,
-          attackType: 'melee',
-          traits: bestiary.traits,
-          imageUrl: lib[type] || undefined
-      };
-
-      setState(prev => ({ ...prev, enemies: [...prev.enemies, newEnemy] }));
-      
-      if (!newEnemy.imageUrl) {
-          getEnemyVisual(type).then(img => {
-              if (img) {
-                  const updatedLib = loadAssetLibrary();
-                  updatedLib[type] = img;
-                  saveAssetLibrary(updatedLib);
-                  refreshAssets();
-              }
-          });
-      }
-  }, [refreshAssets]);
+    if (actionType === 'interact') {
+        const p = state.players[state.activePlayerIndex];
+        const tile = state.board.find(t => t.q === p.position.q && t.r === p.position.r);
+        if (tile?.object?.puzzleType === 'sequence') {
+            setState(prev => ({ ...prev, activePuzzle: { type: 'sequence', difficulty: tile.object?.difficulty || 3, targetTileId: tile.id } }));
+        } else if (tile?.object) {
+            addToLog(`Prøver å fjerne ${tile.object.type}...`);
+            setState(prev => ({
+                ...prev,
+                board: prev.board.map(t => t.id === tile.id ? { ...t, object: undefined } : t)
+            }));
+            addToLog("Hindring fjernet!");
+        }
+    }
+  };
 
   const spawnRoom = useCallback(async (startQ: number, startR: number, tileSet: 'indoor' | 'outdoor' | 'mixed') => {
       const roomId = `room-${Date.now()}`;
       const isConnector = Math.random() > 0.6; 
-      const pool = isConnector 
-        ? (tileSet === 'indoor' ? INDOOR_CONNECTORS : OUTDOOR_CONNECTORS)
-        : (tileSet === 'indoor' ? INDOOR_LOCATIONS : OUTDOOR_LOCATIONS);
+      const pool = isConnector ? (tileSet === 'indoor' ? INDOOR_CONNECTORS : OUTDOOR_CONNECTORS) : (tileSet === 'indoor' ? INDOOR_LOCATIONS : OUTDOOR_LOCATIONS);
       const roomName = pool[Math.floor(Math.random() * pool.length)];
       
-      const lib = loadAssetLibrary();
-      const existingImg = lib[roomName];
+      let object: TileObject | undefined = undefined;
+      const rand = Math.random();
+      if (rand > 0.90) {
+          object = { type: 'locked_door', blocking: true, searched: false, difficulty: 4, puzzleType: 'sequence' };
+      } else if (rand > 0.85) {
+          object = { type: 'fire', blocking: false, searched: false };
+      }
 
-      const newTiles: Tile[] = [{
+      const newTile: Tile = {
           id: `tile-${Date.now()}`,
           q: startQ, r: startR,
           name: roomName,
@@ -174,94 +151,35 @@ const App: React.FC = () => {
           explored: true,
           searchable: !isConnector,
           searched: false,
-          imageUrl: existingImg
-      }];
+          object
+      };
 
-      setState(prev => ({ ...prev, board: [...prev.board, ...newTiles] }));
-      
-      if (!existingImg) {
-          generateLocationAsset(roomName, isConnector ? 'street' : 'room').then(img => {
-              if (img) {
-                  const updatedLib = loadAssetLibrary();
-                  updatedLib[roomName] = img;
-                  saveAssetLibrary(updatedLib);
-                  refreshAssets();
-              }
-          });
-      }
-  }, [refreshAssets]);
-
-  const handleAction = (actionType: string, payload?: any) => {
-    const activePlayer = state.players[state.activePlayerIndex];
-    if (!activePlayer || activePlayer.actions <= 0 || activePlayer.isDead || state.phase !== GamePhase.INVESTIGATOR) return;
-    
-    if (actionType === 'move') {
-        const { q, r } = payload;
-        const targetTile = state.board.find(t => t.q === q && t.r === r);
-        if (!targetTile) spawnRoom(q, r, state.activeScenario?.tileSet || 'mixed');
-        
-        setState(prev => ({ 
-            ...prev, 
-            players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p) 
-        }));
-    }
-  };
-
-  const handleNextTurn = () => {
-      setState(prev => {
-          const nextIndex = prev.activePlayerIndex + 1;
-          const isEndOfRound = nextIndex >= prev.players.length;
-          if (isEndOfRound) return { ...prev, phase: GamePhase.MYTHOS, activePlayerIndex: 0, doom: prev.doom - 1, round: prev.round + 1 };
-          return { ...prev, activePlayerIndex: nextIndex };
-      });
-  };
+      setState(prev => ({ ...prev, board: [...prev.board, newTile] }));
+  }, []);
 
   return (
-    <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative ${state.screenShake ? 'animate-shake' : ''}`}>
-      {isMainMenuOpen && <MainMenu onNewGame={() => { setState({...DEFAULT_STATE, phase: GamePhase.SETUP}); setIsMainMenuOpen(false); }} onContinue={() => setIsMainMenuOpen(false)} onOptions={() => setShowOptions(true)} canContinue={state.phase !== GamePhase.SETUP} version={APP_VERSION} />}
-      {state.phase === GamePhase.SETUP && !isMainMenuOpen && (
-          <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center p-8 bg-[#05050a]">
-               <button onClick={() => {
-                   const charKeys = Object.keys(CHARACTERS) as CharacterType[];
-                   const selectedChar = charKeys[Math.floor(Math.random() * charKeys.length)];
-                   const baseChar = CHARACTERS[selectedChar];
-                   const lib = loadAssetLibrary();
-                   
-                   const newPlayer: Player = {
-                       ...baseChar,
-                       position: { q: 0, r: 0 },
-                       inventory: [],
-                       spells: [],
-                       actions: 2,
-                       isDead: false,
-                       madness: [],
-                       activeMadness: null,
-                       traits: [],
-                       imageUrl: lib[baseChar.id]
-                   };
-
-                   setState(prev => ({ 
-                       ...prev, 
-                       players: [newPlayer],
-                       phase: GamePhase.INVESTIGATOR, 
-                       doom: 12 
-                   }));
-                   spawnEnemy('cultist', 1, 0);
-               }} className="px-12 py-4 bg-[#e94560] text-white font-bold uppercase tracking-widest text-2xl rounded shadow-[0_0_30px_#e94560]">Start Investigation</button>
-          </div>
-      )}
-      {state.phase !== GamePhase.SETUP && !isMainMenuOpen && (
+    <div className={`h-full w-full bg-[#05050a] text-slate-200 overflow-hidden relative ${state.screenShake ? 'animate-shake' : ''}`}>
+      {isMainMenuOpen && <MainMenu onNewGame={() => { 
+          // Start med et tilfeldig vær-modifier for å teste systemet
+          const randomWeather = SCENARIO_MODIFIERS[Math.floor(Math.random() * SCENARIO_MODIFIERS.length)];
+          setState({...DEFAULT_STATE, phase: GamePhase.SETUP, activeModifiers: [randomWeather]}); 
+          setIsMainMenuOpen(false); 
+      }} onContinue={() => setIsMainMenuOpen(false)} onOptions={() => setShowOptions(true)} canContinue={state.phase !== GamePhase.SETUP} version={APP_VERSION} />}
+      
+      {!isMainMenuOpen && state.phase !== GamePhase.SETUP && (
           <>
-            <div className="absolute inset-0 z-0">
-                <GameBoard tiles={state.board} players={state.players} enemies={state.enemies} selectedEnemyId={state.selectedEnemyId} onTileClick={(q, r) => handleAction('move', { q, r })} doom={state.doom} />
-            </div>
-            <footer className="fixed bottom-0 left-0 right-0 h-24 flex items-center justify-center gap-4 px-4 pb-4">
-                <ActionBar onAction={handleAction} actionsRemaining={state.players[state.activePlayerIndex]?.actions || 0} isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} spells={[]} activeSpell={null} onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} showCharacter={showLeftPanel} onToggleInfo={() => setShowRightPanel(!showRightPanel)} showInfo={showRightPanel} />
-                <button onClick={handleNextTurn} className="px-8 py-4 bg-[#e94560] text-white font-bold rounded-xl uppercase tracking-widest">Next Turn</button>
+            <GameBoard tiles={state.board} players={state.players} enemies={state.enemies} onTileClick={(q, r) => handleAction('move', { q, r })} doom={state.doom} activeModifiers={state.activeModifiers} />
+            <footer className="fixed bottom-0 left-0 right-0 h-24 flex items-center justify-center gap-4 z-40 bg-gradient-to-t from-black to-transparent">
+                <ActionBar 
+                    onAction={handleAction} 
+                    actionsRemaining={state.players[state.activePlayerIndex]?.actions || 0} 
+                    isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} 
+                    contextAction={state.board.find(t => t.q === state.players[state.activePlayerIndex]?.position.q && t.r === state.players[state.activePlayerIndex]?.position.r)?.object ? { id: 'obj', label: 'Interager', iconType: 'insight', difficulty: 4 } : null}
+                    spells={[]} activeSpell={null} onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} showCharacter={showLeftPanel} onToggleInfo={() => setShowRightPanel(!showRightPanel)} showInfo={showRightPanel} 
+                />
             </footer>
           </>
       )}
-      {showOptions && <OptionsMenu onClose={() => setShowOptions(false)} onResetData={() => window.location.reload()} onUpdateSettings={setGameSettings} onAssetsUpdated={refreshAssets} />}
     </div>
   );
 };

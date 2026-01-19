@@ -46,45 +46,6 @@ export const OUTDOOR_CONNECTORS = [
 
 export const ALL_LOCATIONS_FULL = ['Train Station', ...INDOOR_LOCATIONS, ...OUTDOOR_LOCATIONS, ...INDOOR_CONNECTORS, ...OUTDOOR_CONNECTORS];
 
-export const LOCATION_DESCRIPTIONS: Record<string, string> = {
-    'Train Station': 'The last train left hours ago. The clock on the wall is shattered.',
-    'Abandoned Manor': 'Dust motes dance in the stale air. Portraits seem to watch you pass.',
-    'Dark Cellar': 'It smells of rot and old earth. Something scuttles in the corner.',
-    'The Library': 'Rows of forbidden texts. You hear a page turn, but no one is there.',
-    'Secret Crypt': 'The air is cold enough to see your breath. Ancient names are carved into the stone.',
-    'Old Church': 'A sense of unease hangs heavy here. The pews are broken.',
-    'Police Station': 'Papers are scattered everywhere. The phones are dead.',
-    'Warehouse': 'Crates piled high create a maze of shadows.',
-    'Arkham Asylum': 'Screams echo from distant cells. The walls are padded.',
-    'Historical Museum': 'Artifacts from lost civilizations gaze blindly from their cases.',
-    'St. Mary\'s Hospital': 'The smell of antiseptic cannot hide the metallic scent of blood.',
-    'Sanitarium': 'The silence here is deafening.',
-    'Underground Vault': 'Thick steel doors protect whatever—or whoever—is inside.',
-    'Dusty Attic': 'Cobwebs drape over forgotten heirlooms.',
-    'Grand Hall': 'Once a place of celebration, now a cavern of echoes.',
-    'Study Room': 'A half-finished letter sits on the desk. The ink is still wet.',
-    'Ritual Chamber': 'Strange symbols are drawn on the floor in something that looks like blood.',
-    'Boiler Room': 'The furnace roars like a trapped beast.',
-    'Misty Docks': 'The waves lap against the rotting wood. The fog is thick here.',
-    'Town Square': 'Deserted. The statue in the center looks different than you remember.',
-    'Old Lighthouse': 'The light spins, cutting through the gloom, revealing brief horrors.',
-    'Blackwood Forest': 'The trees crowd close, their branches like grasping skeletal fingers.',
-    'Graveyard': 'The soil looks disturbed in front of several headstones.',
-    'University Campus': 'Usually bustling, now ominously quiet.',
-    'Market District': 'Stalls are overturned. Merchandise lies trampled in the mud.',
-    'River Bank': 'Something large ripples beneath the surface of the dark water.',
-    'Swamp': 'The ground squelches beneath your feet. Strange lights bob in the distance.',
-    'City Park': 'The swing set creaks in the wind, though there is no breeze.',
-    'Merchant Street': 'Shop windows are smashed. Looters have been here.',
-    'Dark Pier': 'The smell of salt and decay is overwhelming.',
-    'Velvet Lounge': 'Spilled gin and the smell of cheap perfume linger in the empty room.',
-    'Opium Den': 'Sweet, cloying smoke clings to the tattered curtains.',
-    'Grand Theater': 'The stage is set for a play that will never begin.',
-    'Clock Tower Interior': 'The grinding of gears is the only heartbeat this tower has left.',
-    'Kingsport Cliffs': 'The sea crashes against the rocks hundreds of feet below.',
-    'Strange High House in the Mist': 'It should not be here. It should not be anywhere.'
-};
-
 export const SCENARIOS: Scenario[] = [
   {
     id: 's1',
@@ -128,63 +89,6 @@ export const SCENARIOS: Scenario[] = [
         { threshold: 4, triggered: false, type: 'buff_enemies', message: 'The ritual empowers all enemies! (+1 HP)' },
         { threshold: 2, triggered: false, type: 'spawn_boss', targetId: 'shoggoth', message: 'The Priest summons a guardian!' }
     ]
-  },
-  {
-    id: 's3',
-    title: 'The Ritual of Binding',
-    description: 'To stop the encroaching void, you must perform the counter-ritual. Gather the sacred components and place them on the Altar.',
-    startDoom: 14,
-    startLocation: 'Library',
-    goal: 'Collect 3 Sacred Candles and place them on the Altar.',
-    specialRule: 'Map is large. Travel is dangerous.',
-    difficulty: 'Normal',
-    tileSet: 'indoor',
-    victoryType: 'collection',
-    steps: [
-        { id: 'step1', description: 'Find the Red Candle', type: 'find_item', targetId: 'candle_red', completed: false },
-        { id: 'step2', description: 'Find the Black Candle', type: 'find_item', targetId: 'candle_black', completed: false },
-        { id: 'step3', description: 'Find the White Candle', type: 'find_item', targetId: 'candle_white', completed: false },
-        { id: 'step4', description: 'Perform the Ritual at the Altar', type: 'interact', targetId: 'Altar', completed: false }
-    ],
-    doomEvents: [
-        { threshold: 10, triggered: false, type: 'sanity_hit', amount: 1, message: 'The house whispers your secrets. (-1 Sanity)' },
-        { threshold: 7, triggered: false, type: 'spawn_enemy', targetId: 'hound', amount: 1, message: 'A Hound of Tindalos smells you.' },
-        { threshold: 4, triggered: false, type: 'spawn_enemy', targetId: 'nightgaunt', amount: 2, message: 'Nightgaunts descend from the rafters.' }
-    ]
-  },
-  {
-    id: 's4',
-    title: 'The Siege of Arkham',
-    description: 'They are coming. Wave after wave of horrors. You cannot run. You can only survive.',
-    startDoom: 15,
-    startLocation: 'Police Station',
-    goal: 'Survive for 10 rounds.',
-    specialRule: 'Doom decreases every round automatically.',
-    difficulty: 'Nightmare',
-    tileSet: 'mixed',
-    victoryType: 'survival',
-    steps: [
-        { id: 'step1', description: 'Survive until help arrives', type: 'survive', amount: 10, completed: false }
-    ],
-    doomEvents: [
-        { threshold: 12, triggered: false, type: 'spawn_enemy', targetId: 'cultist', amount: 3, message: 'Wave 1: Cultists attack!' },
-        { threshold: 8, triggered: false, type: 'spawn_enemy', targetId: 'ghoul', amount: 3, message: 'Wave 2: Ghouls swarm the barricades!' },
-        { threshold: 4, triggered: false, type: 'spawn_boss', targetId: 'dark_young', amount: 1, message: 'Wave 3: A Dark Young appears!' }
-    ]
-  },
-  {
-    id: 's5',
-    title: 'The Unspeakable Randomness',
-    description: 'The void shuffles reality itself. No two visits to the abyss are the same. Prepare for the unexpected.',
-    startDoom: 12,
-    startLocation: 'Train Station',
-    goal: 'Randomized Objective',
-    specialRule: 'The scenario steps and doom events are generated randomly when the game starts.',
-    difficulty: 'Normal',
-    tileSet: 'mixed',
-    victoryType: 'escape',
-    steps: [],
-    doomEvents: []
   }
 ];
 
@@ -345,7 +249,9 @@ export const MADNESS_CONDITIONS: Madness[] = [
 ];
 
 export const SCENARIO_MODIFIERS: ScenarioModifier[] = [
-    { id: 'mod1', name: 'Thick Fog', description: 'Vision reduced.', effect: 'reduced_vision' }
+    { id: 'mod1', name: 'Thick Fog', description: 'The town is shrouded in an unnatural mist. Vision is severely reduced.', effect: 'reduced_vision', weatherType: 'fog' },
+    { id: 'mod2', name: 'Cursed Rain', description: 'A black, oily rain falls from the sky, chilling you to the bone.', effect: 'hazardous_weather', weatherType: 'rain' },
+    { id: 'mod3', name: 'Cosmic Miasma', description: 'The air glows with a sickly purple light.', effect: 'reduced_vision', weatherType: 'miasma' }
 ];
 
 export const TRAIT_POOL: Trait[] = [

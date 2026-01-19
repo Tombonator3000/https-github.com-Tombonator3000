@@ -24,17 +24,18 @@ export const DEFAULT_SETTINGS: GameSettings = {
 export const loadSettings = (): GameSettings => {
     try {
         const saved = localStorage.getItem(SETTINGS_KEY);
-        if (saved) {
-            // Deep merge to ensure new keys in default settings are present if missing in saved
+        if (saved && saved !== "undefined") {
             const parsed = JSON.parse(saved);
-            return {
-                audio: { ...DEFAULT_SETTINGS.audio, ...parsed.audio },
-                graphics: { ...DEFAULT_SETTINGS.graphics, ...parsed.graphics },
-                gameplay: { ...DEFAULT_SETTINGS.gameplay, ...parsed.gameplay }
-            };
+            if (parsed && typeof parsed === 'object') {
+                return {
+                    audio: { ...DEFAULT_SETTINGS.audio, ...parsed.audio },
+                    graphics: { ...DEFAULT_SETTINGS.graphics, ...parsed.graphics },
+                    gameplay: { ...DEFAULT_SETTINGS.gameplay, ...parsed.gameplay }
+                };
+            }
         }
     } catch (e) {
-        console.warn("Failed to load settings", e);
+        console.warn("Failed to load settings, using defaults.", e);
     }
     return DEFAULT_SETTINGS;
 };
