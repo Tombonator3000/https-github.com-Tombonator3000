@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     X, Trash2, Monitor, AlertTriangle, Image as ImageIcon, Loader, CheckCircle, 
-    Download, RefreshCw, Volume2, Speaker, Zap, Eye, Grid, Activity, VolumeX, Save
+    Download, RefreshCw, Volume2, Speaker, Zap, Eye, Grid, Activity, VolumeX, Save,
+    Contrast, Wind, Sparkles
 } from 'lucide-react';
-import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, getMissingAssets, downloadAssetsAsJSON } from '../utils/AssetLibrary';
+import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary, getMissingAssets, downloadAssetsAsJSON } from '../utils/AssetLibrary';
 import { INDOOR_LOCATIONS, ALL_LOCATIONS_FULL, BESTIARY, CHARACTERS } from '../constants';
 import { GameSettings, EnemyType, CharacterType } from '../types';
 import { loadSettings, saveSettings } from '../utils/Settings';
@@ -71,10 +71,8 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
           setCurrentGenItem(key);
           setGenProgress(Math.round(((i) / totalToGen) * 100));
           
-          // Basic logic: if it's in Bestiary, it's a monster, etc.
           let img = null;
           if (Object.keys(BESTIARY).includes(key)) {
-              // Note: Would need Bestiary logic here, for now use generic location gen for MVP stability
               img = await generateLocationAsset(key, 'room'); 
           } else {
               const isIndoor = INDOOR_LOCATIONS.includes(key);
@@ -100,6 +98,24 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
       >
           <Icon size={18} /> <span className="uppercase tracking-widest text-xs">{label}</span>
       </button>
+  );
+
+  const ToggleItem = ({ label, description, icon: Icon, checked, onChange }: { label: string, description: string, icon: any, checked: boolean, onChange: (val: boolean) => void }) => (
+      <div className="flex items-center justify-between p-4 bg-[#0a0a1a] rounded border border-slate-800 hover:border-slate-700 transition-colors group">
+          <div className="flex items-center gap-4">
+              <div className={`p-2 rounded bg-slate-900 ${checked ? 'text-[#e94560]' : 'text-slate-600'}`}>
+                  <Icon size={20} />
+              </div>
+              <div>
+                  <div className="text-sm font-bold text-slate-200 uppercase tracking-wider">{label}</div>
+                  <div className="text-[10px] text-slate-500 italic">{description}</div>
+              </div>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="sr-only peer" />
+              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#e94560] peer-checked:after:bg-white"></div>
+          </label>
+      </div>
   );
 
   return (
@@ -166,6 +182,57 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
                 </div>
             )}
 
+            {activeTab === 'display' && (
+                <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
+                    <h3 className="text-2xl font-display text-white mb-6">Display & Visuals</h3>
+                    <div className="space-y-4">
+                        <ToggleItem 
+                            label="High Contrast" 
+                            description="Enhances visibility of text and important UI elements."
+                            icon={Contrast}
+                            checked={settings.graphics.highContrast}
+                            onChange={(val) => handleSettingChange('graphics', 'highContrast', val)}
+                        />
+                        <ToggleItem 
+                            label="Reduce Motion" 
+                            description="Disables camera shake and complex UI animations."
+                            icon={Wind}
+                            checked={settings.graphics.reduceMotion}
+                            onChange={(val) => handleSettingChange('graphics', 'reduceMotion', val)}
+                        />
+                        <ToggleItem 
+                            label="Particles" 
+                            description="Enables atmospheric fog and combat hit effects."
+                            icon={Sparkles}
+                            checked={settings.graphics.particles}
+                            onChange={(val) => handleSettingChange('graphics', 'particles', val)}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'gameplay' && (
+                <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
+                    <h3 className="text-2xl font-display text-white mb-6">Gameplay Preferences</h3>
+                    <div className="space-y-4">
+                        <ToggleItem 
+                            label="Show Grid" 
+                            description="Draws visible borders around all discovered hex tiles."
+                            icon={Grid}
+                            checked={settings.gameplay.showGrid}
+                            onChange={(val) => handleSettingChange('gameplay', 'showGrid', val)}
+                        />
+                        <ToggleItem 
+                            label="Fast Mode" 
+                            description="Increases the speed of character movement and enemy turns."
+                            icon={Zap}
+                            checked={settings.gameplay.fastMode}
+                            onChange={(val) => handleSettingChange('gameplay', 'fastMode', val)}
+                        />
+                    </div>
+                </div>
+            )}
+
             {activeTab === 'assets' && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
                     <div className="flex justify-between items-end mb-4 border-b border-slate-800 pb-2">
@@ -217,13 +284,25 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
                 </div>
             )}
 
-            {/* Other tabs remain similar but simplified for brevity in this XML update */}
             {activeTab === 'data' && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
                     <h3 className="text-2xl font-display text-white mb-6">Data Management</h3>
                     <div className="bg-red-900/10 border border-red-900/30 p-6 rounded">
-                        <p className="text-red-300/60 text-xs mb-6">Resetter etterforskere og spill-state. Bilder bevares.</p>
-                        <button onClick={onResetData} className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded">RESET ALL DATA</button>
+                        <p className="text-red-300/60 text-xs mb-6 font-serif italic">This will wipe your current case progress and saved investigators. Assets (images) are preserved.</p>
+                        <button 
+                            onClick={() => {
+                                if (confirmReset) {
+                                    onResetData();
+                                    setConfirmReset(false);
+                                } else {
+                                    setConfirmReset(true);
+                                    setTimeout(() => setConfirmReset(false), 3000);
+                                }
+                            }} 
+                            className={`w-full py-4 font-bold rounded transition-all uppercase tracking-widest text-sm ${confirmReset ? 'bg-red-500 text-white animate-pulse' : 'bg-red-900/40 text-red-500 border border-red-500/50 hover:bg-red-900/60'}`}
+                        >
+                            {confirmReset ? 'Are you absolutely sure?' : 'RESET ALL GAME DATA'}
+                        </button>
                     </div>
                 </div>
             )}
