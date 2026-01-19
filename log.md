@@ -1,5 +1,51 @@
 # Project Log - Shadows of the 1920s
 
+## [v3.10.29 - GitHub Pages Import Map Konflikt Fix] - 2026-01-19
+
+### Problem:
+Spillet viste fortsatt tom/svart side på GitHub Pages etter forrige fix.
+
+### Rotårsak Identifisert:
+**Import Map Konflikt** - `index.html` hadde et `<script type="importmap">` som pekte til ESM.sh CDN for React, Tone.js, Lucide, og Google GenAI. Når Vite bundler koden, inkluderer den allerede alle disse bibliotekene i JavaScript-filen.
+
+Dette forårsaket:
+1. **Dupliserte React-instanser** - Én fra Vite-bundlen, én fra ESM.sh CDN
+2. **React Hydration Errors** - To forskjellige React-versjoner krasjet
+3. **Blank skjerm** - Ingen feilmelding, bare hvit/svart side
+
+### Utført Fix:
+1. **Fjernet import map fra index.html** - Vite bundler allerede alle dependencies
+   - Erstattet med kommentar: `<!-- Import map removed - Vite bundles all dependencies -->`
+
+### Teknisk Forklaring:
+```
+FØR (feil):
+- index.html: import map peker til esm.sh/react@19.2.3
+- Vite bundle: inneholder React 19.2.3 (bundlet)
+- Resultat: Nettleseren laster React to ganger = KRASJ
+
+ETTER (riktig):
+- index.html: ingen import map
+- Vite bundle: inneholder alle dependencies
+- Resultat: Én React-instans = FUNGERER
+```
+
+### Build Output:
+```
+vite v6.4.1 building for production...
+✓ 1715 modules transformed
+dist/index.html                  7.80 kB (ned fra 8.11 kB)
+dist/assets/index-BGqO6tu1.js  554.77 kB
+✓ built in 6.91s
+```
+
+### Neste Steg:
+1. Push endringer til branch
+2. GitHub Actions vil automatisk bygge og deploye
+3. Verifiser at spillet laster på tombonator3000.github.io
+
+---
+
 ## [v3.10.28 - GitHub Pages Startup Fix] - 2026-01-19
 
 ### Problem:
