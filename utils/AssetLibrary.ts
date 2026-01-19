@@ -6,6 +6,9 @@ import { Enemy, Player, CharacterType, EnemyType } from '../types';
 const ASSET_KEY = 'shadows_1920s_assets_v1';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Get base URL for assets (handles GitHub Pages deployment)
+const getBaseUrl = () => import.meta.env.BASE_URL || '/';
+
 export interface AssetLibrary {
     [locationName: string]: string; // Maps location name to Base64 image string or URL path
 }
@@ -53,7 +56,7 @@ export const saveAssetLibrary = (library: AssetLibrary) => {
 export const generateLocationAsset = async (locationName: string, type: 'room' | 'street' | 'building'): Promise<string | null> => {
     // 1. Check Manual File
     const fileName = toFileName(locationName);
-    const localPath = `/assets/graphics/tiles/${fileName}.png`;
+    const localPath = `${getBaseUrl()}assets/graphics/tiles/${fileName}.png`;
     
     if (await checkLocalAsset(localPath)) {
         console.log(`[AssetLibrary] Found local asset for ${locationName}`);
@@ -96,7 +99,7 @@ export const generateLocationAsset = async (locationName: string, type: 'room' |
 export const getCharacterVisual = async (player: Player): Promise<string | null> => {
     // 1. Check Manual File
     const fileName = player.id; // e.g. 'detective'
-    const localPath = `/assets/graphics/characters/${fileName}.png`;
+    const localPath = `${getBaseUrl()}assets/graphics/characters/${fileName}.png`;
 
     if (await checkLocalAsset(localPath)) {
         return localPath;
@@ -128,7 +131,7 @@ export const getCharacterVisual = async (player: Player): Promise<string | null>
 export const getEnemyVisual = async (enemy: Enemy): Promise<string | null> => {
     // 1. Check Manual File
     const fileName = enemy.type;
-    const localPath = `/assets/graphics/monsters/${fileName}.png`;
+    const localPath = `${getBaseUrl()}assets/graphics/monsters/${fileName}.png`;
 
     if (await checkLocalAsset(localPath)) {
         return localPath;

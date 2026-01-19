@@ -1,5 +1,61 @@
 # Project Log - Shadows of the 1920s
 
+## [v3.10.30 - GitHub Pages Asset Path Fix] - 2026-01-19
+
+### Problem:
+Spillet viste fortsatt 404-feil på GitHub Pages. Konsollen viste:
+- `Failed to load resource: the server responded with a status of 404 ()`
+- Feilmeldingen pekte til `index.tsx:1`
+
+### Rotårsak Identifisert:
+**Absolutte asset-stier uten base URL** - `AssetLibrary.ts` brukte absolutte stier som `/assets/graphics/tiles/...` for å sjekke lokale assets. På GitHub Pages er base URL `/https-github.com-Tombonator3000/`, så stiene må inkludere denne prefiksen.
+
+Problemet:
+```typescript
+// FØR (feil på GitHub Pages):
+const localPath = `/assets/graphics/tiles/${fileName}.png`;
+// Resolves til: https://tombonator3000.github.io/assets/graphics/tiles/...
+// Men filen er på: https://tombonator3000.github.io/https-github.com-Tombonator3000/assets/...
+```
+
+### Utført Fix:
+1. **Lagt til `getBaseUrl()` helper i AssetLibrary.ts** - Bruker `import.meta.env.BASE_URL` fra Vite
+2. **Oppdatert alle asset-stier** - Tiles, Characters, og Monsters bruker nå dynamisk base URL
+3. **Lagt til vite-env.d.ts** - TypeScript type definitions for Vite miljøvariabler
+
+```typescript
+// ETTER (fungerer på GitHub Pages):
+const getBaseUrl = () => import.meta.env.BASE_URL || '/';
+const localPath = `${getBaseUrl()}assets/graphics/tiles/${fileName}.png`;
+// Resolves til: https://tombonator3000.github.io/https-github.com-Tombonator3000/assets/graphics/tiles/...
+```
+
+### Endrede Filer:
+- `utils/AssetLibrary.ts` - Lagt til getBaseUrl() og oppdatert alle 3 asset-stier
+- `vite-env.d.ts` - Ny fil for Vite TypeScript support
+
+### Build Output:
+```
+vite v6.4.1 building for production...
+✓ 1715 modules transformed
+dist/index.html                  7.80 kB
+dist/assets/index-DMbJqwo6.js  554.84 kB
+✓ built in 6.49s
+```
+
+### Verifisert i Bundle:
+```javascript
+const rg=()=>"/https-github.com-Tombonator3000/";
+// Asset paths nå korrekt prefixed med base URL
+```
+
+### Neste Steg:
+1. Push endringer til branch
+2. GitHub Actions vil automatisk bygge og deploye
+3. Verifiser at spillet laster uten 404-feil
+
+---
+
 ## [v3.10.29 - GitHub Pages Import Map Konflikt Fix] - 2026-01-19
 
 ### Problem:
