@@ -1,3 +1,4 @@
+
 import { Character, CharacterType, Item, EventCard, Tile, Scenario, Madness, Spell, BestiaryEntry, EnemyType, Trait, ScenarioModifier, TileObjectType } from './types';
 
 export const SPELLS: Spell[] = [
@@ -170,6 +171,20 @@ export const SCENARIOS: Scenario[] = [
         { threshold: 8, triggered: false, type: 'spawn_enemy', targetId: 'ghoul', amount: 3, message: 'Wave 2: Ghouls swarm the barricades!' },
         { threshold: 4, triggered: false, type: 'spawn_boss', targetId: 'dark_young', amount: 1, message: 'Wave 3: A Dark Young appears!' }
     ]
+  },
+  {
+    id: 's5',
+    title: 'The Unspeakable Randomness',
+    description: 'The void shuffles reality itself. No two visits to the abyss are the same. Prepare for the unexpected.',
+    startDoom: 12,
+    startLocation: 'Train Station',
+    goal: 'Randomized Objective',
+    specialRule: 'The scenario steps and doom events are generated randomly when the game starts.',
+    difficulty: 'Normal',
+    tileSet: 'mixed',
+    victoryType: 'escape',
+    steps: [],
+    doomEvents: []
   }
 ];
 
@@ -177,7 +192,6 @@ export const START_TILE: Tile = {
   id: 'start', q: 0, r: 0, name: 'Train Station', type: 'street', category: 'location', explored: true, searchable: true, searched: false
 };
 
-// Fix: Added missing 'sniper' and 'priest' properties to satisfy the Record<EnemyType, BestiaryEntry> constraint.
 export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
   cultist: {
     name: 'Cultist', type: 'cultist', hp: 2, damage: 1, horror: 1,

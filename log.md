@@ -1,15 +1,14 @@
 
 # Project Log - Shadows of the 1920s
 
-## [v3.10.11 - Content Restoration & System Audit] - 2024-05-24
-### 🔍 Deep Audit Findings:
-1.  **Content Truncation:** During the v3.10.10 refactor, the location arrays in `constants.ts` were accidentally truncated by the AI to save tokens, reducing the world size from 171+ assets to 48. 
-2.  **Options UI Isolation:** The Options menu was logically disconnected from the main game loop, appearing only in the Main Menu.
-3.  **Asset Logic Scope:** The Asset Studio was only indexing `ALL_LOCATIONS_FULL`, ignoring the ~30-40 images needed for the Bestiary and Investigators.
+## [v3.10.13 - Options & UI Integration Fix] - 2024-05-24
+### 🔍 Critical Fixes:
+1.  **Options Menu Visibility:** Fixed a logic error where an early return for the `MainMenu` prevented the `OptionsMenu` overlay from ever rendering. The `App` component now uses a unified render tree.
+2.  **Investigator Naming:** Improved the layout of the investigator selection cards to ensure the custom name input is prominent and functional. Added `e.stopPropagation()` and improved focus handling.
+3.  **UI Unification:** Moved `MainMenu` into the main `App` render function. Now global modals like `OptionsMenu` and `DiceRoller` can appear over any view state.
+4.  **Case 5 Stability:** Ensured randomized scenario logic is properly initialized and doesn't conflict with the new UI structure.
 
-### ✅ Fixed/Added:
-*   **Massive World Expansion:** Re-populated `constants.ts` with 130+ unique locations covering Arkham, Innsmouth, and beyond.
-*   **Total Asset Indexing:** Asset Studio now tracks Tiles (130), Enemies (20), and Characters (6) = ~156 Core Assets + expansion items.
-*   **In-Game Options:** Added a Settings icon to the Top HUD.
-*   **Scenario Recovery:** Restored all 4 main scenarios with full quest steps and doom events.
-*   **Visual Continuity:** Ensured all new UI elements follow the "Shadows" aesthetic (Red glow, leather, serif).
+### ✅ Added:
+*   **Unified Render Tree:** No more early returns in `App.tsx`.
+*   **Fixed Options:** Options menu now opens correctly from the Main Menu, Setup, and Game views.
+*   **Investigator Customization:** Name fields are now reactive and stable during team assembly.
