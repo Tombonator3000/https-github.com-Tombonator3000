@@ -14,7 +14,12 @@ const MainMenu: React.FC<MainMenuProps> = ({ onNewGame, onContinue, onOptions, c
   return (
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#05050a] text-slate-200 overflow-hidden font-serif">
       {/* Background Effects */}
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')] opacity-20 animate-pulse"></div>
+      {/* CSS noise pattern instead of external texture */}
+      <div className="absolute inset-0 opacity-20 animate-pulse" style={{
+        backgroundImage: `radial-gradient(circle at 20% 80%, rgba(120, 0, 0, 0.3) 0%, transparent 50%),
+                          radial-gradient(circle at 80% 20%, rgba(50, 0, 80, 0.3) 0%, transparent 50%),
+                          radial-gradient(circle at 40% 40%, rgba(0, 0, 50, 0.2) 0%, transparent 30%)`
+      }}></div>
       <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a1a] via-transparent to-[#0a0a1a]"></div>
       
       {/* Content Container */}

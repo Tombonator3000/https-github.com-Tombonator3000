@@ -21,7 +21,10 @@ const JournalModal: React.FC<JournalModalProps> = ({ unlockedIds, onClose }) => 
         
         {/* Header */}
         <div className="bg-[#2a1d18] p-6 border-b border-amber-900 flex justify-between items-center relative">
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/leather.png')] opacity-30"></div>
+            {/* CSS leather texture pattern */}
+            <div className="absolute inset-0 opacity-30" style={{
+              background: 'repeating-linear-gradient(45deg, rgba(139,90,43,0.1) 0px, transparent 2px, transparent 4px)'
+            }}></div>
             <div className="relative z-10 flex items-center gap-4">
                 <Book className="text-amber-600" size={32} />
                 <div>
@@ -36,7 +39,10 @@ const JournalModal: React.FC<JournalModalProps> = ({ unlockedIds, onClose }) => 
 
         <div className="flex-1 flex overflow-hidden relative">
             {/* Background Texture */}
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/aged-paper.png')] opacity-10 pointer-events-none"></div>
+            {/* CSS aged paper texture pattern */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
+              background: 'repeating-linear-gradient(0deg, rgba(245,222,179,0.1) 0px, transparent 1px, transparent 3px)'
+            }}></div>
 
             {/* Left: List */}
             <div className="w-1/3 border-r border-amber-900/50 overflow-y-auto p-4 bg-[#120c08]/80 backdrop-blur-sm">

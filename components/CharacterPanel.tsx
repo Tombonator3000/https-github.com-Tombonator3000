@@ -36,7 +36,10 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
 
   return (
     <div className="h-full flex flex-col bg-[#1a120b] text-[#d4c5a3] font-serif relative overflow-hidden border-2 border-[#e94560] rounded-2xl shadow-[0_0_30px_rgba(233,69,96,0.3)]">
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/leather.png')] opacity-30 pointer-events-none"></div>
+      {/* CSS leather texture pattern */}
+      <div className="absolute inset-0 opacity-30 pointer-events-none" style={{
+        background: 'repeating-linear-gradient(45deg, rgba(139,90,43,0.1) 0px, transparent 2px, transparent 4px)'
+      }}></div>
       <div className="absolute inset-0 shadow-[inset_0_0_60px_rgba(0,0,0,0.8)] pointer-events-none"></div>
 
       <div className="p-6 pb-4 border-b-2 border-[#3e2c20] relative z-10 shrink-0">
