@@ -55,7 +55,7 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 relative z-10 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 relative z-10 custom-scrollbar momentum-scroll">
         <div className="space-y-4">
             <div>
                 <div className="flex justify-between items-end mb-1 px-1">
