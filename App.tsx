@@ -8,11 +8,13 @@ import MainMenu from './components/MainMenu';
 import OptionsMenu from './components/OptionsMenu';
 import TurnNotification from './components/TurnNotification'; 
 import PuzzleModal from './components/PuzzleModal';
-import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, getEnemyVisual } from './utils/AssetLibrary';
-import { loadSettings, DEFAULT_SETTINGS } from './utils/Settings';
+import CharacterPanel from './components/CharacterPanel';
+import LogPanel from './components/LogPanel';
+import { loadAssetLibrary } from './utils/AssetLibrary';
+import { loadSettings } from './utils/Settings';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
-const APP_VERSION = "3.10.33"; 
+const APP_VERSION = "3.10.35"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -50,25 +52,67 @@ const App: React.FC = () => {
   const [state, setState] = useState<GameState>(() => {
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
-        const lib = loadAssetLibrary();
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            const mergedState = { ...DEFAULT_STATE, ...parsed };
-            if (mergedState.board) {
-                mergedState.board = mergedState.board.map((t: Tile) => ({
-                    ...t,
-                    imageUrl: lib[t.name] || t.imageUrl
-                }));
-            }
-            return mergedState;
-        }
+        if (saved) return { ...DEFAULT_STATE, ...JSON.parse(saved) };
     } catch (e) { console.error(e); }
     return DEFAULT_STATE;
   });
 
+  useEffect(() => {
+    if (state.phase !== GamePhase.SETUP) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+  }, [state]);
+
   const addToLog = (msg: string) => {
-    setState(prev => ({ ...prev, log: [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.log].slice(0, 50) }));
+    setState(prev => ({ ...prev, log: [msg, ...prev.log].slice(0, 100) }));
   };
+
+  const handleEndTurn = () => {
+    setState(prev => {
+        const isLastPlayer = prev.activePlayerIndex === prev.players.length - 1;
+        if (isLastPlayer) {
+            // Skift til MYTHOS fase
+            addToLog("Et gufs av ondskap stryker over byen... (Mythos Phase)");
+            return {
+                ...prev,
+                phase: GamePhase.MYTHOS,
+                activePlayerIndex: 0,
+                players: prev.players.map(p => ({ ...p, actions: 2 })) // Reset actions for neste runde
+            };
+        }
+        return { ...prev, activePlayerIndex: prev.activePlayerIndex + 1 };
+    });
+
+    // Simulert Mythos fase for nå
+    setTimeout(() => {
+        setState(prev => {
+            if (prev.phase === GamePhase.MYTHOS) {
+                addToLog(`Runde ${prev.round + 1} starter.`);
+                return { ...prev, phase: GamePhase.INVESTIGATOR, round: prev.round + 1 };
+            }
+            return prev;
+        });
+    }, 2000);
+  };
+
+  const spawnRoom = useCallback((q: number, r: number, tileSet: string) => {
+      const isConnector = Math.random() > 0.6; 
+      const pool = isConnector ? OUTDOOR_CONNECTORS : OUTDOOR_LOCATIONS;
+      const roomName = pool[Math.floor(Math.random() * pool.length)];
+      
+      const newTile: Tile = {
+          id: `tile-${Date.now()}-${Math.random()}`,
+          q, r,
+          name: roomName,
+          type: isConnector ? 'street' : 'room',
+          explored: true,
+          searchable: !isConnector,
+          searched: false
+      };
+
+      setState(prev => ({ ...prev, board: [...prev.board, newTile] }));
+      addToLog(`Du oppdaget: ${roomName}`);
+  }, []);
 
   const handleAction = (actionType: string, payload?: any) => {
     const activePlayer = state.players[state.activePlayerIndex];
@@ -76,109 +120,115 @@ const App: React.FC = () => {
     
     if (actionType === 'move') {
         const { q, r } = payload;
-        const targetTile = state.board.find(t => t.q === q && t.r === r);
-        
-        if (targetTile?.object?.blocking) {
-            addToLog("Vei sperret! Du må fjerne hindringen først.");
-            return;
-        }
-
-        // Vær-effekt: Tåke begrenser bevegelse (kunne vært brukt her)
-        const isFoggy = state.activeModifiers.some(m => m.weatherType === 'fog');
-        
-        if (!targetTile) spawnRoom(q, r, state.activeScenario?.tileSet || 'mixed');
-        
-        let hpChange = 0;
-        if (targetTile?.object?.type === 'fire') {
-            hpChange = -1;
-            addToLog("AAARGH! Du brenner deg i flammene!");
-        } else if (targetTile?.object?.type === 'trap') {
-            hpChange = -1;
-            addToLog("KLIKK! En felle ble utløst!");
-        }
+        const exists = state.board.find(t => t.q === q && t.r === r);
+        if (!exists) spawnRoom(q, r, 'outdoor');
 
         setState(prev => ({ 
             ...prev, 
-            screenShake: hpChange < 0,
             players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { 
                 ...p, 
                 position: { q, r }, 
-                actions: p.actions - 1,
-                hp: Math.max(0, p.hp + hpChange)
+                actions: p.actions - 1 
             } : p) 
         }));
-
-        setTimeout(() => setState(prev => ({ ...prev, screenShake: false })), 500);
     }
 
-    if (actionType === 'interact') {
-        const p = state.players[state.activePlayerIndex];
-        const tile = state.board.find(t => t.q === p.position.q && t.r === p.position.r);
-        if (tile?.object?.puzzleType === 'sequence') {
-            setState(prev => ({ ...prev, activePuzzle: { type: 'sequence', difficulty: tile.object?.difficulty || 3, targetTileId: tile.id } }));
-        } else if (tile?.object) {
-            addToLog(`Prøver å fjerne ${tile.object.type}...`);
-            setState(prev => ({
-                ...prev,
-                board: prev.board.map(t => t.id === tile.id ? { ...t, object: undefined } : t)
-            }));
-            addToLog("Hindring fjernet!");
-        }
+    if (actionType === 'rest') {
+        setState(prev => ({
+            ...prev,
+            players: prev.players.map((p, i) => i === prev.activePlayerIndex ? {
+                ...p,
+                hp: Math.min(p.maxHp, p.hp + 1),
+                actions: p.actions - 1
+            } : p)
+        }));
+        addToLog("Du hviler og henter deg inn.");
     }
   };
 
-  const spawnRoom = useCallback(async (startQ: number, startR: number, tileSet: 'indoor' | 'outdoor' | 'mixed') => {
-      const roomId = `room-${Date.now()}`;
-      const isConnector = Math.random() > 0.6; 
-      const pool = isConnector ? (tileSet === 'indoor' ? INDOOR_CONNECTORS : OUTDOOR_CONNECTORS) : (tileSet === 'indoor' ? INDOOR_LOCATIONS : OUTDOOR_LOCATIONS);
-      const roomName = pool[Math.floor(Math.random() * pool.length)];
-      
-      let object: TileObject | undefined = undefined;
-      const rand = Math.random();
-      if (rand > 0.90) {
-          object = { type: 'locked_door', blocking: true, searched: false, difficulty: 4, puzzleType: 'sequence' };
-      } else if (rand > 0.85) {
-          object = { type: 'fire', blocking: false, searched: false };
-      }
-
-      const newTile: Tile = {
-          id: `tile-${Date.now()}`,
-          q: startQ, r: startR,
-          name: roomName,
-          type: isConnector ? 'street' : 'room',
-          category: isConnector ? 'connector' : 'location',
-          roomId,
-          explored: true,
-          searchable: !isConnector,
-          searched: false,
-          object
-      };
-
-      setState(prev => ({ ...prev, board: [...prev.board, newTile] }));
-  }, []);
+  const handleStartNewGame = (charType: CharacterType) => {
+    const char = CHARACTERS[charType];
+    const startPlayer: Player = {
+        ...char,
+        position: { q: 0, r: 0 },
+        inventory: [],
+        spells: [],
+        actions: 2,
+        isDead: false,
+        madness: [],
+        activeMadness: null,
+        traits: []
+    };
+    
+    setState({
+        ...DEFAULT_STATE,
+        players: [startPlayer],
+        phase: GamePhase.INVESTIGATOR,
+        board: [{ ...START_TILE, id: 'start' }],
+        log: [`Velkommen, ${char.name}. Etterforskningen begynner.`]
+    });
+    setIsMainMenuOpen(false);
+  };
 
   return (
     <div className={`h-full w-full bg-[#05050a] text-slate-200 overflow-hidden relative ${state.screenShake ? 'animate-shake' : ''}`}>
-      {isMainMenuOpen && <MainMenu onNewGame={() => { 
-          // Start med et tilfeldig vær-modifier for å teste systemet
-          const randomWeather = SCENARIO_MODIFIERS[Math.floor(Math.random() * SCENARIO_MODIFIERS.length)];
-          setState({...DEFAULT_STATE, phase: GamePhase.SETUP, activeModifiers: [randomWeather]}); 
-          setIsMainMenuOpen(false); 
-      }} onContinue={() => setIsMainMenuOpen(false)} onOptions={() => setShowOptions(true)} canContinue={state.phase !== GamePhase.SETUP} version={APP_VERSION} />}
-      
-      {!isMainMenuOpen && state.phase !== GamePhase.SETUP && (
-          <>
-            <GameBoard tiles={state.board} players={state.players} enemies={state.enemies} onTileClick={(q, r) => handleAction('move', { q, r })} doom={state.doom} activeModifiers={state.activeModifiers} />
-            <footer className="fixed bottom-0 left-0 right-0 h-24 flex items-center justify-center gap-4 z-40 bg-gradient-to-t from-black to-transparent">
-                <ActionBar 
-                    onAction={handleAction} 
-                    actionsRemaining={state.players[state.activePlayerIndex]?.actions || 0} 
-                    isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} 
-                    contextAction={state.board.find(t => t.q === state.players[state.activePlayerIndex]?.position.q && t.r === state.players[state.activePlayerIndex]?.position.r)?.object ? { id: 'obj', label: 'Interager', iconType: 'insight', difficulty: 4 } : null}
-                    spells={[]} activeSpell={null} onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} showCharacter={showLeftPanel} onToggleInfo={() => setShowRightPanel(!showRightPanel)} showInfo={showRightPanel} 
-                />
-            </footer>
-          </>
+      {isMainMenuOpen && (
+        <MainMenu 
+            onNewGame={handleStartNewGame} 
+            onContinue={() => setIsMainMenuOpen(false)} 
+            onOptions={() => setShowOptions(true)} 
+            canContinue={state.players.length > 0} 
+            version={APP_VERSION} 
+        />
+      )}
+
+      {!isMainMenuOpen && (
+        <>
+          <GameBoard 
+            tiles={state.board} 
+            players={state.players} 
+            enemies={state.enemies} 
+            onTileClick={(q, r) => handleAction('move', { q, r })} 
+            doom={state.doom} 
+            activeModifiers={state.activeModifiers} 
+          />
+
+          <TurnNotification player={state.players[state.activePlayerIndex]} phase={state.phase} />
+
+          {/* Side Panels */}
+          <div className={`fixed left-0 top-0 bottom-0 w-80 z-[60] transition-transform duration-500 shadow-2xl ${showLeftPanel ? 'translate-x-0' : '-translate-x-full'}`}>
+            <CharacterPanel 
+                player={state.players[state.activePlayerIndex]} 
+                allPlayers={state.players} 
+                onTrade={() => {}} 
+                onDrop={() => {}} 
+            />
+          </div>
+
+          <div className={`fixed right-0 top-0 bottom-0 w-80 z-[60] transition-transform duration-500 shadow-2xl ${showRightPanel ? 'translate-x-0' : 'translate-x-full'}`}>
+            <LogPanel logs={state.log} onClose={() => setShowRightPanel(false)} />
+          </div>
+
+          <footer className="fixed bottom-0 left-0 right-0 h-24 flex items-center justify-center gap-4 z-50 bg-gradient-to-t from-black to-transparent">
+              <ActionBar 
+                  onAction={(type) => type === 'end_turn' ? handleEndTurn() : handleAction(type)} 
+                  actionsRemaining={state.players[state.activePlayerIndex]?.actions || 0} 
+                  isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} 
+                  spells={[]} 
+                  activeSpell={null} 
+                  onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} 
+                  showCharacter={showLeftPanel} 
+                  onToggleInfo={() => setShowRightPanel(!showRightPanel)} 
+                  showInfo={showRightPanel} 
+              />
+              <button 
+                onClick={handleEndTurn}
+                className="bg-[#e94560] px-4 py-2 rounded font-bold uppercase tracking-widest text-xs hover:bg-[#c9354d] transition-colors"
+              >
+                End Turn
+              </button>
+          </footer>
+        </>
       )}
     </div>
   );
