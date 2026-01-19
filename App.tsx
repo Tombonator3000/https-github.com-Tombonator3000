@@ -27,8 +27,22 @@ import { loadSettings, DEFAULT_SETTINGS } from './utils/Settings';
 import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.10.25"; 
+const APP_VERSION = "3.10.31";
+
+// Lazy-initialize AI to prevent crash when API_KEY is undefined (e.g., on GitHub Pages)
+let _ai: GoogleGenAI | null = null;
+const getAI = (): GoogleGenAI | null => {
+    if (_ai) return _ai;
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return null;
+    try {
+        _ai = new GoogleGenAI({ apiKey });
+        return _ai;
+    } catch (e) {
+        console.warn("Failed to initialize GoogleGenAI:", e);
+        return null;
+    }
+}; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -126,6 +140,8 @@ const App: React.FC = () => {
   }, [state]);
 
   const generateNarrative = async (context: string) => {
+    const ai = getAI();
+    if (!ai) return; // Skip narrative generation if no API key
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',

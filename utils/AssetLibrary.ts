@@ -4,7 +4,21 @@ import { INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, BESTIARY, CHARACTERS } from '../co
 import { Enemy, Player, CharacterType, EnemyType } from '../types';
 
 const ASSET_KEY = 'shadows_1920s_assets_v1';
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+// Lazy-initialize AI to prevent crash when API_KEY is undefined (e.g., on GitHub Pages)
+let _ai: GoogleGenAI | null = null;
+const getAI = (): GoogleGenAI | null => {
+    if (_ai) return _ai;
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return null;
+    try {
+        _ai = new GoogleGenAI({ apiKey });
+        return _ai;
+    } catch (e) {
+        console.warn("Failed to initialize GoogleGenAI:", e);
+        return null;
+    }
+};
 
 // Get base URL for assets (handles GitHub Pages deployment)
 const getBaseUrl = () => import.meta.env.BASE_URL || '/';
@@ -64,12 +78,13 @@ export const generateLocationAsset = async (locationName: string, type: 'room' |
     }
 
     // 2. Check AI / API
-    if (!process.env.API_KEY) return null;
-    
-    const prompt = `A top-down, tabletop RPG battlemap tile of a ${locationName} (${type}) in a 1920s Lovecraftian horror setting. 
-    Style: Dark, gritty, hand-painted oil painting aesthetic. High contrast, atmospheric lighting, ominous shadows. 
-    Perspective: Strictly top-down (bird's eye view). 
-    Constraints: No grid lines, no text, no UI elements. 
+    const ai = getAI();
+    if (!ai) return null;
+
+    const prompt = `A top-down, tabletop RPG battlemap tile of a ${locationName} (${type}) in a 1920s Lovecraftian horror setting.
+    Style: Dark, gritty, hand-painted oil painting aesthetic. High contrast, atmospheric lighting, ominous shadows.
+    Perspective: Strictly top-down (bird's eye view).
+    Constraints: No grid lines, no text, no UI elements.
     The image should look like a finished board game component.`;
 
     try {
@@ -106,10 +121,11 @@ export const getCharacterVisual = async (player: Player): Promise<string | null>
     }
 
     // 2. Check AI Generation
-    if (!process.env.API_KEY) return null;
+    const ai = getAI();
+    if (!ai) return null;
 
     const prompt = `A dark, moody, oil painting style portrait of a 1920s ${CHARACTERS[player.id].name} (${player.id}) in a Lovecraftian horror setting. High contrast, atmospheric, vintage.`;
-    
+
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
@@ -138,7 +154,8 @@ export const getEnemyVisual = async (enemy: Enemy): Promise<string | null> => {
     }
 
     // 2. Check AI Generation
-    if (!process.env.API_KEY) return null;
+    const ai = getAI();
+    if (!ai) return null;
 
     const bestiaryEntry = BESTIARY[enemy.type];
     const specificPrompt = bestiaryEntry?.visualPrompt || `A terrifying, nightmarish illustration of a ${enemy.name} (${enemy.type}) from Cthulhu mythos. Dark fantasy art, creature design, horror, menacing, detailed, isolated on dark background.`;
