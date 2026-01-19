@@ -27,7 +27,7 @@ import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.10.18"; 
+const APP_VERSION = "3.10.19"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -126,6 +126,11 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, log: [`[${new Date().toLocaleTimeString()}] ${message}`, ...prev.log].slice(0, 50) }));
   };
 
+  const triggerScreenShake = () => {
+    setState(prev => ({ ...prev, screenShake: true }));
+    setTimeout(() => setState(prev => ({ ...prev, screenShake: false })), 500);
+  };
+
   const addFloatingText = (q: number, r: number, content: string, colorClass: string) => {
     const id = `ft-${Date.now()}`;
     setState(prev => ({
@@ -164,7 +169,7 @@ const App: React.FC = () => {
 
   const spawnRoom = useCallback(async (startQ: number, startR: number, tileSet: 'indoor' | 'outdoor' | 'mixed') => {
       const roomId = `room-${Date.now()}`;
-      const isConnector = Math.random() > 0.6; // 40% chance of a connector (hallway)
+      const isConnector = Math.random() > 0.6; 
       
       const pool = isConnector 
         ? (tileSet === 'indoor' ? INDOOR_CONNECTORS : OUTDOOR_CONNECTORS)
@@ -181,7 +186,6 @@ const App: React.FC = () => {
           const q = startQ + offset.q;
           const r = startR + offset.r;
           
-          // Only add if no tile exists here
           if (!state.board.some(t => t.q === q && t.r === r)) {
               newTiles.push({
                   id: `tile-${Date.now()}-${Math.random()}`,
@@ -205,7 +209,6 @@ const App: React.FC = () => {
           }));
           addToLog(`ROOM: ${roomName}. ${LOCATION_DESCRIPTIONS[roomName] || ""}`);
           
-          // Chance to spawn an enemy in the new room
           if (Math.random() > 0.7 && !isConnector) {
               spawnEnemy('cultist', startQ, startR);
           }
@@ -234,7 +237,6 @@ const App: React.FC = () => {
              }));
         }
 
-        // Check if now in line of sight of any enemy
         state.enemies.forEach(enemy => {
             if (hasLineOfSight(enemy.position, { q, r }, state.board, enemy.visionRange)) {
                 addToLog(`The eyes of a ${enemy.name} fall upon you! You are VISIBLE!`);
@@ -262,9 +264,8 @@ const App: React.FC = () => {
               addToLog("No target selected for attack!");
               return;
           }
-          // Simple Range Check for Combat
           const dist = hexDistance(activePlayer.position, targetEnemy.position);
-          if (dist > 1) { // Melee range default
+          if (dist > 1) { 
               addToLog("Target is too far away to attack!");
               return;
           }
@@ -284,13 +285,13 @@ const App: React.FC = () => {
       const activePlayer = state.players[state.activePlayerIndex];
 
       if (state.activeCombat) {
-          // Resolve Combat
           const enemy = state.enemies.find(e => e.id === state.activeCombat?.enemyId);
           if (enemy) {
               if (successes > 0) {
                   const damage = successes;
                   addToLog(`${activePlayer.name} hit ${enemy.name} for ${damage} damage!`);
                   addFloatingText(enemy.position.q, enemy.position.r, `-${damage} HP`, "text-red-500");
+                  triggerScreenShake();
                   
                   setState(prev => ({
                       ...prev,
@@ -315,7 +316,6 @@ const App: React.FC = () => {
               }
           }
       } else {
-          // Resolve Investigation
           if (successes > 0) {
               const randomItem = ITEMS[Math.floor(Math.random() * ITEMS.length)];
               addToLog(`${activePlayer.name} discovered a ${randomItem.name}!`);
@@ -354,13 +354,11 @@ const App: React.FC = () => {
       });
 
       if (state.phase === GamePhase.MYTHOS) {
-          // Basic AI Awareness for Mythos Phase
           state.enemies.forEach(enemy => {
               const visiblePlayers = state.players.filter(p => !p.isDead && hasLineOfSight(enemy.position, p.position, state.board, enemy.visionRange));
               if (visiblePlayers.length > 0) {
                   const nearest = visiblePlayers.sort((a, b) => hexDistance(enemy.position, a.position) - hexDistance(enemy.position, b.position))[0];
                   addToLog(`The ${enemy.name} begins stalking ${nearest.name}...`);
-                  // AI logic would go here: move or attack if in range
               }
           });
 
@@ -397,7 +395,6 @@ const App: React.FC = () => {
     if (state.players.length === 0 || !state.activeScenario) return;
     setState(prev => ({ ...prev, phase: GamePhase.INVESTIGATOR, activePlayerIndex: 0, doom: prev.activeScenario?.startDoom || 12 }));
     addToLog("The investigation begins. Keep your wits about you.");
-    // Initial Spawn
     spawnEnemy('cultist', 1, 0);
   };
 
@@ -406,7 +403,7 @@ const App: React.FC = () => {
   const selectedEnemy = state.enemies.find(e => e.id === state.selectedEnemyId);
 
   return (
-    <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative transition-all duration-1000 ${state.screenShake ? 'animate-shake' : ''}`}>
+    <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative transition-all duration-1000 ${state.screenShake ? 'animate-shake' : ''} ${activePlayer?.activeMadness?.visualClass || ''}`}>
       
       {isMainMenuOpen && (
           <MainMenu 
@@ -472,7 +469,7 @@ const App: React.FC = () => {
                     </div>
                     {currentStep && <div className="text-sm md:text-lg font-display italic text-[#eecfa1] mt-1 border-t border-[#3e2c20] pt-2">{currentStep.description}</div>}
                 </div>
-                <button onClick={() => setShowOptions(true)} className="bg-[#1a120b]/90 border-2 border-[#e94560] rounded-xl p-3 text-[#e94560]"><Settings size={24}/></button>
+                <button onClick={() => setShowOptions(true)} className="bg-[#1a120b]/90 border-2 border-[#e94560] rounded-xl p-3 text-[#e94560] transition-colors hover:bg-black/50"><Settings size={24}/></button>
             </div>
 
             <div className="absolute inset-0 z-0">
@@ -489,7 +486,7 @@ const App: React.FC = () => {
                 {selectedEnemy ? (
                     <EnemyPanel enemy={selectedEnemy} onClose={() => setState(prev => ({ ...prev, selectedEnemyId: null }))} />
                 ) : (
-                    <div className="bg-[#1a120b]/95 border-2 border-[#e94560] rounded-2xl h-full flex flex-col overflow-hidden">
+                    <div className="bg-[#1a120b]/95 border-2 border-[#e94560] rounded-2xl h-full flex flex-col overflow-hidden shadow-2xl">
                         <div className="p-4 border-b border-[#3e2c20] bg-black/40 flex items-center gap-3">
                             <ScrollText size={18} className="text-[#e94560]" />
                             <h3 className="text-xs font-bold text-[#eecfa1] uppercase tracking-[0.2em]">Field Journal</h3>
@@ -503,7 +500,7 @@ const App: React.FC = () => {
 
             <footer className="fixed bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black to-transparent z-50 flex items-center justify-center gap-4 px-4 pb-4">
                 <ActionBar onAction={handleAction} actionsRemaining={activePlayer?.actions || 0} isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} spells={activePlayer?.spells || []} activeSpell={state.activeSpell} showCharacter={showLeftPanel} onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} showInfo={showRightPanel} onToggleInfo={() => setShowRightPanel(!showRightPanel)} />
-                <button onClick={handleNextTurn} className="px-8 py-4 bg-[#e94560] text-white font-bold rounded-xl uppercase tracking-widest hover:scale-105 transition-all">
+                <button onClick={handleNextTurn} className="px-8 py-4 bg-[#e94560] text-white font-bold rounded-xl uppercase tracking-widest hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_#e94560]">
                     {state.activePlayerIndex === state.players.length - 1 ? "End Round" : "Next"}
                 </button>
             </footer>

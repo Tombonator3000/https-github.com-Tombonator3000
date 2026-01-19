@@ -28,7 +28,6 @@ const VISIBILITY_RANGE = 2; // Default range
 const DRAG_THRESHOLD = 5; // Pixels of movement required to count as a drag
 
 // SVG Polygon Points for Flat-Topped Hexagon (0-100 coordinate space)
-// Matches clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
 const HEX_POLY_POINTS = "25,0 75,0 100,50 75,100 25,100 0,50";
 
 // --- ICON MAPPER FOR MONSTERS ---
@@ -191,9 +190,9 @@ const getDoomLighting = (doom: number, activeModifiers: ScenarioModifier[] = [])
     const danger = Math.max(0, 1 - (doom / 12)); 
 
     let overlayColor = 'rgba(10, 20, 40, 0.4)'; 
-    let vignetteStrength = '60%'; 
+    let vignetteStrength = Math.min(100, 40 + (danger * 60)) + '%'; 
     let animation = 'none';
-    let contrast = 1;
+    let contrast = 1 + (danger * 0.4);
 
     const isBloodMoon = activeModifiers.some(m => m.effect === 'strong_enemies');
     if (isBloodMoon) {
@@ -201,18 +200,14 @@ const getDoomLighting = (doom: number, activeModifiers: ScenarioModifier[] = [])
     }
 
     if (doom <= 3) {
-        overlayColor = isBloodMoon ? 'rgba(80, 0, 0, 0.5)' : 'rgba(60, 0, 0, 0.3)'; 
-        vignetteStrength = '90%'; 
+        overlayColor = isBloodMoon ? 'rgba(100, 0, 0, 0.5)' : 'rgba(80, 0, 0, 0.3)'; 
         animation = isBloodMoon ? 'doom-pulse-red 3s infinite' : 'doom-flicker 4s infinite';
-        contrast = 1.2;
     } else if (doom <= 6) {
-        overlayColor = isBloodMoon ? 'rgba(60, 20, 20, 0.4)' : 'rgba(40, 10, 40, 0.3)';
-        vignetteStrength = '75%';
+        overlayColor = isBloodMoon ? 'rgba(80, 20, 20, 0.4)' : 'rgba(40, 10, 40, 0.3)';
         animation = 'none';
-        contrast = 1.1;
     }
 
-    const gradient = `radial-gradient(circle, transparent 30%, ${overlayColor} ${vignetteStrength}, #000 100%)`;
+    const gradient = `radial-gradient(circle, transparent 20%, ${overlayColor} ${vignetteStrength}, #000 100%)`;
 
     return { gradient, animation, contrast, danger };
 };
@@ -222,19 +217,21 @@ const getWeatherVisuals = (activeModifiers: ScenarioModifier[] = []) => {
     const isBloodMoon = activeModifiers.some(m => m.effect === 'strong_enemies');
     
     let bgImage = 'url("https://www.transparenttextures.com/patterns/foggy-birds.png")';
-    let opacity = 0.3;
+    let opacity = 0.2;
     let blendMode = 'screen';
-    let filter = 'blur(2px)';
+    let filter = 'blur(1px)';
     let animation = 'animate-fog';
 
     if (isFoggy) {
-        opacity = 0.6; 
-        filter = 'blur(4px) contrast(1.2)';
+        opacity = 0.5; 
+        filter = 'blur(3px) contrast(1.1)';
+        animation = 'animate-fog';
     } else if (isBloodMoon) {
         bgImage = 'url("https://www.transparenttextures.com/patterns/dark-matter.png")';
         opacity = 0.4;
         blendMode = 'color-dodge';
-        filter = 'sepia(1) hue-rotate(-50deg)'; 
+        filter = 'sepia(0.8) hue-rotate(-60deg)'; 
+        animation = 'animate-cloud-drift';
     }
 
     return { bgImage, opacity, blendMode, filter, animation };
@@ -431,15 +428,33 @@ const GameBoard: React.FC<GameBoardProps> = ({
       onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
     >
+      {/* Dynamic Background Pulse Layer */}
+      <div className="absolute inset-0 z-0 bg-black animate-spooky-pulse opacity-20 pointer-events-none" />
+
+      {/* Cloud & Fog Overlays */}
+      <div className="absolute inset-0 pointer-events-none z-[22] overflow-hidden">
+          <div 
+            className="absolute inset-[-100%] animate-cloud-drift opacity-[0.15] mix-blend-multiply" 
+            style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/foggy-birds.png")', backgroundSize: '800px' }}
+          />
+          <div 
+            className="absolute inset-[-100%] animate-fog opacity-[0.1] mix-blend-overlay scale-150" 
+            style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/dark-matter.png")', backgroundSize: '1000px' }}
+          />
+      </div>
+
+      {/* Lighting & Vignette Layer */}
       <div 
-        className="absolute inset-0 pointer-events-none z-20 transition-all duration-1000"
+        className="absolute inset-0 pointer-events-none z-24 transition-all duration-1000"
         style={{
             background: lighting.gradient,
             animation: lighting.animation,
-            mixBlendMode: 'overlay' 
+            mixBlendMode: 'overlay',
+            filter: `contrast(${lighting.contrast})`
         }}
       />
 
+      {/* Weather Layer */}
       <div 
         className={`absolute inset-0 pointer-events-none z-25 transition-opacity duration-1000 ${weather.animation}`}
         style={{
@@ -535,15 +550,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
                      strokeLinejoin="round"
                      className="transition-all duration-300"
                   />
-                  {tile.object?.blocking && (
-                      <polygon 
-                         points={HEX_POLY_POINTS} 
-                         fill="none" 
-                         stroke="#ef4444" 
-                         strokeWidth="2"
-                         className="opacity-60"
-                      />
-                  )}
               </svg>
             </div>
           );
@@ -585,7 +591,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
             return (
                 <div
                     key={player.id}
-                    className="absolute w-12 h-12 rounded-full border-2 border-white shadow-[0_0_15px_rgba(255,255,255,0.6)] flex items-center justify-center bg-[#1a1a2e] z-30 transition-all duration-500 ease-in-out"
+                    className="absolute w-12 h-12 rounded-full border-2 border-white shadow-[0_0_25px_rgba(255,255,255,0.4)] flex items-center justify-center bg-[#1a1a2e] z-30 transition-all duration-500 ease-in-out"
                     style={{
                         left: `${x - 24}px`,
                         top: `${y - 24}px`,
@@ -596,7 +602,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
                     ) : (
                         <User className="text-white" size={20} />
                     )}
-                    <div className="absolute inset-0 bg-amber-200/20 rounded-full animate-lantern pointer-events-none blur-xl scale-[3]"></div>
+                    {/* The Lantern Effect */}
+                    <div className="absolute inset-0 bg-amber-200/20 rounded-full animate-lantern pointer-events-none blur-[24px] scale-[4]"></div>
                     
                     <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none">
                         <circle cx="22" cy="22" r="21" fill="none" stroke="#7e22ce" strokeWidth="2" strokeDasharray="132" strokeDashoffset={132 * (1 - player.sanity/player.maxSanity)} className="transition-all duration-500" />
@@ -624,12 +631,10 @@ const GameBoard: React.FC<GameBoardProps> = ({
                         e.stopPropagation();
                         if (!hasDragged.current && onEnemyClick) onEnemyClick(enemy.id);
                     }}
-                    onMouseEnter={() => onEnemyHover && onEnemyHover(enemy.id)}
-                    onMouseLeave={() => onEnemyHover && onEnemyHover(null)}
                 >
-                     {isSelected && <div className="absolute inset-[-4px] border-2 border-red-500 rounded-full animate-ping opacity-50"></div>}
+                     {isSelected && <div className="absolute inset-[-8px] border-2 border-red-500 rounded-full animate-ping opacity-40"></div>}
 
-                     <div className={`w-full h-full rounded-full bg-[#1a0505] border-2 ${isSelected ? 'border-red-500' : 'border-red-900'} flex items-center justify-center overflow-hidden shadow-[0_0_20px_rgba(220,38,38,0.4)] relative`}>
+                     <div className={`w-full h-full rounded-full bg-[#1a0505] border-2 ${isSelected ? 'border-red-500 shadow-[0_0_30px_rgba(220,38,38,0.6)]' : 'border-red-900 shadow-[0_0_20px_rgba(220,38,38,0.3)]'} flex items-center justify-center overflow-hidden relative`}>
                          {enemy.imageUrl ? (
                              <img src={enemy.imageUrl} alt={enemy.name} className="w-full h-full object-cover" />
                          ) : (
@@ -649,7 +654,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
             return (
                 <div 
                     key={ft.id}
-                    className={`absolute z-50 pointer-events-none font-bold text-sm md:text-lg animate-float-up text-stroke-sm whitespace-nowrap ${ft.colorClass}`}
+                    className={`absolute z-[60] pointer-events-none font-bold text-sm md:text-lg animate-float-up text-stroke-sm whitespace-nowrap ${ft.colorClass}`}
                     style={{
                         left: `${x + ft.randomOffset.x}px`,
                         top: `${y - 40 + ft.randomOffset.y}px`
@@ -660,11 +665,6 @@ const GameBoard: React.FC<GameBoardProps> = ({
             );
         })}
 
-      </div>
-      
-      <div className="absolute bottom-24 right-4 flex flex-col gap-2 z-50 md:hidden">
-          <button onClick={() => setScale(s => Math.min(s + 0.2, 1.5))} className="p-3 bg-slate-800/80 rounded-full text-white border border-slate-600">+</button>
-          <button onClick={() => setScale(s => Math.max(s - 0.2, 0.3))} className="p-3 bg-slate-800/80 rounded-full text-white border border-slate-600">-</button>
       </div>
     </div>
   );
