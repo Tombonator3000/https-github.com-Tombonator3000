@@ -27,7 +27,7 @@ import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.10.17"; 
+const APP_VERSION = "3.10.18"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -55,6 +55,13 @@ const DEFAULT_STATE: GameState = {
     questItemsCollected: []
 };
 
+const ROOM_SHAPES = {
+    SMALL: [{q:0, r:0}],
+    MEDIUM: [{q:0, r:0}, {q:1, r:0}, {q:0, r:1}, {q:1, r:-1}],
+    LARGE: [{q:0, r:0}, {q:1, r:0}, {q:0, r:1}, {q:1, r:-1}, {q:-1, r:0}, {q:0, r:-1}, {q:-1, r:1}],
+    LINEAR: [{q:0, r:0}, {q:1, r:0}, {q:2, r:0}]
+};
+
 const formatLogEntry = (entry: string) => {
     const keywords = [
         { regex: /(skade|damage)/gi, color: 'text-red-400 font-bold' },
@@ -66,7 +73,7 @@ const formatLogEntry = (entry: string) => {
         { regex: /(failed|mislyktes|bommet)/gi, color: 'text-orange-400 font-bold' },
         { regex: /(item|gjenstand|found)/gi, color: 'text-amber-400 font-bold' },
         { regex: /(doom|dommedag)/gi, color: 'text-[#e94560] font-black uppercase' },
-        { regex: /(ENTERED:|LOCATION:)/gi, color: 'text-[#eecfa1] font-bold tracking-widest' },
+        { regex: /(ENTERED:|LOCATION:|ROOM:)/gi, color: 'text-[#eecfa1] font-bold tracking-widest' },
         { regex: /(VISIBLE|SIGHT|EYES)/gi, color: 'text-red-300 font-bold' }
     ];
 
@@ -155,6 +162,56 @@ const App: React.FC = () => {
       addToLog(`A ${bestiary.name} emerges from the shadows!`);
   }, []);
 
+  const spawnRoom = useCallback(async (startQ: number, startR: number, tileSet: 'indoor' | 'outdoor' | 'mixed') => {
+      const roomId = `room-${Date.now()}`;
+      const isConnector = Math.random() > 0.6; // 40% chance of a connector (hallway)
+      
+      const pool = isConnector 
+        ? (tileSet === 'indoor' ? INDOOR_CONNECTORS : OUTDOOR_CONNECTORS)
+        : (tileSet === 'indoor' ? INDOOR_LOCATIONS : OUTDOOR_LOCATIONS);
+      
+      const roomName = pool[Math.floor(Math.random() * pool.length)];
+      const shapes = isConnector ? [ROOM_SHAPES.LINEAR] : [ROOM_SHAPES.SMALL, ROOM_SHAPES.MEDIUM, ROOM_SHAPES.LARGE];
+      const shape = shapes[Math.floor(Math.random() * shapes.length)];
+      
+      const newTiles: Tile[] = [];
+      const imageUrl = await generateLocationAsset(roomName, isConnector ? 'street' : 'room');
+
+      shape.forEach(offset => {
+          const q = startQ + offset.q;
+          const r = startR + offset.r;
+          
+          // Only add if no tile exists here
+          if (!state.board.some(t => t.q === q && t.r === r)) {
+              newTiles.push({
+                  id: `tile-${Date.now()}-${Math.random()}`,
+                  q, r,
+                  name: roomName,
+                  type: isConnector ? 'street' : 'room',
+                  category: isConnector ? 'connector' : 'location',
+                  roomId,
+                  explored: true,
+                  searchable: !isConnector,
+                  searched: false,
+                  imageUrl: imageUrl || undefined
+              });
+          }
+      });
+
+      if (newTiles.length > 0) {
+          setState(prev => ({
+              ...prev,
+              board: [...prev.board, ...newTiles]
+          }));
+          addToLog(`ROOM: ${roomName}. ${LOCATION_DESCRIPTIONS[roomName] || ""}`);
+          
+          // Chance to spawn an enemy in the new room
+          if (Math.random() > 0.7 && !isConnector) {
+              spawnEnemy('cultist', startQ, startR);
+          }
+      }
+  }, [state.board, spawnEnemy]);
+
   const handleAction = (actionType: string, payload?: any) => {
     const activePlayer = state.players[state.activePlayerIndex];
     if (!activePlayer || activePlayer.actions <= 0 || activePlayer.isDead || state.phase !== GamePhase.INVESTIGATOR) return;
@@ -165,17 +222,9 @@ const App: React.FC = () => {
         const targetTile = state.board.find(t => t.q === q && t.r === r);
         
         if (!targetTile) {
-             const pool = state.activeScenario?.tileSet === 'indoor' ? INDOOR_LOCATIONS : OUTDOOR_LOCATIONS; 
-             const newTileName = pool[Math.floor(Math.random() * pool.length)];
-             const newTile: Tile = { id: `tile-${Date.now()}`, q, r, name: newTileName, type: 'room', explored: true, searchable: true, searched: false };
-             generateLocationAsset(newTileName, 'room').then(url => {
-                 if (url) setState(prev => ({ ...prev, board: prev.board.map(t => t.id === newTile.id ? {...t, imageUrl: url} : t) }));
-             });
-             
+             spawnRoom(q, r, state.activeScenario?.tileSet || 'mixed');
              setState(prev => ({ 
                  ...prev, 
-                 log: [`ENTERED: ${newTileName}. ${LOCATION_DESCRIPTIONS[newTileName] || ""}`, ...prev.log],
-                 board: [...prev.board, newTile], 
                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p) 
              }));
         } else {

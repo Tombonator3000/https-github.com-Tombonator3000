@@ -140,6 +140,7 @@ export interface Tile {
   name: string;
   type: 'building' | 'room' | 'street';
   category?: 'connector' | 'location';
+  roomId?: string; // ID to group tiles belonging to the same room
   explored: boolean;
   hasWater?: boolean;
   searchable: boolean;

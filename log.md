@@ -1,13 +1,13 @@
 # Project Log - Shadows of the 1920s
 
-## [v3.10.17 - Line of Sight Implementation] - 2024-05-24 16:15
+## [v3.10.18 - Room-Based Map Generation] - 2024-05-24 17:45
 ### 🔍 Status Report:
-- **NEW MECHANIC:** Line of Sight (LoS). Enemies now have a vision range (default 3) and cannot see through blocking objects (walls, rubble).
-- **VISUALIZATION:** When an enemy is selected on the game board, their field of vision is highlighted with a red spectral overlay.
-- **AI ENHANCEMENT:** The Mythos phase now includes a check for player visibility. Enemies will focus on players they can "see" through clear paths.
-- **AUDIT:** Ensured `hasLineOfSight` utility is correctly integrated into both rendering and logic layers.
+- **REFACTOR:** Transitioned from single-tile generation to "Room-Based" generation. Moving to an empty space now spawns a coherent cluster of tiles (a Room) or a Connector (Hallway/Alley).
+- **LOGIC:** Rooms are generated using templates (Small, Medium, Large, Linear). Each room shares a name and visual identity, making locations feel like actual structures rather than random hexes.
+- **EXPLORATION:** Improved "Fog of War" feel. When entering a room, the entire room is added to the board, but visibility rules (Line of Sight and Range) still dictate what is clearly seen.
+- **CONNECTIONS:** The system now alternates between Rooms and Connectors to ensure a sprawling but navigable layout.
 
 ### ✅ Added:
-* **Enemy Vision Highlight:** Added `selectedEnemyVisionTiles` memo to `GameBoard.tsx` for real-time LoS visualization.
-* **Mythos Awareness:** Updated `App.tsx` logic to acknowledge enemy awareness of players within LoS.
-* **UI Feedback:** Added log messages when investigators enter an enemy's line of sight.
+* **Room Templates:** Defined `RoomShape` and `spawnRoom` logic in `App.tsx`.
+* **Coherent Visuals:** Tiles belonging to the same room are themed together automatically.
+* **Navigation Logic:** Improved tile placement to prevent excessive overlap while maintaining connectivity.
