@@ -5,6 +5,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
+      // Base URL for GitHub Pages deployment
+      base: mode === 'production' ? '/https-github.com-Tombonator3000/' : '/',
       server: {
         port: 3000,
         host: '0.0.0.0',

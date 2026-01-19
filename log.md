@@ -1,5 +1,88 @@
 # Project Log - Shadows of the 1920s
 
+## [v3.10.27 - GitHub Pages Deployment & Asset Pipeline] - 2026-01-19
+
+### Dagens oppgaver:
+1. Gjore sa spillet starter fra GitHub
+2. Sjekke om asset pipeline for lyd/grafikk er implementert
+
+### Status Rapport:
+
+#### 1. GitHub Pages Deployment
+**IMPLEMENTERT**: Opprettet GitHub Actions workflow for automatisk deployment.
+
+**Filer opprettet:**
+- `.github/workflows/deploy.yml` - Automatisk bygging og deployment til GitHub Pages
+- Oppdatert `vite.config.ts` med `base` URL for produksjon
+
+**Slik fungerer det:**
+- Push til `main` branch trigger automatisk bygging
+- Vite bygger prosjektet til `/dist`
+- GitHub Actions deployer til GitHub Pages
+- **Krever**: Legg til `GEMINI_API_KEY` som repository secret
+
+**Aktivering:**
+1. Ga til GitHub repo -> Settings -> Pages
+2. Velg "GitHub Actions" som source
+3. Ga til Settings -> Secrets -> Actions
+4. Legg til `GEMINI_API_KEY` secret
+
+#### 2. Asset Pipeline Verifisering
+
+**AssetLibrary.ts VERIFISERT** - Implementert med full asset pipeline:
+- `generateLocationAsset()` - Sjekker `/assets/graphics/tiles/{name}.png` forst
+- `getCharacterVisual()` - Sjekker `/assets/graphics/characters/{id}.png` forst
+- `getEnemyVisual()` - Sjekker `/assets/graphics/monsters/{type}.png` forst
+- Fallback til Gemini AI hvis fil ikke finnes
+- Cache i localStorage
+
+**Mappestruktur OPPRETTET:**
+```
+/public/assets
+  /audio
+    /music      <- For bakgrunnsmusikk (ambience.mp3, combat.mp3, etc.)
+    /sfx        <- For lydeffekter (roll.mp3, click.mp3, etc.)
+  /graphics
+    /tiles      <- For tile-grafikk (library.png, harbor.png, etc.)
+    /monsters   <- For monster-grafikk (cultist.png, deep_one.png, etc.)
+    /characters <- For karakter-grafikk (detective.png, veteran.png, etc.)
+```
+
+**Navnekonvensjon:** Lowercase med underscores
+- "Dark Altar" -> `dark_altar.png`
+- "Deep One" -> `deep_one.png`
+
+#### 3. Lydsystem Status
+
+**DELVIS IMPLEMENTERT:**
+- Settings.ts har lyd-innstillinger (masterVolume, musicVolume, sfxVolume)
+- Tone.js er importert i App.tsx
+- **MANGLER**: Faktisk lydavspilling med file-fallback i AssetLibrary
+
+**Anbefaling for fremtidig implementasjon:**
+```typescript
+// Legg til i AssetLibrary.ts eller ny AudioManager.ts
+const playSound = async (name: string) => {
+    const path = `/assets/audio/sfx/${name}.mp3`;
+    if (await checkLocalAsset(path)) {
+        const audio = new Audio(path);
+        audio.play();
+    } else {
+        // Fallback til Tone.js synth
+    }
+};
+```
+
+### Oppsummering:
+| Funksjon | Status |
+|----------|--------|
+| GitHub Pages Deployment | IMPLEMENTERT |
+| Asset Pipeline (Grafikk) | VERIFISERT |
+| Mappestruktur | OPPRETTET |
+| Lydsystem med filer | DELVIS (kun settings, ikke avspilling) |
+
+---
+
 ## [v3.10.24 - World Expansion & Madness Realized] - 2024-05-25 16:20
 ### 🔍 Status Report:
 - **FIXED: Exploration Logic:** `spawnRoom` nå oppdaterer `board`-staten umiddelbart med tile-metadata før bilde-generering. Dette fjerner "void"-staten som gjorde at utforskning stoppet opp.
