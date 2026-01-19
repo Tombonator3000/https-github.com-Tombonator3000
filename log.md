@@ -12,3 +12,15 @@
 * **AI Pathfinding:** Fiender navigerer rundt hindringer for å nå spillere.
 * **Combat Feedback:** Loggføring av fiendtlige angrep og visuelle effekter (floating text) for skade på spillere.
 * **Narrative Integration:** Automatiske kall til Gemini ved rom-oppdagelse for å forbedre innlevelsen.
+
+## [v3.10.22 - Tactical Audit & UI Polish] - 2024-05-25 10:15
+### 🔍 Status Report:
+- **AUDIT:** Full gjennomgang av AI og kampsystem. Alt er bekreftet operativt.
+- **ENHANCEMENT:** `EnemyPanel` viser nå "Special Abilities" (Traits) for å gi spilleren bedre oversikt over fiendtlige fordeler (f.eks. Ranged, Massive, Fast).
+- **FIX:** Forbedret døds-logikk for spillere i Mythos-fasen. Sjekker nå HP mer nøyaktig under fiendtlige angrep.
+- **NARRATIVE:** Verifisert at Gemini Narrative kalles ved `spawnRoom` og `spawnEnemy`. Lagt til "Atmospheric" tag i loggen for disse for bedre synlighet.
+- **STABILITY:** Sikret at `log.md` bevares og kun oppdateres med nye hendelser.
+
+### ✅ Added:
+* **Special Abilities Display:** Viser fiendens traits direkte i kamp-panelet.
+* **Refined Combat AI:** Fiender prioriterer angrep fremfor bevegelse hvis de allerede er i nærkamp-rekkevidde.

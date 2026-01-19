@@ -27,7 +27,7 @@ import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.10.21"; 
+const APP_VERSION = "3.10.22"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -75,7 +75,8 @@ const formatLogEntry = (entry: string) => {
         { regex: /(doom|dommedag)/gi, color: 'text-[#e94560] font-black uppercase' },
         { regex: /(ENTERED:|LOCATION:|ROOM:)/gi, color: 'text-[#eecfa1] font-bold tracking-widest' },
         { regex: /(VISIBLE|SIGHT|EYES)/gi, color: 'text-red-300 font-bold' },
-        { regex: /(SPELL|MAGI|ARCANE|GRIMOIRE)/gi, color: 'text-purple-300 font-bold' }
+        { regex: /(SPELL|MAGI|ARCANE|GRIMOIRE)/gi, color: 'text-purple-300 font-bold' },
+        { regex: /(NARRATIVE:)/gi, color: 'text-amber-200 italic font-medium' }
     ];
 
     const parts = entry.split(/(\s+)/);
@@ -151,6 +152,7 @@ const App: React.FC = () => {
                 const alivePlayers = updatedPlayers.filter(p => !p.isDead);
                 if (alivePlayers.length === 0) continue;
 
+                // Find nearest player
                 const nearestPlayer = alivePlayers.sort((a, b) => 
                     hexDistance(enemy.position, a.position) - hexDistance(enemy.position, b.position)
                 )[0];
@@ -164,9 +166,16 @@ const App: React.FC = () => {
                     if (enemy.horror > 0) addFloatingText(nearestPlayer.position.q, nearestPlayer.position.r, `-${enemy.horror} SAN`, "text-purple-500");
                     triggerScreenShake();
 
-                    updatedPlayers = updatedPlayers.map(p => 
-                        (p.id === nearestPlayer.id) ? { ...p, hp: Math.max(0, p.hp - enemy.damage), sanity: Math.max(0, p.sanity - enemy.horror), isDead: (p.hp - enemy.damage <= 0) } : p
-                    );
+                    updatedPlayers = updatedPlayers.map(p => {
+                        if (p.id === nearestPlayer.id) {
+                            const newHp = Math.max(0, p.hp - enemy.damage);
+                            const newSanity = Math.max(0, p.sanity - enemy.horror);
+                            const isDead = newHp <= 0;
+                            if (isDead) addToLog(`${p.name} has fallen to the darkness...`);
+                            return { ...p, hp: newHp, sanity: newSanity, isDead };
+                        }
+                        return p;
+                    });
                 } 
                 // 2. ACTIVE MOVEMENT: If not in range, move towards the nearest player
                 else {
@@ -182,7 +191,6 @@ const App: React.FC = () => {
 
             // Apply updates
             setTimeout(() => {
-                // FIXED: Removed duplicate 'players' property in the state update object.
                 setState(prev => ({ 
                     ...prev, 
                     enemies: updatedEnemies,

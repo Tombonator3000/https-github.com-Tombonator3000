@@ -2,7 +2,7 @@
 import React from 'react';
 import { Enemy } from '../types';
 import { BESTIARY } from '../constants';
-import { Skull, Swords, Brain, Activity, Crosshair, BookOpen, X } from 'lucide-react';
+import { Skull, Swords, Brain, Activity, Crosshair, BookOpen, X, Shield } from 'lucide-react';
 import Tooltip from './Tooltip';
 
 interface EnemyPanelProps {
@@ -61,6 +61,22 @@ const EnemyPanel: React.FC<EnemyPanelProps> = ({ enemy, onClose }) => {
                     <span className="text-[8px] text-slate-500 uppercase tracking-widest">Horror</span>
                 </div>
             </div>
+
+            {/* Special Abilities Section */}
+            {enemy.traits && enemy.traits.length > 0 && (
+                <div className="pt-4 border-t border-[#e94560]/20">
+                    <div className="text-[9px] text-[#e94560] uppercase tracking-[0.2em] font-bold mb-2 flex items-center gap-2">
+                        <Shield size={10} /> Special Abilities
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {enemy.traits.map(trait => (
+                            <span key={trait} className="px-2 py-0.5 bg-red-900/30 text-red-300 text-[10px] font-bold uppercase rounded border border-red-800/50">
+                                {trait}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="pt-4 border-t border-[#e94560]/20">
                 <div className="text-[9px] text-[#e94560] uppercase tracking-[0.2em] font-bold mb-2 flex items-center gap-2">
