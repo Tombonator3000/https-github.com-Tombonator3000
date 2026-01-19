@@ -1,4 +1,3 @@
-
 import { Character, CharacterType, Item, EventCard, Tile, Scenario, Madness, Spell, BestiaryEntry, EnemyType, Trait, ScenarioModifier, TileObjectType } from './types';
 
 export const SPELLS: Spell[] = [
@@ -17,78 +16,74 @@ export const CHARACTERS: Record<CharacterType, Character> = {
   doctor: { id: 'doctor', name: 'The Doctor', hp: 4, maxHp: 4, sanity: 5, maxSanity: 5, insight: 2, special: 'Can heal HP or Sanity' }
 };
 
-export const TRAIT_POOL: Trait[] = [
-    { id: 't1', name: 'Hardened', description: '+1 Max HP', type: 'positive', effect: 'combat_bonus' },
-    { id: 't2', name: 'Shell-Shocked', description: 'Starts with 1 less Sanity', type: 'negative', effect: 'fragile_mind' },
-    { id: 't3', name: 'Scavenger', description: 'Better chance to find items', type: 'positive', effect: 'scavenger' },
-    { id: 't4', name: 'Adrenaline Junkie', description: '+1 Movement Speed', type: 'positive', effect: 'runner' },
-    { id: 't5', name: 'Old Wound', description: '-1 Max HP', type: 'negative', effect: 'max_hp_down' },
-    { id: 't6', name: 'Occult Scholar', description: 'Regenerate 1 Sanity when finding a clue', type: 'positive', effect: 'sanity_regen' }
+export const INDOOR_LOCATIONS = [
+    'Abandoned Manor', 'Dark Cellar', 'The Library', 'Secret Crypt', 'Old Church', 'Police Station', 'Warehouse', 'Arkham Asylum', 'Historical Museum', 'St. Mary\'s Hospital', 
+    'Sanitarium', 'Underground Vault', 'Dusty Attic', 'Grand Hall', 'Study Room', 'Ritual Chamber', 'Boiler Room', 'Velvet Lounge', 'Opium Den', 'Grand Theater', 
+    'Clock Tower Interior', 'Private Study', 'Damp Basement', 'Hidden Laboratory', 'Trophy Room', 'Servant Quarters', 'Billiard Room', 'Wine Cellar', 'Cold Storage', 
+    'Padded Cell', 'Archives', 'Anatomy Theater', 'Gothic Chapel', 'Observatory', 'Vaulted Library', 'Secret Passage', 'Dusty Parlor', 'Morning Room', 'Ballroom',
+    'Curio Shop', 'Old Bookstore', 'Printing Press', 'Mayor\'s Office', 'Holding Cell', 'Armory', 'Masonic Lodge', 'Silver Twilight Lodge', 'Witch House Attic', 
+    'Gilman House Hotel Room', 'Marsh Refinery Office', 'Esoteric Order of Dagon Hall', 'First National Bank Vault', 'Orne Library Stacks', 'Miskatonic Exhibit'
 ];
 
-export const SCENARIO_MODIFIERS: ScenarioModifier[] = [
-    { id: 'mod1', name: 'Thick Fog', description: 'Vision range reduced by 1.', effect: 'reduced_vision' },
-    { id: 'mod2', name: 'Blood Moon', description: 'Enemies deal +1 Damage.', effect: 'strong_enemies' },
-    { id: 'mod3', name: 'Dwindling Supplies', description: 'Items are harder to find.', effect: 'less_items' },
-    { id: 'mod4', name: 'The Stars Align', description: 'Doom advances faster (+1 per Mythos phase).', effect: 'extra_doom' }
+export const OUTDOOR_LOCATIONS = [
+    'Misty Docks', 'Town Square', 'Old Lighthouse', 'Blackwood Forest', 'Graveyard', 'University Campus', 'Market District', 'River Bank', 'Train Station', 'Swamp', 
+    'City Park', 'Merchant Street', 'Dark Pier', 'Hanging Tree', 'Ruined Farmhouse', 'Overgrown Garden', 'Foggy Harbor', 'Lonely Crossroads', 'Cemetery Gate', 
+    'Stone Circle', 'Miskatonic Bridge', 'Innsmouth Wharf', 'Devil Reef', 'Sentinel Hill', 'Blasted Heath', 'Aylesbury Pike', 'Whateley Farm', 'Cold Spring', 
+    'Dead Man\'s Point', 'Whalebone Beach', 'Shuttered Street', 'Alley of Shadows', 'Rainy Courtyard', 'Abandoned Fairground', 'Old Mill', 'Deserted Pier', 
+    'Kingsport Cliffs', 'Strange High House in the Mist', 'Plateau of Leng', 'Vale of Pnath', 'Dreamlands Forest', 'Ulthar Street', 'Celephaïs Gate'
 ];
 
-export const ITEMS: Item[] = [
-  // Standard Items
-  { id: 'rev', name: 'Revolver', type: 'weapon', effect: '+1 Combat Die', bonus: 1, cost: 3, statModifier: 'combat' },
-  { id: 'shot', name: 'Shotgun', type: 'weapon', effect: '+2 Combat Dice', bonus: 2, cost: 5, statModifier: 'combat' },
-  { id: 'tommy', name: 'Tommy Gun', type: 'weapon', effect: '+3 Combat Dice', bonus: 3, cost: 10, statModifier: 'combat' },
-  { id: 'knife', name: 'Dagger', type: 'weapon', effect: '+1 Combat Die', bonus: 1, cost: 2, statModifier: 'combat' },
-  { id: 'med', name: 'Medical Kit', type: 'consumable', effect: 'Heal 2 HP', bonus: 2, cost: 3 },
-  { id: 'whiskey', name: 'Old Whiskey', type: 'consumable', effect: 'Heal 2 Sanity', bonus: 2, cost: 2 },
-  { id: 'flash', name: 'Flashlight', type: 'tool', effect: '+1 Investigation Die', bonus: 1, cost: 2, statModifier: 'investigation' },
-  { id: 'lens', name: 'Magnifying Glass', type: 'tool', effect: '+1 Investigation Die', bonus: 1, cost: 3, statModifier: 'investigation' },
-  { id: 'map', name: 'Old Map', type: 'tool', effect: 'Explore further', cost: 2 },
-  { id: 'boots', name: 'Sturdy Boots', type: 'tool', effect: '+1 Agility', bonus: 1, cost: 4, statModifier: 'agility' },
-  { id: 'coin', name: 'Lucky Coin', type: 'relic', effect: '+1 Agility', bonus: 1, cost: 3, statModifier: 'agility' },
-  { id: 'coat', name: 'Heavy Coat', type: 'armor', effect: '-1 Physical Dmg Taken', bonus: 1, cost: 5, statModifier: 'physical_defense' },
-  { id: 'amulet', name: 'Elder Sign', type: 'relic', effect: '-1 Sanity Dmg Taken', bonus: 1, cost: 6, statModifier: 'mental_defense' },
-  { id: 'book', name: 'Necronomicon', type: 'relic', effect: '+3 Insight, -1 Sanity', bonus: 3, cost: 8 },
-
-  // CURSED ITEMS (v3.10.0)
-  { id: 'cursed_dagger', name: 'Bloodthirsty Dagger', type: 'weapon', effect: '+3 Combat. Drains 1 HP on kill.', bonus: 3, cost: 6, statModifier: 'combat', curse: 'Lose 1 HP after each kill.', curseEffect: 'drain_hp_on_kill' },
-  { id: 'cursed_bone', name: 'Cursed Bone', type: 'relic', effect: '+2 Max HP. Cannot heal > 4 HP.', bonus: 2, cost: 5, statModifier: 'physical_defense', curse: 'Cannot heal above 4 HP.', curseEffect: 'cap_hp' },
-  { id: 'cursed_tome', name: 'Mad Prophet\'s Tome', type: 'relic', effect: '+3 Insight. Start with Hallucinations.', bonus: 3, cost: 7, statModifier: 'investigation', curse: 'Permanent Hallucinations.', curseEffect: 'hallucinations' },
-  { id: 'cursed_lens', name: 'Lens of the Void', type: 'tool', effect: '+2 Investigate. Lose Sanity on Clue.', bonus: 2, cost: 5, statModifier: 'investigation', curse: 'Lose 1 Sanity when finding items/clues.', curseEffect: 'sanity_cost_clue' },
-  { id: 'cursed_armor', name: 'Living Armor', type: 'armor', effect: '-2 Phys Dmg. Cannot Rest.', bonus: 2, cost: 8, statModifier: 'physical_defense', curse: 'Cannot perform Rest action.', curseEffect: 'no_rest' }
+export const INDOOR_CONNECTORS = [
+    'Narrow Hallway', 'Dark Corridor', 'Grand Staircase', 'Servant Passage', 'Dusty Landing', 'Maintenance Shaft', 'Basement Tunnel', 'Service Elevator', 
+    'Spiral Stairs', 'Crawlspace', 'Iron Rung Ladder', 'Vaulted Walkway', 'Dim Vestibule', 'Shadowed Foyer', 'Gallery Bridge'
 ];
 
-export const EVENTS: EventCard[] = [
-  { id: 'e1', title: 'Shadows in the Dark', description: 'You feel watched. Lose 1 Sanity.', effectType: 'sanity', value: -1 },
-  { id: 'e2', title: 'Hidden Diary', description: 'Found important notes! +1 Insight.', effectType: 'insight', value: 1 },
-  { id: 'e3', title: 'Dark Ritual', description: 'You stumble upon a ceremony in progress!', effectType: 'spawn', value: 1 },
-  { id: 'e4', title: 'Helpful Witness', description: 'A local points the way. +1 Insight.', effectType: 'insight', value: 1 },
-  { id: 'e5', title: 'Eldritch Sign', description: 'The ritual accelerates! Doom -1.', effectType: 'doom', value: -1 },
-  { id: 'e6', title: 'Cold Mist', description: 'A bone-chilling mist surrounds you.', effectType: 'health', value: -1 },
-  { id: 'e7', title: 'Broken Seal', description: 'Something pushes through the veil.', effectType: 'spawn', value: 1 },
-  { id: 'e8', title: 'Echoes of the Past', description: 'Voices from another time haunt you.', effectType: 'sanity', value: -2 }
+export const OUTDOOR_CONNECTORS = [
+    'Narrow Alley', 'Cobblestone Path', 'Foggy Bridge', 'Tram Track', 'Dark Tunnel', 'Stone Steps', 'River Crossing', 'Overpass', 'Dirt Trail', 
+    'Winding Lane', 'Muddy Track', 'Overgrown Path', 'Brick Walkway', 'Misty Quay', 'Desolate Road', 'Sewer Tunnel', 'Drainage Pipe'
 ];
 
-export const MADNESS_CONDITIONS: Madness[] = [
-  { id: 'm1', name: 'Hallucinations', description: 'You see things that are not there.', effect: 'Visual distortion.', visualClass: 'madness-hallucination' },
-  { id: 'm2', name: 'Paranoia', description: 'They are watching you.', effect: 'Cannot Rest.', visualClass: 'madness-paranoia' },
-  { id: 'm3', name: 'Hysteria', description: 'Your hands shake uncontrollably.', effect: '-1 Die on ALL checks.', visualClass: 'madness-hysteria' },
-  { id: 'm4', name: 'Catatonia', description: 'Your mind retreats into darkness.', effect: 'Max 1 Action.', visualClass: 'madness-catatonia' }
-];
-
-export const INDOOR_CONNECTORS = ['Narrow Hallway', 'Dark Corridor', 'Grand Staircase', 'Servant Passage', 'Dusty Landing', 'Maintenance Shaft', 'Basement Tunnel', 'Service Elevator'];
-export const INDOOR_LOCATIONS = ['Abandoned Manor', 'Dark Cellar', 'The Library', 'Secret Crypt', 'Old Church', 'Police Station', 'Warehouse', 'Arkham Asylum', 'Historical Museum', 'St. Mary\'s Hospital', 'Sanitarium', 'Underground Vault', 'Dusty Attic', 'Grand Hall', 'Study Room', 'Ritual Chamber', 'Boiler Room'];
-export const OUTDOOR_CONNECTORS = ['Narrow Alley', 'Cobblestone Path', 'Foggy Bridge', 'Tram Track', 'Dark Tunnel', 'Stone Steps', 'River Crossing', 'Overpass', 'Dirt Trail'];
-export const OUTDOOR_LOCATIONS = ['Misty Docks', 'Town Square', 'Old Lighthouse', 'Blackwood Forest', 'Graveyard', 'University Campus', 'Market District', 'River Bank', 'Train Station', 'Swamp', 'City Park', 'Merchant Street', 'Dark Pier'];
-export const LOCATION_NAMES = [...INDOOR_LOCATIONS, ...OUTDOOR_LOCATIONS, ...INDOOR_CONNECTORS, ...OUTDOOR_CONNECTORS];
 export const ALL_LOCATIONS_FULL = ['Train Station', ...INDOOR_LOCATIONS, ...OUTDOOR_LOCATIONS, ...INDOOR_CONNECTORS, ...OUTDOOR_CONNECTORS];
-export const TILE_INTERACTABLES: TileObjectType[] = ['bookshelf', 'crate', 'chest', 'cabinet', 'radio', 'switch', 'mirror', 'statue', 'altar', 'rubble', 'locked_door', 'barricade', 'fog_wall', 'trap', 'fire'];
 
-export const START_TILE: Tile = {
-  id: 'start', q: 0, r: 0, name: 'Train Station', type: 'street', category: 'location', explored: true, searchable: true, searched: false
+export const LOCATION_DESCRIPTIONS: Record<string, string> = {
+    'Train Station': 'The last train left hours ago. The clock on the wall is shattered.',
+    'Abandoned Manor': 'Dust motes dance in the stale air. Portraits seem to watch you pass.',
+    'Dark Cellar': 'It smells of rot and old earth. Something scuttles in the corner.',
+    'The Library': 'Rows of forbidden texts. You hear a page turn, but no one is there.',
+    'Secret Crypt': 'The air is cold enough to see your breath. Ancient names are carved into the stone.',
+    'Old Church': 'A sense of unease hangs heavy here. The pews are broken.',
+    'Police Station': 'Papers are scattered everywhere. The phones are dead.',
+    'Warehouse': 'Crates piled high create a maze of shadows.',
+    'Arkham Asylum': 'Screams echo from distant cells. The walls are padded.',
+    'Historical Museum': 'Artifacts from lost civilizations gaze blindly from their cases.',
+    'St. Mary\'s Hospital': 'The smell of antiseptic cannot hide the metallic scent of blood.',
+    'Sanitarium': 'The silence here is deafening.',
+    'Underground Vault': 'Thick steel doors protect whatever—or whoever—is inside.',
+    'Dusty Attic': 'Cobwebs drape over forgotten heirlooms.',
+    'Grand Hall': 'Once a place of celebration, now a cavern of echoes.',
+    'Study Room': 'A half-finished letter sits on the desk. The ink is still wet.',
+    'Ritual Chamber': 'Strange symbols are drawn on the floor in something that looks like blood.',
+    'Boiler Room': 'The furnace roars like a trapped beast.',
+    'Misty Docks': 'The waves lap against the rotting wood. The fog is thick here.',
+    'Town Square': 'Deserted. The statue in the center looks different than you remember.',
+    'Old Lighthouse': 'The light spins, cutting through the gloom, revealing brief horrors.',
+    'Blackwood Forest': 'The trees crowd close, their branches like grasping skeletal fingers.',
+    'Graveyard': 'The soil looks disturbed in front of several headstones.',
+    'University Campus': 'Usually bustling, now ominously quiet.',
+    'Market District': 'Stalls are overturned. Merchandise lies trampled in the mud.',
+    'River Bank': 'Something large ripples beneath the surface of the dark water.',
+    'Swamp': 'The ground squelches beneath your feet. Strange lights bob in the distance.',
+    'City Park': 'The swing set creaks in the wind, though there is no breeze.',
+    'Merchant Street': 'Shop windows are smashed. Looters have been here.',
+    'Dark Pier': 'The smell of salt and decay is overwhelming.',
+    'Velvet Lounge': 'Spilled gin and the smell of cheap perfume linger in the empty room.',
+    'Opium Den': 'Sweet, cloying smoke clings to the tattered curtains.',
+    'Grand Theater': 'The stage is set for a play that will never begin.',
+    'Clock Tower Interior': 'The grinding of gears is the only heartbeat this tower has left.',
+    'Kingsport Cliffs': 'The sea crashes against the rocks hundreds of feet below.',
+    'Strange High House in the Mist': 'It should not be here. It should not be anywhere.'
 };
 
-// --- UPDATED SCENARIOS (v3.10.0) ---
 export const SCENARIOS: Scenario[] = [
   {
     id: 's1',
@@ -124,7 +119,7 @@ export const SCENARIOS: Scenario[] = [
     tileSet: 'mixed',
     victoryType: 'assassination',
     steps: [
-        { id: 'step1', description: 'Find the Dark Priest', type: 'find_item', targetId: 'location_intel', completed: false }, // Finding intel reveals location? Or just find him
+        { id: 'step1', description: 'Find the Dark Priest', type: 'find_item', targetId: 'location_intel', completed: false },
         { id: 'step2', description: 'Kill the Dark Priest', type: 'kill_enemy', targetId: 'priest', amount: 1, completed: false }
     ],
     doomEvents: [
@@ -178,133 +173,167 @@ export const SCENARIOS: Scenario[] = [
   }
 ];
 
+export const START_TILE: Tile = {
+  id: 'start', q: 0, r: 0, name: 'Train Station', type: 'street', category: 'location', explored: true, searchable: true, searched: false
+};
+
+// Fix: Added missing 'sniper' and 'priest' properties to satisfy the Record<EnemyType, BestiaryEntry> constraint.
 export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
   cultist: {
     name: 'Cultist', type: 'cultist', hp: 2, damage: 1, horror: 1,
     description: 'A brainwashed servant of the Outer Gods.',
-    visualPrompt: 'A sinister cultist in ragged, hooded robes, face obscured by shadow, clutching a jagged ceremonial dagger. Dramatic chiaroscuro lighting, 1920s horror illustration style, oil painting texture.',
-    lore: 'Recruited from the desperate and the mad, these fanatics have traded their humanity for forbidden promises.',
-    defeatFlavor: 'The cultist collapses, a dark amulet shattering on the cobblestones.',
-    traits: []
-  },
-  sniper: {
-    name: 'Cult Sniper', type: 'sniper', hp: 2, damage: 1, horror: 0,
-    description: 'An assassin striking from the shadows.',
-    visualPrompt: 'A menacing silhouette in a trench coat and fedora, perched on a rooftop with a long rifle. Noir atmosphere, high contrast.',
-    lore: 'Armed with stolen military hardware and unholy blessings.',
-    defeatFlavor: 'The sniper slumps forward, their rifle clattering to the ground.',
-    traits: ['ranged']
-  },
-  priest: {
-    name: 'Dark Priest', type: 'priest', hp: 3, damage: 1, horror: 2,
-    description: 'A chanter of doom.',
-    visualPrompt: 'A deranged priest in ornate, tattered ceremonial vestments, eyes glowing with purple madness. Eldritch energy crackles around them.',
-    lore: 'Their very voice warps reality, accelerating the cosmic alignment.',
-    defeatFlavor: 'The chanting is cut short by a gurgling gasp as the priest expires.',
+    visualPrompt: 'A sinister cultist in hooded robes, 1920s horror style.',
+    lore: 'Recruited from the desperate and the mad.',
+    defeatFlavor: 'The cultist collapses, a dark amulet shattering.',
     traits: []
   },
   ghoul: {
     name: 'Ghoul', type: 'ghoul', hp: 3, damage: 2, horror: 2,
     description: 'A flesh-eating subterranean dweller.',
-    visualPrompt: 'A hunched, canine-like humanoid with rubbery grey skin, hoof-like feet, and a face like a feral dog. Dirt and bone fragments scattered around.',
+    visualPrompt: 'A hunched, canine-like humanoid with rubbery skin.',
     lore: 'Subterranean dwellers that feast on the dead.',
-    defeatFlavor: 'It collapses into a pile of dust and foul-smelling grave dirt.',
+    defeatFlavor: 'It collapses into grave dirt.',
     traits: ['scavenger']
   },
   deepone: {
     name: 'Deep One', type: 'deepone', hp: 3, damage: 2, horror: 2,
     description: 'An immortal amphibious humanoid.',
-    visualPrompt: 'A terrifying fish-frog hybrid humanoid with glistening gray-green scales. Standing on a wet dock, dripping with slime.',
-    lore: 'Immortal servants of Father Dagon who dwell in underwater cities.',
-    defeatFlavor: 'The creature dissolves into a foul-smelling puddle of brine and ichor.',
+    visualPrompt: 'A fish-frog hybrid humanoid with glistening scales.',
+    lore: 'Immortal servants of Father Dagon.',
+    defeatFlavor: 'The creature dissolves into brine.',
     traits: ['aquatic']
   },
   shoggoth: {
     name: 'Shoggoth', type: 'shoggoth', hp: 6, damage: 3, horror: 4,
     description: 'A protoplasmic mass of eyes and mouths.',
-    visualPrompt: 'A massive, shapeless monstrosity of iridescent black slime, rolling forward like a tide. Covered in thousands of eyes and mouths.',
-    lore: 'A nightmarish slave race created by the Elder Things eons ago.',
+    visualPrompt: 'A massive monstrosity of iridescent black slime.',
+    lore: 'A nightmarish slave race created by the Elder Things.',
     traits: ['massive', 'slow'],
-    defeatFlavor: 'The massive form loses cohesion, becoming a lifeless pool of inert slime.'
+    defeatFlavor: 'The massive form loses cohesion.'
+  },
+  sniper: {
+    name: 'Cultist Sniper', type: 'sniper', hp: 2, damage: 2, horror: 1,
+    description: 'A cultist armed with a long-range rifle.',
+    visualPrompt: 'A hooded cultist with a vintage sniper rifle, 1920s horror style.',
+    lore: 'Chosen for their steady hands and lack of remorse.',
+    traits: ['ranged'],
+    defeatFlavor: 'The sniper falls from their perch.'
+  },
+  priest: {
+    name: 'Dark Priest', type: 'priest', hp: 5, damage: 2, horror: 3,
+    description: 'A high-ranking member of the cult, channeling dark energies.',
+    visualPrompt: 'A cult priest in ornate robes, surrounded by dark energy.',
+    lore: 'They have traded their humanity for forbidden power.',
+    traits: ['elite'],
+    defeatFlavor: 'The priest screams as the darkness consumes them.'
   },
   'mi-go': {
     name: 'Mi-Go', type: 'mi-go', hp: 3, damage: 1, horror: 1,
     description: 'A fungoid crustacean from Yuggoth.',
-    visualPrompt: 'A pinkish, fungoid, crustacean-like alien creature with large membranous wings and a pulsating ellipsoid head.',
-    lore: 'Fungi from Yuggoth who fly through the ether of space.',
+    visualPrompt: 'A pinkish, fungoid alien with large wings.',
+    lore: 'Fungi from Yuggoth who fly through space.',
     traits: ['flying'],
-    defeatFlavor: 'The fungoid body disintegrates, vibrating out of our dimension.'
+    defeatFlavor: 'The body disintegrates.'
   },
   nightgaunt: {
     name: 'Nightgaunt', type: 'nightgaunt', hp: 3, damage: 1, horror: 1,
     description: 'A faceless, horned flyer.',
-    visualPrompt: 'A sleek, oily black humanoid creature with absolutely no face, large curved horns, and bat-like wings.',
-    lore: 'Faceless, silent servants of Nodens.',
+    visualPrompt: 'A sleek black humanoid with bat wings and no face.',
+    lore: 'Faceless servants of Nodens.',
     traits: ['flying'],
-    defeatFlavor: 'It vanishes into the night sky without a sound, leaving only a cold breeze.'
+    defeatFlavor: 'It vanishes into the night sky.'
   },
   hound: {
     name: 'Hound of Tindalos', type: 'hound', hp: 4, damage: 2, horror: 3,
     description: 'A predator from the angles of time.',
-    visualPrompt: 'A lean, emaciated beast emerging from a sharp 90-degree angle in a room. It appears made of blue smoke and ichor.',
-    lore: 'Predators that inhabit the angles of time, unlike life which exists in curves.',
+    visualPrompt: 'A lean, emaciated beast emerging from a corner.',
+    lore: 'Predators that inhabit the angles of time.',
     traits: ['fast', 'ambusher'],
-    defeatFlavor: 'The beast howls and recedes back into the angles of reality.'
+    defeatFlavor: 'The beast recedes into the angles.'
   },
   dark_young: {
     name: 'Dark Young', type: 'dark_young', hp: 6, damage: 2, horror: 3,
     description: 'Offspring of Shub-Niggurath.',
-    visualPrompt: 'A terrifying mass of ropy black tentacles and hooves, resembling a twisted, leafless tree that walks.',
-    lore: 'The Black Goat of the Woods with a Thousand Young.',
+    visualPrompt: 'A mass of black tentacles and hooves.',
+    lore: 'The Black Goat of the Woods.',
     traits: ['massive'],
-    defeatFlavor: 'The monstrosity withers rapidly, resembling a dead, rotted tree stump.'
+    defeatFlavor: 'The monstrosity withers.'
   },
   byakhee: {
     name: 'Byakhee', type: 'byakhee', hp: 3, damage: 2, horror: 1,
     description: 'An interstellar steed.',
-    visualPrompt: 'A disturbing hybrid monster composed of crow, mole, ant, and decomposing human corpse. Large wings, furry texture.',
+    visualPrompt: 'A disturbing hybrid monster of crow, mole, and ant.',
     lore: 'Interstellar steeds serving Hastur.',
     traits: ['flying', 'fast'],
-    defeatFlavor: 'It screeches one last time before dissolving into cosmic dust.'
+    defeatFlavor: 'It dissolves into cosmic dust.'
   },
   star_spawn: {
     name: 'Star Spawn', type: 'star_spawn', hp: 8, damage: 3, horror: 5,
     description: 'A colossal kin of Cthulhu.',
-    visualPrompt: 'A gigantic, green, gelatinous monster with an octopus-like head, dragon wings, and claws. Towering over buildings.',
-    lore: 'Smaller versions of the Great Dreamer himself. They waged war against the Elder Things eons ago.',
+    visualPrompt: 'A gigantic, green monster with octopus head.',
+    lore: 'Smaller versions of the Great Dreamer.',
     traits: ['massive'],
-    defeatFlavor: 'The ground shakes violently as the colossal entity falls, liquefying into green ooze.'
+    defeatFlavor: 'The entity liquefies into green ooze.'
   },
   formless_spawn: {
     name: 'Formless Spawn', type: 'formless_spawn', hp: 5, damage: 2, horror: 2,
     description: 'Black ooze of Tsathoggua.',
-    visualPrompt: 'A pitch-black, liquid shapeshifter changing forms rapidly. An oily toad-like shape emerging from a puddle of tar.',
-    lore: 'Living, sentient puddles of black ichor associated with Tsathoggua.',
+    visualPrompt: 'A pitch-black, liquid shapeshifter.',
+    lore: 'Living puddles of black ichor.',
     traits: ['regenerate'],
-    defeatFlavor: 'The black ooze evaporates into foul steam, leaving a permanent stain on reality.'
+    defeatFlavor: 'The ooze evaporates into foul steam.'
   },
   hunting_horror: {
     name: 'Hunting Horror', type: 'hunting_horror', hp: 4, damage: 3, horror: 3,
     description: 'A viper of the void.',
-    visualPrompt: 'A colossal, serpentine creature flying through the air, resembling a dragon without wings, with a single distorted face.',
-    lore: 'A massive, serpentine entity resembling a dragon without wings. It serves Nyarlathotep.',
+    visualPrompt: 'A colossal, serpentine flyer with a distorted face.',
+    lore: 'A serpentine entity that serves Nyarlathotep.',
     traits: ['fast', 'flying'],
-    defeatFlavor: 'It coils in on itself, shrieking, and vanishes in a blinding flash of light.'
+    defeatFlavor: 'It coils in and vanishes.'
   },
   moon_beast: {
     name: 'Moon-Beast', type: 'moon_beast', hp: 4, damage: 1, horror: 2,
     description: 'Sadistic torturers from the moon.',
-    visualPrompt: 'A pale, toad-like abomination with no eyes and a mass of short, pink tentacles vibrating on its snout.',
-    lore: 'Blind, pale, toad-like abominations from the Dreamlands\' moon.',
+    visualPrompt: 'A pale, toad-like abomination with no eyes.',
+    lore: 'Sadistic beings from the Dreamlands.',
     traits: ['ranged'],
-    defeatFlavor: 'The pale abomination falls silent, its tentacles twitching one last time.'
+    defeatFlavor: 'The abomination falls silent.'
   },
   boss: {
     name: 'Ancient One', type: 'boss', hp: 10, damage: 4, horror: 6,
     description: 'An avatar of cosmic destruction.',
-    visualPrompt: 'A cosmic entity of impossible geometry, surrounded by madness and void. An avatar of Nyarlathotep or Cthulhu.',
-    lore: 'You should not be seeing this. It is an intrusion from outside the ordered universe.',
+    visualPrompt: 'A cosmic entity of impossible geometry.',
+    lore: 'An intrusion from outside the ordered universe.',
     traits: ['massive'],
-    defeatFlavor: 'The avatar is banished, screaming as it is pulled back into the void, sealing the gate.'
+    defeatFlavor: 'The avatar is pulled back into the void.'
   }
 };
+
+export const ITEMS: Item[] = [
+  { id: 'rev', name: 'Revolver', type: 'weapon', effect: '+1 Combat Die', bonus: 1, cost: 3, statModifier: 'combat' },
+  { id: 'shot', name: 'Shotgun', type: 'weapon', effect: '+2 Combat Dice', bonus: 2, cost: 5, statModifier: 'combat' },
+  { id: 'tommy', name: 'Tommy Gun', type: 'weapon', effect: '+3 Combat Dice', bonus: 3, cost: 10, statModifier: 'combat' },
+  { id: 'med', name: 'Medical Kit', type: 'consumable', effect: 'Heal 2 HP', bonus: 2, cost: 3 },
+  { id: 'whiskey', name: 'Old Whiskey', type: 'consumable', effect: 'Heal 2 Sanity', bonus: 2, cost: 2 },
+  { id: 'flash', name: 'Flashlight', type: 'tool', effect: '+1 Investigation Die', bonus: 1, cost: 2, statModifier: 'investigation' },
+  { id: 'book', name: 'Necronomicon', type: 'relic', effect: '+3 Insight, -1 Sanity', bonus: 3, cost: 8 }
+];
+
+export const EVENTS: EventCard[] = [
+  { id: 'e1', title: 'Shadows in the Dark', description: 'You feel watched. Lose 1 Sanity.', effectType: 'sanity', value: -1 },
+  { id: 'e2', title: 'Hidden Diary', description: 'Found important notes! +1 Insight.', effectType: 'insight', value: 1 },
+  { id: 'e3', title: 'Dark Ritual', description: 'You stumble upon a ceremony!', effectType: 'spawn', value: 1 }
+];
+
+export const MADNESS_CONDITIONS: Madness[] = [
+  { id: 'm1', name: 'Hallucinations', description: 'You see things.', effect: 'Visual distortion.', visualClass: 'madness-hallucination' },
+  { id: 'm2', name: 'Paranoia', description: 'They are watching.', effect: 'Cannot Rest.', visualClass: 'madness-paranoia' }
+];
+
+export const SCENARIO_MODIFIERS: ScenarioModifier[] = [
+    { id: 'mod1', name: 'Thick Fog', description: 'Vision reduced.', effect: 'reduced_vision' }
+];
+
+export const TRAIT_POOL: Trait[] = [
+    { id: 't1', name: 'Hardened', description: '+1 Max HP', type: 'positive', effect: 'combat_bonus' }
+];
