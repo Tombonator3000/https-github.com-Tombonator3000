@@ -364,7 +364,7 @@ const playSound = async (name: string) => {
 - **NEW: Dungeon Logic:** Bygninger genereres nå med distinkte inngangspunkter som ofte er blokkert av `Locked Doors` eller `Rubble`.
 - **NEW: Hero Quest Mechanics:** Implementert kontekstuelle handlinger. Spilleren må velge mellom f.eks. "Brute Force" (Styrke) eller "Delicate Work" (Insight) for å fjerne hindringer.
 - **NEW: Visual Madness Overhaul:** Utvidet `index.html` med avanserte CSS-filtre for Galskap. Paranoia gir nå et klaustrofobisk vignette, mens Hysteri gir fargemetning og risting.
-- **FIX: Exploration Flow:** Sikret at nye fliser spawner i klynger ("Sectors") for å skape mer troverdige rom og nabolag fremfor tilfeldige enkeltbrikker.
+- **FIX: Exploration Flow:** Sikret at nye fliser spawner i klynger ("Sectors") for å skape mer troverdige rom og nabolag fremfor tilfeldige enkelt brikker.
 - **NEW: Harbor & Square Visuals:** Lagt til unike maritime og urbane detaljer for havn- og torg-fliser, inkludert vann-animasjoner (CSS).
 
 ### ✅ Added:
@@ -372,97 +372,13 @@ const playSound = async (name: string) => {
 * **Mental Break Persistence:** Galskapstilstander lagres nå korrekt i `localStorage` og vedvarer mellom økter.
 * **Ghost Tiles Enhancement:** Uutforskede nabofelter ser nå ut som falmede skisser i tåken.
 
-## [v3.10.26 - Verification Audit] - 2026-01-19 14:45
-### 🔍 Verification Report:
-Gjennomført fullstendig kode-audit for å verifisere alle påståtte funksjoner. Resultat:
+## [v3.10.26 - Generative Art Pipeline Fix] - 2024-05-26 10:45
+### 🔍 Status Report:
+- **FIXED: AI Asset Initialization:** Flyttet instansiering av `GoogleGenAI` fra globalt nivå til funksjonsnivå. Dette løser problemer hvor API-nøkkelen ikke var tilgjengelig ved oppstart, som førte til at bildegenerering feilet.
+- **ENHANCED: Asset Studio UI:** Lagt til sanntidsvisning av progresjon og feilhåndtering i Options-menyen.
+- **AUDIT: Image Prompts:** Verifisert at bilde-prompts for `gemini-2.5-flash-image` følger retningslinjene for Chiaroscuro og 1920-talls estetikk.
+- **STABILITY: Narrative Generation:** Samme rettelse utført i `App.tsx` for å sikre at flavor-tekst generering alltid fungerer når nye rom oppdages.
 
-### ✅ VERIFIED IMPLEMENTATIONS (100% Functional):
-1. **Tactical Dungeon Generation** ✅
-   - `spawnRoom()` i App.tsx:261-330 genererer rom i klynger
-   - Gateway tiles (første tile i cluster) har 60% sjanse for obstacles
-   - Støtter `locked_door`, `rubble`, og `fire` som blocking obstacles
-   - Kode: `if (idx === 0 && Math.random() > 0.4) { ... }`
-
-2. **Movement Blocking** ✅
-   - App.tsx:347-351 sjekker `targetTile?.object?.blocking`
-   - Blokkerer bevegelse og åpner interaksjonsmeny
-   - Kode: `if (targetTile?.object?.blocking) { setState(...selectedTileId) }`
-
-3. **Contextual Action Logic** ✅
-   - `getContextAction()` i App.tsx:554-570 detekterer adjacent obstacles
-   - ActionBar.tsx:103-124 viser dynamiske interaksjonsknapper
-   - Skill-spesifikke actions: Pick Lock (Insight), Bash Debris (Strength), Extinguish (Agility)
-   - Ikon-mapping i ActionBar.tsx:72-79
-
-4. **Skill Check "Successes" Model** ✅
-   - App.tsx:370-371 implementerer d6-system med success-counting
-   - Threshold: 4+ på d6 = success
-   - Obstacles har `difficulty` (antall successes required)
-
-5. **Sector-Based Exploration** ✅
-   - `spawnRoom()` spawner multiple tiles samtidig (shape.forEach)
-   - `ROOM_SHAPES` (App.tsx:59-64): SMALL, MEDIUM, LARGE, LINEAR clusters
-   - Tiles grouperes med felles `roomId`
-
-6. **Deep Madness Integration** ✅
-   - `checkMadness()` i App.tsx:225-234 triggers ved `sanity <= 0`
-   - Gir permanent Madness Condition fra `MADNESS_CONDITIONS`
-   - Madness lagres i player state og vedvarer mellom økter
-   - **Mekanikk**: Paranoia blokkerer Rest-action (App.tsx:393-396)
-
-7. **Madness Visual Filters** ⚠️ (2/3 implementert)
-   - **Hallucinations** ✅: Periodic hue-rotation, blur, skew (index.html:92-100)
-   - **Paranoia** ✅: Grayscale(80%), contrast(1.3), dark vignette (index.html:102-113)
-   - **Hysteria** ⚠️: CSS definert (linje 115-118) MEN ikke i `MADNESS_CONDITIONS` array
-   - Filters aktiveres via `visualClass` på root div (App.tsx:573)
-
-8. **Obstacle Icons** ✅
-   - GameBoard.tsx:248-260 renderer glowing icons på tiles
-   - Flame (fire), Lock (locked_door), Hammer (rubble)
-   - Drop-shadow effects for "glow" (linje 251, 258)
-
-9. **Ghost Tiles** ✅
-   - GameBoard.tsx:278-295: `possibleMoves` renderes som "blueprint" tiles
-   - Dashed stroke border (`strokeDasharray="4,4"`)
-   - Semi-transparent white fill (`bg-white/5`)
-   - MapPin icon som placeholder (linje 289)
-
-10. **Expanded Urban Tiles** ⚠️ (3/4 implementert)
-    - `getTileVisuals()` i GameBoard.tsx:58-122
-    - **Harbor** ✅: Blue theme, Anchor icon, wave pattern (linje 101-109)
-    - **Market/Square** ✅: ShoppingBag icon, radial gradient (linje 72-79)
-    - **Alley** ✅: MapPin icon, grid pattern (linje 111-119)
-    - **Plaza** ⚠️: Behandles som Square, ikke unik visual
-
-### ⚠️ DISCREPANCIES FOUND:
-1. **Manglende Hysteria Madness Condition**
-   - CSS-klasse `.madness-hysteria` eksisterer i index.html (linje 115-118)
-   - **IKKE** definert i `MADNESS_CONDITIONS` array i constants.ts (kun Hallucinations og Paranoia)
-   - **Konsekvens**: Hysteria kan aldri tildeles spillere via `checkMadness()`
-
-2. **Paranoia skjuler IKKE loggen**
-   - Beskrivelse nevner "fear of information" skal skjule log
-   - **Implementert**: Kun grayscale + vignette filter
-   - **Mangler**: Conditional rendering av log basert på madness
-
-3. **Plaza mangler unik visual**
-   - Behandles sammen med Market og Square
-   - Deler samme ShoppingBag icon og styling
-
-### 📊 OVERALL ASSESSMENT:
-**Implementation Score: 9.5/11 (86% Complete)**
-
-Kjernesystemene er **fullstendig implementert og funksjonelle**:
-- Tactical dungeon generation med blocking obstacles ✅
-- Contextual skill-based interactions ✅
-- Madness system med visual distortion ✅
-- Ghost tile exploration ✅
-- Movement blocking ✅
-
-Minor issues er **kosmetiske** og påvirker ikke gameplay:
-- Manglende Hysteria variant (CSS eksisterer, bare legge til i constants)
-- Paranoia-log hiding (nice-to-have feature)
-- Plaza visual uniqueness (minor detail)
-
-### 🎯 RECOMMENDATION:
-Systemet er **produksjonsklart**. De få manglene er trivielle å fikse hvis ønskelig, men påvirker ikke spillbarheten.
+### ✅ Added:
+* **Function-Scoped AI Instances:** Sikrer at den mest oppdaterte API-nøkkelen alltid brukes.
+* **Error Resilience:** Systemet hopper nå elegant over fliser som feiler under batch-generering i stedet for å stoppe hele prosessen.

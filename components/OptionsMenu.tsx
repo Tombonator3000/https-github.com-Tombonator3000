@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     X, Trash2, Monitor, AlertTriangle, Image as ImageIcon, Loader, CheckCircle, 
     Download, RefreshCw, Volume2, Speaker, Zap, Eye, Grid, Activity, VolumeX, Save,
-    Contrast, Wind, Sparkles
+    Contrast, Wind, Sparkles, AlertOctagon
 } from 'lucide-react';
 import { loadAssetLibrary, saveAssetLibrary, generateLocationAsset, AssetLibrary, getMissingAssets, downloadAssetsAsJSON } from '../utils/AssetLibrary';
 import { INDOOR_LOCATIONS, ALL_LOCATIONS_FULL, BESTIARY, CHARACTERS } from '../constants';
@@ -27,6 +28,7 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
   const [isGenerating, setIsGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
   const [currentGenItem, setCurrentGenItem] = useState('');
+  const [genErrors, setGenErrors] = useState(0);
 
   const assetRegistry = useMemo(() => {
       const lib = loadAssetLibrary();
@@ -62,6 +64,7 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
           return;
       }
       setIsGenerating(true);
+      setGenErrors(0);
       const lib = loadAssetLibrary();
       const missing = assetRegistry.missing;
       const totalToGen = missing.length;
@@ -72,18 +75,24 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
           setGenProgress(Math.round(((i) / totalToGen) * 100));
           
           let img = null;
-          if (Object.keys(BESTIARY).includes(key)) {
-              img = await generateLocationAsset(key, 'room'); 
-          } else {
-              const isIndoor = INDOOR_LOCATIONS.includes(key);
-              img = await generateLocationAsset(key, isIndoor ? 'room' : 'street');
+          try {
+            if (Object.keys(BESTIARY).includes(key)) {
+                img = await generateLocationAsset(key, 'room'); 
+            } else {
+                const isIndoor = INDOOR_LOCATIONS.includes(key);
+                img = await generateLocationAsset(key, isIndoor ? 'room' : 'street');
+            }
+          } catch (e) {
+            console.error(`Generation error for ${key}:`, e);
           }
           
           if (img) {
               lib[key] = img;
               saveAssetLibrary(lib);
+          } else {
+              setGenErrors(prev => prev + 1);
           }
-          await new Promise(r => setTimeout(r, 1000));
+          await new Promise(r => setTimeout(r, 800)); // Slightly faster but safe delay
       }
 
       setGenProgress(100);
@@ -237,7 +246,10 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({ onClose, onResetData, onUpdat
                 <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
                     <div className="flex justify-between items-end mb-4 border-b border-slate-800 pb-2">
                         <h3 className="text-xl font-bold text-amber-500 uppercase tracking-widest">Generative Art Pipeline</h3>
-                        <span className="text-xs text-slate-400">{assetRegistry.generated} / {assetRegistry.total} Assets</span>
+                        <div className="text-right">
+                          <span className="text-xs text-slate-400 block">{assetRegistry.generated} / {assetRegistry.total} Assets</span>
+                          {genErrors > 0 && <span className="text-[10px] text-red-500 uppercase font-bold tracking-widest flex items-center gap-1 justify-end"><AlertOctagon size={10}/> {genErrors} Failures</span>}
+                        </div>
                     </div>
                     
                     <div className="p-6 bg-[#0a0a1a] rounded border border-amber-900/30 shadow-inner">

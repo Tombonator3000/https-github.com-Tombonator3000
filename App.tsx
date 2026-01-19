@@ -43,6 +43,7 @@ const getAI = (): GoogleGenAI | null => {
         return null;
     }
 }; 
+const APP_VERSION = "3.10.26"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -140,9 +141,8 @@ const App: React.FC = () => {
   }, [state]);
 
   const generateNarrative = async (context: string) => {
-    const ai = getAI();
-    if (!ai) return; // Skip narrative generation if no API key
     try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: `Write a short, chilling 1920s Lovecraftian horror flavor text for: ${context}. Keep it under 15 words.`,
