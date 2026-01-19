@@ -5,9 +5,10 @@ import { GoogleGenAI } from "@google/genai";
 import { 
   Skull, ChevronRight, ChevronLeft, RotateCcw, Minimize2, ScrollText, Target, FolderOpen, 
   ArrowLeft, Users, Star, Trash2, Edit2, ShoppingBag, Book, CloudFog, Zap, 
-  User, Save, MapPin, CheckCircle, HelpCircle, FileText, History, Heart, Brain, Settings, Edit3
+  User, Save, MapPin, CheckCircle, HelpCircle, FileText, History, Heart, Brain, Settings, Edit3,
+  Hammer, Wind, Lock, Flame
 } from 'lucide-react';
-import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, ContextAction, SavedInvestigator, Item, Spell, Trait, GameSettings, ScenarioStep, DoomEvent, EnemyType, VictoryType, FloatingText } from './types';
+import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, ContextAction, SavedInvestigator, Item, Spell, Trait, GameSettings, ScenarioStep, DoomEvent, EnemyType, VictoryType, FloatingText, Madness } from './types';
 import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS, BESTIARY, INDOOR_CONNECTORS, OUTDOOR_CONNECTORS, SCENARIO_MODIFIERS, TRAIT_POOL, LOCATION_DESCRIPTIONS } from './constants';
 import GameBoard from './components/GameBoard';
 import CharacterPanel from './components/CharacterPanel';
@@ -27,7 +28,7 @@ import { hexDistance, findPath, hasLineOfSight } from './utils/hexUtils';
 
 const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.10.22"; 
+const APP_VERSION = "3.10.23"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -66,7 +67,7 @@ const formatLogEntry = (entry: string) => {
     const keywords = [
         { regex: /(skade|damage)/gi, color: 'text-red-400 font-bold' },
         { regex: /(død|dead|die|beseiret|overvant)/gi, color: 'text-red-600 font-black uppercase' },
-        { regex: /(sanity|sinnslidelse|madness)/gi, color: 'text-purple-400 font-bold' },
+        { regex: /(sanity|sinnslidelse|madness|galskap)/gi, color: 'text-purple-400 font-bold' },
         { regex: /(insight|clue|hint)/gi, color: 'text-blue-400 font-bold' },
         { regex: /(heal|hp|liv)/gi, color: 'text-green-400 font-bold' },
         { regex: /(suksess|success|unlocked|klarte|traff)/gi, color: 'text-green-300 font-bold uppercase' },
@@ -152,14 +153,12 @@ const App: React.FC = () => {
                 const alivePlayers = updatedPlayers.filter(p => !p.isDead);
                 if (alivePlayers.length === 0) continue;
 
-                // Find nearest player
                 const nearestPlayer = alivePlayers.sort((a, b) => 
                     hexDistance(enemy.position, a.position) - hexDistance(enemy.position, b.position)
                 )[0];
 
                 const dist = hexDistance(enemy.position, nearestPlayer.position);
 
-                // 1. TACTICAL COMBAT: If in attack range, attack the nearest player
                 if (dist <= enemy.attackRange) {
                     addToLog(`The ${enemy.name} strikes ${nearestPlayer.name}!`);
                     addFloatingText(nearestPlayer.position.q, nearestPlayer.position.r, `-${enemy.damage} HP`, "text-red-500");
@@ -177,7 +176,6 @@ const App: React.FC = () => {
                         return p;
                     });
                 } 
-                // 2. ACTIVE MOVEMENT: If not in range, move towards the nearest player
                 else {
                     const enemyBlockers = new Set(updatedEnemies.filter(e => e.id !== enemy.id).map(e => `${e.position.q},${e.position.r}`));
                     const path = findPath(enemy.position, [nearestPlayer.position], state.board, enemyBlockers, false);
@@ -226,6 +224,16 @@ const App: React.FC = () => {
     }, 2000);
   };
 
+  const checkMadness = (player: Player) => {
+      if (player.sanity <= 0 && !player.activeMadness) {
+          const newMadness = MADNESS_CONDITIONS[Math.floor(Math.random() * MADNESS_CONDITIONS.length)];
+          addToLog(`${player.name} has cracked. Madness sets in: ${newMadness.name}!`);
+          generateNarrative(`${player.name} is succumbing to ${newMadness.name}.`);
+          return { ...player, sanity: Math.floor(player.maxSanity / 2), activeMadness: newMadness, madness: [...player.madness, newMadness.id] };
+      }
+      return player;
+  };
+
   const spawnEnemy = useCallback(async (type: EnemyType, q: number, r: number) => {
       const bestiary = BESTIARY[type];
       if (!bestiary) return;
@@ -261,8 +269,7 @@ const App: React.FC = () => {
         : (tileSet === 'indoor' ? INDOOR_LOCATIONS : OUTDOOR_LOCATIONS);
       
       const roomName = pool[Math.floor(Math.random() * pool.length)];
-      const shapes = isConnector ? [ROOM_SHAPES.LINEAR] : [ROOM_SHAPES.SMALL, ROOM_SHAPES.MEDIUM, ROOM_SHAPES.LARGE];
-      const shape = shapes[Math.floor(Math.random() * shapes.length)];
+      const shape = isConnector ? ROOM_SHAPES.LINEAR : ROOM_SHAPES.MEDIUM;
       
       const newTiles: Tile[] = [];
       const imageUrl = await generateLocationAsset(roomName, isConnector ? 'street' : 'room');
@@ -272,6 +279,17 @@ const App: React.FC = () => {
           const r = startR + offset.r;
           
           if (!state.board.some(t => t.q === q && t.r === r)) {
+              let object: TileObjectType | undefined = undefined;
+              let blocking = false;
+
+              // Obstacle spawning logic (40% chance in building)
+              if (tileSet === 'indoor' && Math.random() > 0.6) {
+                  const roll = Math.random();
+                  if (roll > 0.8) { object = 'locked_door'; blocking = true; }
+                  else if (roll > 0.6) { object = 'rubble'; blocking = true; }
+                  else if (roll > 0.4) { object = 'fire'; blocking = true; }
+              }
+
               newTiles.push({
                   id: `tile-${Date.now()}-${Math.random()}`,
                   q, r,
@@ -282,7 +300,8 @@ const App: React.FC = () => {
                   explored: true,
                   searchable: !isConnector,
                   searched: false,
-                  imageUrl: imageUrl || undefined
+                  imageUrl: imageUrl || undefined,
+                  object: object ? { type: object, searched: false, blocking, difficulty: 4 } : undefined
               });
           }
       });
@@ -295,7 +314,7 @@ const App: React.FC = () => {
           addToLog(`ROOM: ${roomName}. ${LOCATION_DESCRIPTIONS[roomName] || ""}`);
           generateNarrative(`Entering the ${roomName}.`);
           
-          if (Math.random() > 0.7 && !isConnector) {
+          if (Math.random() > 0.8) {
               spawnEnemy('cultist', startQ, startR);
           }
       }
@@ -328,13 +347,12 @@ const App: React.FC = () => {
               setState(prev => ({
                   ...prev,
                   enemies: prev.enemies.map(e => e.id === enemy.id ? { ...e, hp: e.hp - spell.value } : e).filter(e => e.hp > 0),
-                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1, insight: p.insight - spell.cost } : p),
+                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? checkMadness({ ...p, actions: p.actions - 1, insight: p.insight - spell.cost }) : p),
                   activeSpell: null
               }));
               if (enemy.hp - spell.value <= 0) addToLog(`${enemy.name} was banished back to the void!`);
           }
       } else {
-          // Self or Tile targeting
           if (spell.effectType === 'heal') {
               addToLog(`${activePlayer.name} weaves ${spell.name}...`);
               addFloatingText(activePlayer.position.q, activePlayer.position.r, `+${spell.value} HP`, "text-green-400");
@@ -342,13 +360,6 @@ const App: React.FC = () => {
                   ...prev,
                   players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, hp: Math.min(p.maxHp, p.hp + spell.value), actions: p.actions - 1, insight: p.insight - spell.cost } : p),
                   activeSpell: null
-              }));
-          } else if (spell.effectType === 'reveal') {
-              addToLog(`${activePlayer.name} uses ${spell.name} to peel back the veil.`);
-              setState(prev => ({
-                ...prev,
-                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1, insight: p.insight - spell.cost } : p),
-                activeSpell: null
               }));
           }
       }
@@ -369,24 +380,52 @@ const App: React.FC = () => {
         const { q, r } = payload;
         const targetTile = state.board.find(t => t.q === q && t.r === r);
         
+        if (targetTile?.object?.blocking) {
+            setState(prev => ({ ...prev, selectedTileId: targetTile.id }));
+            addToLog(`A ${targetTile.object.type} blocks your path.`);
+            return;
+        }
+
         if (!targetTile) {
              spawnRoom(q, r, state.activeScenario?.tileSet || 'mixed');
-             setState(prev => ({ 
-                 ...prev, 
-                 players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p) 
-             }));
-        } else {
-             setState(prev => ({ 
-                 ...prev, 
-                 players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p) 
-             }));
-        }
+        } 
+        
+        setState(prev => ({ 
+            ...prev, 
+            players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, position: { q, r }, actions: p.actions - 1 } : p) 
+        }));
 
         state.enemies.forEach(enemy => {
             if (hasLineOfSight(enemy.position, { q, r }, state.board, enemy.visionRange)) {
                 addToLog(`The eyes of a ${enemy.name} fall upon you! You are VISIBLE!`);
             }
         });
+        break;
+
+      case 'interact':
+        const tile = state.board.find(t => t.id === state.selectedTileId);
+        if (!tile || !tile.object) return;
+
+        // Skill check logic
+        const roll = Array.from({ length: 1 + activePlayer.insight }, () => Math.floor(Math.random() * 6) + 1);
+        const successes = roll.filter(v => v >= 4).length;
+
+        if (successes >= 1) {
+            addToLog(`SUCCESS! The ${tile.object.type} is no longer an obstacle.`);
+            setState(prev => ({
+                ...prev,
+                board: prev.board.map(t => t.id === tile.id ? { ...t, object: { ...t.object!, blocking: false } } : t),
+                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
+                selectedTileId: null
+            }));
+        } else {
+            addToLog(`FAILED! The ${tile.object.type} remains firm.`);
+            setState(prev => ({
+                ...prev,
+                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1, sanity: Math.max(0, p.sanity - 1) } : p),
+                selectedTileId: null
+            }));
+        }
         break;
 
       case 'rest':
@@ -399,29 +438,15 @@ const App: React.FC = () => {
 
       case 'investigate':
           const diceCount = 1 + activePlayer.insight + (activePlayer.id === 'detective' ? 1 : 0);
-          const roll = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
-          setState(prev => ({ ...prev, lastDiceRoll: roll }));
+          const iRoll = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
+          setState(prev => ({ ...prev, lastDiceRoll: iRoll }));
           break;
 
       case 'attack':
           const targetEnemy = state.enemies.find(e => e.id === state.selectedEnemyId);
-          if (!targetEnemy) {
-              addToLog("No target selected for attack!");
-              return;
-          }
-          const dist = hexDistance(activePlayer.position, targetEnemy.position);
-          if (dist > 1) { 
-              addToLog("Target is too far away to attack!");
-              return;
-          }
-
-          const combatDice = 1 + (activePlayer.id === 'veteran' ? 1 : 0);
-          const combatRoll = Array.from({ length: combatDice }, () => Math.floor(Math.random() * 6) + 1);
+          if (!targetEnemy) return;
+          const combatRoll = Array.from({ length: 1 + (activePlayer.id === 'veteran' ? 1 : 0) }, () => Math.floor(Math.random() * 6) + 1);
           setState(prev => ({ ...prev, lastDiceRoll: combatRoll, activeCombat: { playerId: activePlayer.id, enemyId: targetEnemy.id } }));
-          break;
-
-      case 'enemy_click':
-          setState(prev => ({...prev, selectedEnemyId: payload.id}));
           break;
 
       case 'cast':
@@ -431,26 +456,6 @@ const App: React.FC = () => {
 
       case 'cancel_cast':
           setState(prev => ({ ...prev, activeSpell: null }));
-          break;
-
-      case 'item':
-          const medkit = activePlayer.inventory.find(i => i.id === 'med');
-          const whiskey = activePlayer.inventory.find(i => i.id === 'whiskey');
-          if (medkit) {
-              addToLog(`${activePlayer.name} uses a Medical Kit.`);
-              setState(prev => ({
-                  ...prev,
-                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, hp: Math.min(p.maxHp, p.hp + 2), inventory: p.inventory.filter(item => item !== medkit), actions: p.actions - 1 } : p)
-              }));
-          } else if (whiskey) {
-              addToLog(`${activePlayer.name} takes a swig of Old Whiskey.`);
-              setState(prev => ({
-                  ...prev,
-                  players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, sanity: Math.min(p.maxSanity, p.sanity + 2), inventory: p.inventory.filter(item => item !== whiskey), actions: p.actions - 1 } : p)
-              }));
-          } else {
-              addToLog("No usable items in inventory.");
-          }
           break;
     }
   };
@@ -474,15 +479,10 @@ const App: React.FC = () => {
                   setState(prev => ({
                       ...prev,
                       enemies: prev.enemies.map(e => e.id === enemy.id ? { ...e, hp: e.hp - damage } : e).filter(e => e.hp > 0),
-                      players: prev.players.map((p, i) => i === prev.activePlayerIndex ? { ...p, actions: p.actions - 1 } : p),
+                      players: prev.players.map((p, i) => i === prev.activePlayerIndex ? checkMadness({ ...p, actions: p.actions - 1 }) : p),
                       lastDiceRoll: null,
                       activeCombat: null
                   }));
-
-                  if (enemy.hp - damage <= 0) {
-                      addToLog(`${enemy.name} was defeated!`);
-                      setState(prev => ({ ...prev, cluesFound: prev.cluesFound + 1 }));
-                  }
               } else {
                   addToLog(`${activePlayer.name} missed the attack!`);
                   setState(prev => ({
@@ -533,44 +533,10 @@ const App: React.FC = () => {
       });
   };
 
-  const selectScenario = (scenario: Scenario) => { 
-      let finalScenario = { ...scenario };
-      if (scenario.id === 's5') {
-          const goals: VictoryType[] = ['escape', 'assassination', 'collection', 'survival'];
-          const victory = goals[Math.floor(Math.random() * goals.length)];
-          finalScenario.victoryType = victory;
-          finalScenario.startDoom = 10 + Math.floor(Math.random() * 5);
-          finalScenario.steps = [{ id: 'rs1', description: 'Survive the unknown', type: 'survive', amount: 8, completed: false }];
-      }
-      setState(prev => ({ ...prev, activeScenario: finalScenario })); 
-  };
-
-  const toggleCharacterSelection = (type: CharacterType) => {
-    setState(prev => {
-      const existing = prev.players.find(p => p.id === type);
-      if (existing) return { ...prev, players: prev.players.filter(p => p !== existing) };
-      if (prev.players.length >= 4) return prev;
-      const char = CHARACTERS[type];
-      
-      const startingSpells: Spell[] = [];
-      if (type === 'occultist') {
-          startingSpells.push(SPELLS[Math.floor(Math.random() * SPELLS.length)]);
-      }
-
-      return { ...prev, players: [...prev.players, { ...char, position: { q: 0, r: 0 }, inventory: [], spells: startingSpells, actions: 2, isDead: false, madness: [], activeMadness: null, traits: [] }] };
-    });
-  };
-
-  const startGame = () => {
-    if (state.players.length === 0 || !state.activeScenario) return;
-    setState(prev => ({ ...prev, phase: GamePhase.INVESTIGATOR, activePlayerIndex: 0, doom: prev.activeScenario?.startDoom || 12 }));
-    addToLog("The investigation begins. Keep your wits about you.");
-    spawnEnemy('cultist', 1, 0);
-  };
-
   const activePlayer = state.players[state.activePlayerIndex] || state.players[0] || null;
   const currentStep = state.activeScenario?.steps?.[state.currentStepIndex];
   const selectedEnemy = state.enemies.find(e => e.id === state.selectedEnemyId);
+  const selectedTile = state.board.find(t => t.id === state.selectedTileId);
 
   return (
     <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative transition-all duration-1000 ${state.screenShake ? 'animate-shake' : ''} ${activePlayer?.activeMadness?.visualClass || ''}`}>
@@ -595,7 +561,7 @@ const App: React.FC = () => {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {SCENARIOS.map(s => (
-                              <button key={s.id} onClick={() => selectScenario(s)} className="p-6 bg-[#0a0a1a] border border-slate-700 hover:border-[#e94560] rounded-xl text-left transition-all group">
+                              <button key={s.id} onClick={() => setState(prev => ({ ...prev, activeScenario: s }))} className="p-6 bg-[#0a0a1a] border border-slate-700 hover:border-[#e94560] rounded-xl text-left transition-all group">
                                   <h3 className="text-xl font-bold text-white group-hover:text-[#e94560] mb-2">{s.title}</h3>
                                   <p className="text-xs text-slate-400 italic leading-relaxed">{s.description}</p>
                               </button>
@@ -612,7 +578,13 @@ const App: React.FC = () => {
                           {(Object.keys(CHARACTERS) as CharacterType[]).map(type => {
                               const isSelected = !!state.players.find(p => p.id === type);
                               return (
-                                  <button key={type} onClick={() => toggleCharacterSelection(type)} className={`p-4 bg-[#0a0a1a] border-2 rounded-xl transition-all ${isSelected ? 'border-[#e94560] shadow-[0_0_15px_rgba(233,69,96,0.3)] scale-105' : 'border-slate-800 opacity-60'}`}>
+                                  <button key={type} onClick={() => {
+                                      const char = CHARACTERS[type];
+                                      setState(prev => ({
+                                          ...prev,
+                                          players: isSelected ? prev.players.filter(p => p.id !== type) : [...prev.players, { ...char, position: { q: 0, r: 0 }, inventory: [], spells: (type === 'occultist' ? [SPELLS[0]] : []), actions: 2, isDead: false, madness: [], activeMadness: null, traits: [] }]
+                                      }));
+                                  }} className={`p-4 bg-[#0a0a1a] border-2 rounded-xl transition-all ${isSelected ? 'border-[#e94560] shadow-[0_0_15px_rgba(233,69,96,0.3)] scale-105' : 'border-slate-800 opacity-60'}`}>
                                       <div className="text-lg font-bold text-white uppercase tracking-tighter">{CHARACTERS[type].name}</div>
                                       <div className="flex justify-center gap-4 text-xs font-bold mt-2">
                                           <span className="text-red-500 flex items-center gap-1"><Heart size={12}/> {CHARACTERS[type].hp}</span>
@@ -622,7 +594,11 @@ const App: React.FC = () => {
                               );
                           })}
                       </div>
-                      <button disabled={state.players.length === 0} onClick={startGame} className={`px-12 py-4 font-display text-2xl tracking-[0.3em] uppercase border-2 transition-all ${state.players.length > 0 ? 'bg-[#e94560] border-white text-white shadow-[0_0_30px_#e94560]' : 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed'}`}>Assemble Team</button>
+                      <button disabled={state.players.length === 0} onClick={() => {
+                          setState(prev => ({ ...prev, phase: GamePhase.INVESTIGATOR, doom: prev.activeScenario?.startDoom || 12 }));
+                          addToLog("The investigation begins.");
+                          spawnEnemy('cultist', 1, 0);
+                      }} className={`px-12 py-4 font-display text-2xl tracking-[0.3em] uppercase border-2 transition-all ${state.players.length > 0 ? 'bg-[#e94560] border-white text-white shadow-[0_0_30px_#e94560]' : 'bg-slate-900 border-slate-800 text-slate-700 cursor-not-allowed'}`}>Assemble Team</button>
                   </div>
               )}
           </div>
@@ -637,7 +613,6 @@ const App: React.FC = () => {
                         <span className="w-1.5 h-1.5 bg-[#e94560] rounded-full"></span>
                         <span className="flex items-center gap-2"><Skull size={14}/> DOOM: <span className="text-[#e94560]">{state.doom}</span></span>
                     </div>
-                    {currentStep && <div className="text-sm md:text-lg font-display italic text-[#eecfa1] mt-1 border-t border-[#3e2c20] pt-2">{currentStep.description}</div>}
                 </div>
                 <button onClick={() => setShowOptions(true)} className="bg-[#1a120b]/90 border-2 border-[#e94560] rounded-xl p-3 text-[#e94560] transition-colors hover:bg-black/50"><Settings size={24}/></button>
             </div>
@@ -669,7 +644,18 @@ const App: React.FC = () => {
             </div>
 
             <footer className="fixed bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black to-transparent z-50 flex items-center justify-center gap-4 px-4 pb-4">
-                <ActionBar onAction={handleAction} actionsRemaining={activePlayer?.actions || 0} isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} spells={activePlayer?.spells || []} activeSpell={state.activeSpell} showCharacter={showLeftPanel} onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} showInfo={showRightPanel} onToggleInfo={() => setShowRightPanel(!showRightPanel)} />
+                <ActionBar 
+                    onAction={handleAction} 
+                    actionsRemaining={activePlayer?.actions || 0} 
+                    isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} 
+                    spells={activePlayer?.spells || []} 
+                    activeSpell={state.activeSpell} 
+                    showCharacter={showLeftPanel} 
+                    onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} 
+                    showInfo={showRightPanel} 
+                    onToggleInfo={() => setShowRightPanel(!showRightPanel)} 
+                    contextAction={selectedTile?.object?.blocking ? { id: 'interact', label: `Clear ${selectedTile.object.type}`, iconType: 'strength', difficulty: 4 } : null}
+                />
                 <button onClick={handleNextTurn} className="px-8 py-4 bg-[#e94560] text-white font-bold rounded-xl uppercase tracking-widest hover:scale-110 active:scale-95 transition-all shadow-[0_0_20px_#e94560]">
                     {state.activePlayerIndex === state.players.length - 1 ? "End Round" : "Next Turn"}
                 </button>

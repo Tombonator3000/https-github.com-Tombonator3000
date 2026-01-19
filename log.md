@@ -24,3 +24,16 @@
 ### ✅ Added:
 * **Special Abilities Display:** Viser fiendens traits direkte i kamp-panelet.
 * **Refined Combat AI:** Fiender prioriterer angrep fremfor bevegelse hvis de allerede er i nærkamp-rekkevidde.
+
+## [v3.10.23 - Madness & Obstacles Expansion] - 2024-05-25 14:30
+### 🔍 Status Report:
+- **NEW: Madness System:** Når Sanity treffer 0, "knekker" etterforskeren. De får en permanent `Madness Condition` (Hallusinasjoner, Paranoia, Hysteri) og visuelle filtre legges på hele skjermen.
+- **NEW: Physical Obstacles:** Tiles kan nå inneholde `Locked Doors`, `Rubble`, `Fire` og `Ritual Sigils`. Disse blokkerer bevegelse (`blocking: true`).
+- **NEW: Contextual Skill Checks:** Lagt til interaksjonslogikk. Spilleren kan klikke på en blokkert dør for å utføre en `Strength`-test eller en `Insight`-test for å bryte seg gjennom.
+- **ENHANCED: Tile Visuals:** Fullstendig overhaling av teksturer. Tregulv for herregårder, brostein for gater, og rituelle symboler for kirker.
+- **ENHANCED: Room Generation:** 40% sjanse for at dør-brikker eller hindringer spawner mellom rom-seksjoner, noe som tvinger spillerne til å bruke handlinger på å åpne veien.
+
+### ✅ Added:
+* **Visual Madness Filters:** CSS-filtre i `index.html` som aktiveres basert på `activeMadness`.
+* **Obstacle Interaction:** Handlingslinjen oppdateres dynamisk når man står ved siden av en hindring.
+* **Complex Tile Metadata:** Hver tile-type har nå unike visuelle kjennetegn og bakgrunnsikoner.
