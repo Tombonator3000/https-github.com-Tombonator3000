@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Search, Sword, Heart, Package, LockOpen, Hammer, Wind, Zap, X, Eye } from 'lucide-react';
+import { Search, Sword, Heart, Package, LockOpen, Hammer, Wind, Zap, X, Eye, User, BookOpen } from 'lucide-react';
 import { ContextAction, Spell } from '../types';
 import Tooltip from './Tooltip';
 
@@ -8,12 +8,20 @@ interface ActionBarProps {
   onAction: (action: string, payload?: any) => void;
   actionsRemaining: number;
   isInvestigatorPhase: boolean;
-  contextAction?: ContextAction | null; // Context specific action (e.g. "Break Door")
+  contextAction?: ContextAction | null; 
   spells: Spell[];
   activeSpell: Spell | null;
+  // New props for sidebar toggles
+  onToggleCharacter: () => void;
+  showCharacter: boolean;
+  onToggleInfo: () => void;
+  showInfo: boolean;
 }
 
-const ActionBar: React.FC<ActionBarProps> = ({ onAction, actionsRemaining, isInvestigatorPhase, contextAction, spells, activeSpell }) => {
+const ActionBar: React.FC<ActionBarProps> = ({ 
+    onAction, actionsRemaining, isInvestigatorPhase, contextAction, spells, activeSpell,
+    onToggleCharacter, showCharacter, onToggleInfo, showInfo
+}) => {
   const [showSpellMenu, setShowSpellMenu] = useState(false);
   const disabled = actionsRemaining <= 0 || !isInvestigatorPhase;
 
@@ -80,7 +88,18 @@ const ActionBar: React.FC<ActionBarProps> = ({ onAction, actionsRemaining, isInv
   return (
     <div className="flex items-center gap-2 md:gap-4 overflow-x-auto max-w-[90vw] md:max-w-none pb-1 md:pb-0 hide-scrollbar relative">
       
-      {/* If we have a context action (selected a blocker), show BIG button */}
+      {/* LEFT TOGGLE: CHARACTER SHEET */}
+      <button 
+        onClick={onToggleCharacter}
+        className={`group flex flex-col items-center justify-center w-14 h-14 md:w-20 md:h-20 rounded border transition-all duration-200 shrink-0 ${showCharacter ? 'bg-amber-900/40 border-amber-500 text-amber-100' : 'bg-[#1a1a2e] border-slate-700 text-slate-500 hover:border-amber-600 hover:text-amber-500'}`}
+      >
+          <User size={20} className="mb-1" />
+          <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-wider hidden md:block">Char</span>
+      </button>
+
+      <div className="w-px h-12 bg-slate-800 mx-1"></div>
+
+      {/* MAIN ACTION BAR CONTENT */}
       {contextAction ? (
           <Tooltip 
             variant="action"
@@ -220,6 +239,18 @@ const ActionBar: React.FC<ActionBarProps> = ({ onAction, actionsRemaining, isInv
           })}
         </div>
       </div>
+
+      <div className="w-px h-12 bg-slate-800 mx-1"></div>
+
+      {/* RIGHT TOGGLE: LOG/INFO */}
+      <button 
+        onClick={onToggleInfo}
+        className={`group flex flex-col items-center justify-center w-14 h-14 md:w-20 md:h-20 rounded border transition-all duration-200 shrink-0 ${showInfo ? 'bg-slate-800 border-white text-white' : 'bg-[#1a1a2e] border-slate-700 text-slate-500 hover:border-slate-400 hover:text-slate-300'}`}
+      >
+          <BookOpen size={20} className="mb-1" />
+          <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-wider hidden md:block">Log</span>
+      </button>
+
     </div>
   );
 };

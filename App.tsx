@@ -3,9 +3,9 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import * as Tone from 'tone';
 import { GoogleGenAI } from "@google/genai";
 import { 
-  Skull, ChevronRight, RotateCcw, Minimize2, ScrollText, Target, FolderOpen, 
+  Skull, ChevronRight, ChevronLeft, RotateCcw, Minimize2, ScrollText, Target, FolderOpen, 
   ArrowLeft, Users, Star, Trash2, Edit2, ShoppingBag, Book, CloudFog, Zap, 
-  User, Save, MapPin, CheckCircle, HelpCircle
+  User, Save, MapPin, CheckCircle, HelpCircle, FileText
 } from 'lucide-react';
 import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, TileObjectType, Scenario, ContextAction, SavedInvestigator, Item, Spell, Trait, GameSettings, ScenarioStep, DoomEvent, EnemyType } from './types';
 import { CHARACTERS, ITEMS, START_TILE, EVENTS, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, SCENARIOS, MADNESS_CONDITIONS, SPELLS, BESTIARY, INDOOR_CONNECTORS, OUTDOOR_CONNECTORS, SCENARIO_MODIFIERS, TRAIT_POOL } from './constants';
@@ -29,7 +29,7 @@ const STORAGE_KEY = 'shadows_1920s_save_v3';
 const ROSTER_KEY = 'shadows_1920s_roster';
 const SETUP_CONFIG_KEY = 'shadows_1920s_setup_config_v1';
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const APP_VERSION = "3.10.1";
+const APP_VERSION = "3.10.6"; // Hotfix: UI Layout Restoration
 
 // --- DEFAULT STATE CONSTANT ---
 const DEFAULT_STATE: GameState = {
@@ -93,7 +93,11 @@ const App: React.FC = () => {
   // --- STATE ---
   const [isMainMenuOpen, setIsMainMenuOpen] = useState(true);
   const [showOptions, setShowOptions] = useState(false);
-  const [showJournal, setShowJournal] = useState(false);
+  
+  // UI Panels State (Controlled by ActionBar now)
+  const [showLeftPanel, setShowLeftPanel] = useState(false);
+  const [showRightPanel, setShowRightPanel] = useState(false);
+  
   const [showTurnNotification, setShowTurnNotification] = useState(false); 
   const [gameSettings, setGameSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
 
@@ -139,8 +143,6 @@ const App: React.FC = () => {
       } catch (e) { return {}; }
   });
   const [hoveredEnemyId, setHoveredEnemyId] = useState<string | null>(null);
-  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(window.innerWidth < 768);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(window.innerWidth < 768);
 
   const audioInit = useRef(false);
   const ambientSynthRef = useRef<Tone.PolySynth | null>(null);
@@ -510,100 +512,6 @@ const App: React.FC = () => {
       addToLog(logMsg);
   };
 
-  // --- MENU & SETUP ---
-  const startGame = () => {
-    if (state.players.length === 0) return;
-    // Check for invalid players
-    const invalidPlayer = state.players.find(p => !p.name || p.name.trim() === '');
-    if (invalidPlayer) { playStinger('block'); alert("All investigators must have a name!"); return; }
-
-    initAudio();
-    
-    // Check if "Random" selected
-    let scenario = state.activeScenario;
-    if (scenario?.id === 'random') {
-        scenario = generateRandomScenario();
-    }
-    if (!scenario) return;
-
-    const startTile: Tile = { ...START_TILE, name: scenario.startLocation };
-    generateTileVisual(startTile);
-    const randomModifier = SCENARIO_MODIFIERS[Math.floor(Math.random() * SCENARIO_MODIFIERS.length)];
-    
-    setState(prev => ({ 
-        ...prev, 
-        phase: GamePhase.INVESTIGATOR, 
-        activePlayerIndex: 0, 
-        doom: scenario!.startDoom, 
-        board: [startTile], 
-        cluesFound: 0, 
-        activeModifiers: [randomModifier], 
-        activeScenario: scenario,
-        currentStepIndex: 0,
-        questItemsCollected: [],
-        log: [`SAKSFIL: ${scenario!.title}`, `OBJECTIVE: ${scenario!.goal}`, `GLOBAL EFFEKT: ${randomModifier.name}`, ...prev.log] 
-    }));
-    addToLog("The investigation begins...");
-  };
-
-  const selectScenario = (scenario: Scenario) => { playStinger('click'); setState(prev => ({ ...prev, activeScenario: scenario })); };
-  
-  // RESTORED SETUP HELPERS (Missing in previous version)
-  const toggleCharacterSelection = (type: CharacterType) => {
-    if (state.phase !== GamePhase.SETUP) return;
-    playStinger('click');
-    setState(prev => {
-      const existing = prev.players.find(p => p.id === type && !p.instanceId);
-      if (existing) return { ...prev, players: prev.players.filter(p => p !== existing) };
-      if (prev.players.length >= 4) return prev;
-      const char = CHARACTERS[type];
-      const startingSpells: Spell[] = type === 'occultist' ? [SPELLS.find(s => s.id === 'wither')!] : [];
-      const sessionName = setupNames[type] && setupNames[type].trim() !== '' ? setupNames[type] : char.name;
-      const newPlayer: Player = { ...char, name: sessionName, position: { q: 0, r: 0 }, inventory: [], spells: startingSpells, actions: 2, isDead: false, madness: [], activeMadness: null, traits: [] };
-      generateCharacterPortrait(newPlayer);
-      return { ...prev, players: [...prev.players, newPlayer] };
-    });
-  };
-
-  const toggleVeteranSelection = (vet: SavedInvestigator) => {
-      if (state.phase !== GamePhase.SETUP) return;
-      playStinger('click');
-      setState(prev => {
-          const existing = prev.players.find(p => p.instanceId === vet.instanceId);
-          if (existing) return { ...prev, players: prev.players.filter(p => p.instanceId !== vet.instanceId) };
-          if (prev.players.length >= 4) return prev;
-          const sessionName = (vet.instanceId && setupNames[vet.instanceId] && setupNames[vet.instanceId].trim() !== '') ? setupNames[vet.instanceId] : vet.name;
-          const player: Player = { ...vet, name: sessionName, position: { q: 0, r: 0 }, actions: 2, isDead: false };
-          return { ...prev, players: [...prev.players, player] };
-      });
-  };
-
-  const updatePlayerName = (identifier: string, newName: string, isVeteran: boolean) => {
-      setSetupNames(prev => ({ ...prev, [identifier]: newName }));
-      setState(prev => ({ ...prev, players: prev.players.map(p => {
-              if (isVeteran) return p.instanceId === identifier ? { ...p, name: newName } : p;
-              else return (p.id === identifier && !p.instanceId) ? { ...p, name: newName } : p;
-          }) }));
-  };
-
-  const handleNameBlur = (identifier: string, currentName: string, defaultName: string, isVeteran: boolean) => {
-      if (!currentName || currentName.trim() === '') updatePlayerName(identifier, defaultName, isVeteran);
-  };
-
-  const deleteVeteran = (instanceId: string) => {
-      setRoster(prev => prev.filter(p => p.instanceId !== instanceId));
-  };
-
-  const handleResetGame = () => { 
-      setIsMainMenuOpen(true); 
-  };
-
-  // Create a specific "Random" scenario card for the UI
-  const RANDOM_SCENARIO_CARD: Scenario = {
-      id: 'random', title: 'The Unknown Horror', description: 'A completely randomized nightmare. No two runs are alike.',
-      startDoom: 12, startLocation: 'Random', goal: '???', specialRule: 'Roguelite Mode', difficulty: 'Nightmare', tileSet: 'mixed', victoryType: 'survival', steps: [], doomEvents: []
-  };
-
   // --- ACTIONS WITH CURSES ---
   const activePlayer = useMemo(() => state.players[state.activePlayerIndex] || state.players[0], [state.players, state.activePlayerIndex]);
 
@@ -631,6 +539,74 @@ const App: React.FC = () => {
               addToLog(`${item.name} whispers madness! (-1 Sanity)`);
           }
           // 'no_rest' handled in canRest check
+      });
+  };
+
+  // --- TURN MANAGEMENT ---
+  const handleNextTurn = () => {
+      setState(prev => {
+          const nextIndex = prev.activePlayerIndex + 1;
+          const isEndOfRound = nextIndex >= prev.players.length;
+          
+          if (isEndOfRound) {
+              // Go to Mythos
+              return { ...prev, phase: GamePhase.MYTHOS, activePlayerIndex: 0 };
+          } else {
+              // Next Player
+              return { ...prev, activePlayerIndex: nextIndex };
+          }
+      });
+  };
+
+  // --- INVENTORY ACTIONS ---
+  const handleUseItem = (item: Item) => {
+      if (!activePlayer || item.type !== 'consumable') return;
+      playStinger('heal');
+      let newHp = activePlayer.hp;
+      let newSanity = activePlayer.sanity;
+      let msg = `Used ${item.name}.`;
+
+      // Simplified logic for standard items
+      if (item.name.includes("Medical")) newHp = Math.min(activePlayer.maxHp, activePlayer.hp + 2);
+      if (item.name.includes("Whiskey")) newSanity = Math.min(activePlayer.maxSanity, activePlayer.sanity + 2);
+      
+      setState(prev => ({
+          ...prev,
+          players: prev.players.map(p => p.id === activePlayer.id ? { 
+              ...p, 
+              hp: newHp, 
+              sanity: newSanity, 
+              inventory: p.inventory.filter(i => i.id !== item.id) 
+          } : p),
+          log: [msg, ...prev.log]
+      }));
+  };
+
+  const handleDropItem = (item: Item) => {
+      setState(prev => ({
+          ...prev,
+          players: prev.players.map(p => p.id === activePlayer.id ? { 
+              ...p, 
+              inventory: p.inventory.filter(i => i.id !== item.id) 
+          } : p),
+          log: [`Dropped ${item.name}.`, ...prev.log]
+      }));
+  };
+
+  const handleTradeItem = (item: Item, targetId: string) => {
+      setState(prev => {
+          const target = prev.players.find(p => p.instanceId === targetId || p.id === targetId);
+          if (!target) return prev;
+          
+          return {
+              ...prev,
+              players: prev.players.map(p => {
+                  if (p.id === activePlayer.id) return { ...p, inventory: p.inventory.filter(i => i.id !== item.id) };
+                  if (p.id === target.id) return { ...p, inventory: [...p.inventory, item] };
+                  return p;
+              }),
+              log: [`Traded ${item.name} to ${target.name}.`, ...prev.log]
+          };
       });
   };
 
@@ -826,8 +802,12 @@ const App: React.FC = () => {
               updatedEvents = updatedEvents.map(e => e === event ? { ...e, triggered: true } : e);
           }
 
+          // RESET ACTIONS FOR NEW ROUND
+          const resetPlayers = prev.players.map(p => ({ ...p, actions: 2 }));
+
           return { 
               ...prev, 
+              players: resetPlayers,
               doom: newDoom, 
               enemies: newEnemies,
               log: logMessages,
@@ -841,8 +821,114 @@ const App: React.FC = () => {
     }
   }, [state.phase]);
 
+  // --- MENU & SETUP ---
+  const startGame = () => {
+    if (state.players.length === 0) return;
+    // Check for invalid players
+    const invalidPlayer = state.players.find(p => !p.name || p.name.trim() === '');
+    if (invalidPlayer) { playStinger('block'); alert("All investigators must have a name!"); return; }
+
+    initAudio();
+    setIsMainMenuOpen(false); // FIXED: Close menu when game starts
+    
+    // Check if "Random" selected
+    let scenario = state.activeScenario;
+    if (scenario?.id === 'random') {
+        scenario = generateRandomScenario();
+    }
+    if (!scenario) return;
+
+    const startTile: Tile = { ...START_TILE, name: scenario.startLocation };
+    generateTileVisual(startTile);
+    const randomModifier = SCENARIO_MODIFIERS[Math.floor(Math.random() * SCENARIO_MODIFIERS.length)];
+    
+    setState(prev => ({ 
+        ...prev, 
+        phase: GamePhase.INVESTIGATOR, 
+        activePlayerIndex: 0, 
+        doom: scenario!.startDoom, 
+        board: [startTile], 
+        cluesFound: 0, 
+        activeModifiers: [randomModifier], 
+        activeScenario: scenario,
+        currentStepIndex: 0,
+        questItemsCollected: [],
+        log: [`SAKSFIL: ${scenario!.title}`, `OBJECTIVE: ${scenario!.goal}`, `GLOBAL EFFEKT: ${randomModifier.name}`, ...prev.log] 
+    }));
+    addToLog("The investigation begins...");
+  };
+
+  const selectScenario = (scenario: Scenario) => { playStinger('click'); setState(prev => ({ ...prev, activeScenario: scenario })); };
+  
+  // RESTORED SETUP HELPERS (Missing in previous version)
+  const toggleCharacterSelection = (type: CharacterType) => {
+    if (state.phase !== GamePhase.SETUP) return;
+    playStinger('click');
+    setState(prev => {
+      const existing = prev.players.find(p => p.id === type && !p.instanceId);
+      if (existing) return { ...prev, players: prev.players.filter(p => p !== existing) };
+      if (prev.players.length >= 4) return prev;
+      const char = CHARACTERS[type];
+      const startingSpells: Spell[] = type === 'occultist' ? [SPELLS.find(s => s.id === 'wither')!] : [];
+      const sessionName = setupNames[type] && setupNames[type].trim() !== '' ? setupNames[type] : char.name;
+      const newPlayer: Player = { ...char, name: sessionName, position: { q: 0, r: 0 }, inventory: [], spells: startingSpells, actions: 2, isDead: false, madness: [], activeMadness: null, traits: [] };
+      generateCharacterPortrait(newPlayer);
+      return { ...prev, players: [...prev.players, newPlayer] };
+    });
+  };
+
+  const toggleVeteranSelection = (vet: SavedInvestigator) => {
+      if (state.phase !== GamePhase.SETUP) return;
+      playStinger('click');
+      setState(prev => {
+          const existing = prev.players.find(p => p.instanceId === vet.instanceId);
+          if (existing) return { ...prev, players: prev.players.filter(p => p.instanceId !== vet.instanceId) };
+          if (prev.players.length >= 4) return prev;
+          const sessionName = (vet.instanceId && setupNames[vet.instanceId] && setupNames[vet.instanceId].trim() !== '') ? setupNames[vet.instanceId] : vet.name;
+          const player: Player = { ...vet, name: sessionName, position: { q: 0, r: 0 }, actions: 2, isDead: false };
+          return { ...prev, players: [...prev.players, player] };
+      });
+  };
+
+  const updatePlayerName = (identifier: string, newName: string, isVeteran: boolean) => {
+      setSetupNames(prev => ({ ...prev, [identifier]: newName }));
+      setState(prev => ({ ...prev, players: prev.players.map(p => {
+              if (isVeteran) return p.instanceId === identifier ? { ...p, name: newName } : p;
+              else return (p.id === identifier && !p.instanceId) ? { ...p, name: newName } : p;
+          }) }));
+  };
+
+  const handleNameBlur = (identifier: string, currentName: string, defaultName: string, isVeteran: boolean) => {
+      if (!currentName || currentName.trim() === '') updatePlayerName(identifier, defaultName, isVeteran);
+  };
+
+  const deleteVeteran = (instanceId: string) => {
+      setRoster(prev => prev.filter(p => p.instanceId !== instanceId));
+  };
+
+  const handleResetGame = () => { 
+      setIsMainMenuOpen(true); 
+  };
+
+  // Create a specific "Random" scenario card for the UI
+  const RANDOM_SCENARIO_CARD: Scenario = {
+      id: 'random', title: 'The Unknown Horror', description: 'A completely randomized nightmare. No two runs are alike.',
+      startDoom: 12, startLocation: 'Random', goal: '???', specialRule: 'Roguelite Mode', difficulty: 'Nightmare', tileSet: 'mixed', victoryType: 'survival', steps: [], doomEvents: []
+  };
+
   // --- UI RENDER ---
   
+  if (isMainMenuOpen) return <MainMenu 
+    onNewGame={() => { 
+        setState(prev => ({...DEFAULT_STATE, phase: GamePhase.SETUP})); 
+        setIsMainMenuOpen(false); 
+    }} 
+    onContinue={() => {setIsMainMenuOpen(false);}} 
+    onOptions={() => setShowOptions(true)} 
+    canContinue={state.phase !== GamePhase.SETUP} 
+    version={APP_VERSION} 
+  />;
+
   if (state.phase === GamePhase.VICTORY) {
       return (
           <div className="fixed inset-0 bg-black flex items-center justify-center text-center p-8 z-[200]">
@@ -989,51 +1075,102 @@ const App: React.FC = () => {
     );
   }
 
-  if (isMainMenuOpen) return <MainMenu onNewGame={() => setState(prev => ({...DEFAULT_STATE, phase: GamePhase.SETUP}))} onContinue={() => {setIsMainMenuOpen(false);}} onOptions={() => setShowOptions(true)} canContinue={state.phase !== GamePhase.SETUP} version={APP_VERSION} />;
-
   // --- GAME UI ---
   const currentStep = state.activeScenario?.steps[state.currentStepIndex];
+  // Calculate dynamic classes
+  const activeMadnessClass = activePlayer?.activeMadness?.visualClass || '';
+  const highContrastClass = gameSettings.graphics.highContrast ? 'high-contrast-mode' : '';
+  const selectedEnemy = state.enemies.find(e => e.id === state.selectedEnemyId);
 
   return (
-    <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative transition-all duration-1000 ${state.screenShake ? 'animate-shake' : ''}`}>
+    <div className={`h-screen w-screen bg-[#05050a] text-slate-200 overflow-hidden select-none font-serif relative transition-all duration-1000 ${state.screenShake ? 'animate-shake' : ''} ${activeMadnessClass} ${highContrastClass}`}>
       
-      {/* OBJECTIVE OVERLAY (v3.10.0) */}
-      <div className="absolute top-4 right-4 z-50 w-64">
-          <div className="bg-black/80 border-l-4 border-[#e94560] p-4 backdrop-blur-sm">
-              <h3 className="text-xs font-bold text-[#e94560] uppercase tracking-widest mb-2 flex items-center gap-2">
-                  <MapPin size={12} /> Current Objective
-              </h3>
-              {currentStep ? (
-                  <div className="text-sm text-slate-200 font-serif italic">
-                      {currentStep.description}
-                      {currentStep.amount && <span className="block text-xs text-slate-500 mt-1">Progress: {currentStep.type === 'survive' ? `${state.round}/${currentStep.amount}` : 'Incomplete'}</span>}
+      {/* 0. PHASE NOTIFICATION (RESTORED) */}
+      {showTurnNotification && (
+          <TurnNotification 
+              player={activePlayer} 
+              phase={state.phase === GamePhase.MYTHOS ? 'mythos' : 'investigator'} 
+          />
+      )}
+
+      {/* 1. TOP OVERLAY (RESTORED & CENTERED) */}
+      {state.phase !== GamePhase.SETUP && state.phase !== GamePhase.VICTORY && (
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl text-center pointer-events-none">
+              <div className="bg-gradient-to-b from-black/90 to-transparent pt-4 pb-12 px-8 flex flex-col items-center">
+                  <div className="flex items-center gap-6 text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] text-slate-500 mb-1">
+                      <span>Round: <span className="text-slate-300">{state.round}</span></span>
+                      <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
+                      <span>Doom: <span className="text-[#e94560]">{state.doom}</span></span>
                   </div>
-              ) : (
-                  <div className="text-sm text-green-400 font-bold">Objectives Complete</div>
-              )}
-              {state.activeScenario && (
-                  <div className="mt-2 pt-2 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between">
-                      <span>Doom Level: <span className="text-red-500">{state.doom}</span></span>
-                      <span>Phase: {state.phase}</span>
-                  </div>
-              )}
+                  
+                  {currentStep ? (
+                      <div className="text-base md:text-lg font-display italic text-[#eecfa1] drop-shadow-md">
+                          {currentStep.description}
+                          {currentStep.amount && <span className="text-xs text-slate-400 ml-2">({state.round}/{currentStep.amount})</span>}
+                      </div>
+                  ) : (
+                      <div className="text-green-400 font-bold">Objectives Complete</div>
+                  )}
+              </div>
           </div>
+      )}
+
+      {/* 2. GAME BOARD */}
+      <div className="absolute inset-0 z-0">
+        <GameBoard 
+            tiles={state.board} 
+            players={state.players} 
+            enemies={state.enemies} 
+            selectedEnemyId={state.selectedEnemyId} 
+            onTileClick={(q, r) => handleAction('move', { q, r })} 
+            onEnemyClick={(id) => setState(prev => ({...prev, selectedEnemyId: id}))} 
+            onEnemyHover={setHoveredEnemyId} 
+            floatingTexts={state.floatingTexts} 
+            doom={state.doom}
+            activeModifiers={state.activeModifiers}
+        />
       </div>
 
-      <GameBoard 
-        tiles={state.board} 
-        players={state.players} 
-        enemies={state.enemies} 
-        selectedEnemyId={state.selectedEnemyId} 
-        onTileClick={(q, r) => handleAction('move', { q, r })} 
-        onEnemyClick={(id) => setState(prev => ({...prev, selectedEnemyId: id}))} 
-        onEnemyHover={setHoveredEnemyId} 
-        floatingTexts={state.floatingTexts} 
-        doom={state.doom}
-        activeModifiers={state.activeModifiers}
-      />
+      {/* 3. LEFT PANEL: CHARACTER SHEET (Toggled via Footer) */}
+      <div className={`fixed top-0 left-0 bottom-20 w-80 z-40 transition-transform duration-300 ease-in-out ${showLeftPanel ? 'translate-x-0' : '-translate-x-full'}`}>
+          <CharacterPanel 
+              player={activePlayer} 
+              allPlayers={state.players}
+              onUse={handleUseItem}
+              onDrop={handleDropItem}
+              onTrade={handleTradeItem}
+          />
+      </div>
 
-      <footer className="fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-40">
+      {/* 4. RIGHT PANEL: LOG / ENEMY INFO (Toggled via Footer) */}
+      <div className={`fixed top-0 right-0 bottom-20 w-80 z-40 bg-[#0a0a1a]/95 border-l border-slate-800 backdrop-blur-md flex flex-col transition-transform duration-300 ease-in-out ${showRightPanel ? 'translate-x-0' : 'translate-x-full'}`}>
+          {/* Panel Content Switcher */}
+          {selectedEnemy ? (
+              <EnemyPanel enemy={selectedEnemy} onClose={() => setState(prev => ({ ...prev, selectedEnemyId: null }))} />
+          ) : (
+              <div className="flex flex-col h-full">
+                  <div className="p-4 border-b border-slate-800 bg-slate-900/50">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                          <ScrollText size={12} /> Investigation Log
+                      </h3>
+                  </div>
+                  {/* LOG FEED */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar font-mono text-xs">
+                      {state.log.length === 0 && <div className="text-slate-600 italic text-center mt-10">No activity recorded...</div>}
+                      {state.log.map((entry, i) => (
+                          <div key={i} className="border-b border-slate-800/50 pb-1 mb-1 last:border-0 text-slate-400">
+                              <span className="text-slate-600 mr-2">[{state.log.length - i}]</span>
+                              {formatLogEntry(entry)}
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          )}
+      </div>
+
+      {/* 5. FOOTER: ACTION BAR & TOGGLES */}
+      <footer className="fixed bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black via-[#0a0a1a] to-transparent z-50 flex items-center justify-center gap-4 px-4 pb-4">
+        
         <ActionBar 
             onAction={handleAction} 
             actionsRemaining={activePlayer?.isDead ? 0 : activePlayer?.actions} 
@@ -1047,10 +1184,17 @@ const App: React.FC = () => {
                     if (currentStep?.type === 'interact' && t?.name.includes(currentStep.targetId!)) return { id: 'interact', label: 'Interact', iconType: 'insight', difficulty: 0 };
                 }
                 return null;
-            })()} 
+            })()}
+            // Toggle Props
+            showCharacter={showLeftPanel}
+            onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)}
+            showInfo={showRightPanel}
+            onToggleInfo={() => setShowRightPanel(!showRightPanel)}
         />
+        
         <div className="w-px h-12 bg-slate-800 mx-2"></div>
-        <button onClick={() => setState(prev => ({ ...prev, activePlayerIndex: (prev.activePlayerIndex + 1) % prev.players.length, phase: (prev.activePlayerIndex + 1 >= prev.players.length) ? GamePhase.MYTHOS : GamePhase.INVESTIGATOR }))} className="px-6 py-4 bg-[#e94560] text-white font-bold rounded-xl uppercase tracking-widest shadow-lg hover:bg-red-600 transition-all">
+        
+        <button onClick={handleNextTurn} className="px-6 py-4 bg-[#e94560] text-white font-bold rounded-xl uppercase tracking-widest shadow-lg hover:bg-red-600 transition-all shrink-0">
             {state.activePlayerIndex === state.players.length - 1 ? "End Round" : "Next"}
         </button>
       </footer>
