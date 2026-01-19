@@ -86,7 +86,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
   );
 
   return (
-    <div className="flex items-center gap-2 md:gap-4 overflow-x-auto max-w-[90vw] md:max-w-none pb-1 md:pb-0 hide-scrollbar relative">
+    <div className="flex items-center gap-2 md:gap-4 overflow-x-auto max-w-[85vw] md:max-w-none pb-1 md:pb-0 hide-scrollbar momentum-scroll relative no-select">
       
       {/* LEFT TOGGLE: CHARACTER SHEET */}
       <button 

@@ -6,12 +6,13 @@ import GameBoard from './components/GameBoard';
 import ActionBar from './components/ActionBar';
 import MainMenu from './components/MainMenu';
 import OptionsMenu from './components/OptionsMenu';
-import TurnNotification from './components/TurnNotification'; 
+import TurnNotification from './components/TurnNotification';
 import PuzzleModal from './components/PuzzleModal';
 import CharacterPanel from './components/CharacterPanel';
 import LogPanel from './components/LogPanel';
 import DiceRoller from './components/DiceRoller';
 import { loadSettings } from './utils/Settings';
+import { useIsMobile } from './utils/useMobile';
 
 const STORAGE_KEY = 'shadows_1920s_save_v4';
 const APP_VERSION = "3.12.0"; 
@@ -43,6 +44,7 @@ const DEFAULT_STATE: GameState = {
 };
 
 const App: React.FC = () => {
+  const isMobile = useIsMobile();
   const [isMainMenuOpen, setIsMainMenuOpen] = useState(true);
   const [showOptions, setShowOptions] = useState(false);
   const [showLeftPanel, setShowLeftPanel] = useState(false);
@@ -365,43 +367,67 @@ const App: React.FC = () => {
 
           <TurnNotification player={state.players[state.activePlayerIndex]} phase={state.phase} />
 
-          <div className={`fixed left-0 top-0 bottom-0 w-80 z-[60] transition-transform duration-500 shadow-2xl ${showLeftPanel ? 'translate-x-0' : '-translate-x-full'}`}>
-            <CharacterPanel 
-                player={state.players[state.activePlayerIndex]} 
-                allPlayers={state.players} 
-                onTrade={() => {}} 
-                onDrop={() => {}} 
+          {/* Character Panel - Full screen on mobile, sidebar on desktop */}
+          <div className={`fixed left-0 top-0 bottom-0 z-[60] transition-transform duration-300 ease-out shadow-2xl ${isMobile ? 'w-full' : 'w-80'} ${showLeftPanel ? 'translate-x-0' : '-translate-x-full'}`}>
+            <CharacterPanel
+                player={state.players[state.activePlayerIndex]}
+                allPlayers={state.players}
+                onTrade={() => {}}
+                onDrop={() => {}}
             />
+            {/* Mobile close button overlay */}
+            {isMobile && showLeftPanel && (
+              <button
+                onClick={() => setShowLeftPanel(false)}
+                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white z-10 active:scale-95"
+                aria-label="Lukk panel"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
-          <div className={`fixed right-0 top-0 bottom-0 w-80 z-[60] transition-transform duration-500 shadow-2xl ${showRightPanel ? 'translate-x-0' : 'translate-x-full'}`}>
+          {/* Log Panel - Full screen on mobile, sidebar on desktop */}
+          <div className={`fixed right-0 top-0 bottom-0 z-[60] transition-transform duration-300 ease-out shadow-2xl ${isMobile ? 'w-full' : 'w-80'} ${showRightPanel ? 'translate-x-0' : 'translate-x-full'}`}>
             <LogPanel logs={state.log} onClose={() => setShowRightPanel(false)} />
           </div>
 
-          <footer className="fixed bottom-0 left-0 right-0 h-24 flex items-center justify-center gap-4 z-50 bg-gradient-to-t from-black to-transparent">
-              <ActionBar 
+          {/* Mobile panel backdrop */}
+          {isMobile && (showLeftPanel || showRightPanel) && (
+            <div
+              className="fixed inset-0 bg-black/50 z-[55] transition-opacity duration-300"
+              onClick={() => {
+                setShowLeftPanel(false);
+                setShowRightPanel(false);
+              }}
+            />
+          )}
+
+          {/* Footer - Responsive height and padding for mobile */}
+          <footer className={`fixed bottom-0 left-0 right-0 flex items-center justify-center gap-2 md:gap-4 z-50 bg-gradient-to-t from-black via-black/90 to-transparent safe-area-bottom ${isMobile ? 'h-28 pb-4 px-2' : 'h-24 px-4'}`}>
+              <ActionBar
                   onAction={(type) => {
                       if (type === 'end_turn') handleEndTurn();
                       else handleAction(type);
-                  }} 
-                  actionsRemaining={state.players[state.activePlayerIndex]?.actions || 0} 
-                  isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} 
-                  contextAction={activeTile?.object ? { 
-                      id: 'obj', 
-                      label: activeTile.object.type.replace('_', ' '), 
-                      iconType: activeTile.object.type === 'switch' ? 'agility' : activeTile.object.type === 'fog_wall' ? 'strength' : 'insight', 
-                      difficulty: activeTile.object.difficulty || 4 
+                  }}
+                  actionsRemaining={state.players[state.activePlayerIndex]?.actions || 0}
+                  isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR}
+                  contextAction={activeTile?.object ? {
+                      id: 'obj',
+                      label: activeTile.object.type.replace('_', ' '),
+                      iconType: activeTile.object.type === 'switch' ? 'agility' : activeTile.object.type === 'fog_wall' ? 'strength' : 'insight',
+                      difficulty: activeTile.object.difficulty || 4
                   } : null}
-                  spells={[]} 
-                  activeSpell={null} 
-                  onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} 
-                  showCharacter={showLeftPanel} 
-                  onToggleInfo={() => setShowRightPanel(!showRightPanel)} 
-                  showInfo={showRightPanel} 
+                  spells={[]}
+                  activeSpell={null}
+                  onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)}
+                  showCharacter={showLeftPanel}
+                  onToggleInfo={() => setShowRightPanel(!showRightPanel)}
+                  showInfo={showRightPanel}
               />
-              <button 
+              <button
                 onClick={handleEndTurn}
-                className="bg-[#e94560] px-6 py-3 rounded-xl border border-white/20 font-bold uppercase tracking-widest text-xs hover:bg-[#c9354d] transition-all shadow-lg active:scale-95"
+                className={`bg-[#e94560] rounded-xl border border-white/20 font-bold uppercase tracking-widest hover:bg-[#c9354d] transition-all shadow-lg active:scale-95 ${isMobile ? 'px-4 py-3 text-[10px]' : 'px-6 py-3 text-xs'}`}
               >
                 End Turn
               </button>

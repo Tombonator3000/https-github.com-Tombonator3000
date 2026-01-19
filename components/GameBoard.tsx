@@ -1,10 +1,11 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Tile, Player, Enemy, ScenarioModifier } from '../types';
-import { 
-  User, MapPin, DoorOpen, BookOpen, Church, Anchor, Building, 
-  Radio, Power, Eye, CloudFog, Lock, ShieldAlert, Ghost
+import {
+  User, MapPin, DoorOpen, BookOpen, Church, Anchor, Building,
+  Radio, Power, Eye, CloudFog, Lock, ShieldAlert, Ghost, ZoomIn, ZoomOut, Crosshair
 } from 'lucide-react';
+import { useTouchGestures, useIsMobile } from '../utils/useMobile';
 
 interface GameBoardProps {
   tiles: Tile[];
@@ -15,7 +16,9 @@ interface GameBoardProps {
   activeModifiers?: ScenarioModifier[];
 }
 
-const HEX_SIZE = 110;
+// Responsive hex size - smaller on mobile for better overview
+const HEX_SIZE_DESKTOP = 110;
+const HEX_SIZE_MOBILE = 90;
 
 const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
   const n = name.toLowerCase();
@@ -41,24 +44,50 @@ const getObjectIcon = (type: string) => {
 };
 
 const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileClick }) => {
-  const [scale, setScale] = useState(0.85);
-  const [position, setPosition] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 - 50 });
-  const isDragging = useRef(false);
-  const dragStart = useRef({ x: 0, y: 0 });
+  const isMobile = useIsMobile();
+  const HEX_SIZE = isMobile ? HEX_SIZE_MOBILE : HEX_SIZE_DESKTOP;
+
+  // Use touch gestures hook for pan/zoom
+  const {
+    position,
+    setPosition,
+    scale,
+    setScale,
+    isDragging,
+    handlers
+  } = useTouchGestures(
+    { x: typeof window !== 'undefined' ? window.innerWidth / 2 : 400, y: typeof window !== 'undefined' ? window.innerHeight / 2 - 50 : 300 },
+    isMobile ? 0.7 : 0.85,
+    0.3,
+    1.5
+  );
 
   const hexToPixel = (q: number, r: number) => {
-    const x = HEX_SIZE * (3/2 * q);
-    const y = HEX_SIZE * (Math.sqrt(3)/2 * q + Math.sqrt(3) * r);
+    const x = HEX_SIZE * (3 / 2 * q);
+    const y = HEX_SIZE * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
     return { x, y };
   };
 
+  // Center on player
+  const centerOnPlayer = () => {
+    if (players.length > 0) {
+      const playerPos = hexToPixel(players[0].position.q, players[0].position.r);
+      setPosition({
+        x: window.innerWidth / 2 - playerPos.x * scale,
+        y: window.innerHeight / 2 - playerPos.y * scale
+      });
+    }
+  };
+
+  // Zoom controls for mobile
+  const zoomIn = () => setScale(prev => Math.min(prev + 0.15, 1.5));
+  const zoomOut = () => setScale(prev => Math.max(prev - 0.15, 0.3));
+
   return (
-    <div 
-      className="w-full h-full overflow-hidden relative cursor-move bg-[#020205] touch-none"
-      onMouseDown={(e) => { isDragging.current = true; dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y }; }}
-      onMouseMove={(e) => { if (isDragging.current) setPosition({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y }); }}
-      onMouseUp={() => isDragging.current = false}
-      onWheel={(e) => setScale(prev => Math.min(Math.max(prev + (e.deltaY > 0 ? -0.05 : 0.05), 0.3), 1.5))}
+    <div
+      className="w-full h-full overflow-hidden relative cursor-move bg-[#020205]"
+      style={{ touchAction: 'none' }}
+      {...handlers}
     >
       <div 
         style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, transition: isDragging.current ? 'none' : 'transform 0.1s ease-out' }} 
@@ -139,12 +168,45 @@ const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileCl
         {/* Render Players */}
         {players.map(player => {
             const { x, y } = hexToPixel(player.position.q, player.position.r);
+            const playerSize = isMobile ? 12 : 16;
             return (
-                <div key={player.id} className="absolute w-16 h-16 rounded-full border-4 border-white shadow-[0_0_30px_rgba(255,255,255,0.7)] flex items-center justify-center bg-[#1a1a2e] z-50 transition-all duration-500" style={{ left: `${x - 32}px`, top: `${y - 32}px` }}>
-                    {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-cover rounded-full" /> : <User className="text-white" size={32} />}
+                <div key={player.id} className={`absolute ${isMobile ? 'w-12 h-12 border-2' : 'w-16 h-16 border-4'} rounded-full border-white shadow-[0_0_30px_rgba(255,255,255,0.7)] flex items-center justify-center bg-[#1a1a2e] z-50 transition-all duration-500`} style={{ left: `${x - playerSize * 2}px`, top: `${y - playerSize * 2}px` }}>
+                    {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-cover rounded-full" alt="" /> : <User className="text-white" size={isMobile ? 24 : 32} />}
                 </div>
             );
         })}
+      </div>
+
+      {/* Mobile Zoom Controls */}
+      {isMobile && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[100]">
+          <button
+            onClick={zoomIn}
+            className="w-12 h-12 rounded-full bg-[#1a1a2e]/90 border-2 border-slate-600 flex items-center justify-center text-white active:scale-95 active:bg-[#2a2a3e] shadow-lg"
+            aria-label="Zoom inn"
+          >
+            <ZoomIn size={22} />
+          </button>
+          <button
+            onClick={centerOnPlayer}
+            className="w-12 h-12 rounded-full bg-[#1a1a2e]/90 border-2 border-[#e94560] flex items-center justify-center text-[#e94560] active:scale-95 active:bg-[#2a2a3e] shadow-lg"
+            aria-label="Sentrer på spiller"
+          >
+            <Crosshair size={22} />
+          </button>
+          <button
+            onClick={zoomOut}
+            className="w-12 h-12 rounded-full bg-[#1a1a2e]/90 border-2 border-slate-600 flex items-center justify-center text-white active:scale-95 active:bg-[#2a2a3e] shadow-lg"
+            aria-label="Zoom ut"
+          >
+            <ZoomOut size={22} />
+          </button>
+        </div>
+      )}
+
+      {/* Zoom indicator */}
+      <div className="absolute left-3 bottom-28 md:bottom-3 bg-black/60 px-2 py-1 rounded text-[10px] text-slate-400 z-[100]">
+        {Math.round(scale * 100)}%
       </div>
     </div>
   );
