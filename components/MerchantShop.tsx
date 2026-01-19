@@ -27,7 +27,10 @@ const MerchantShop: React.FC<MerchantShopProps> = ({ players, onBuy, onFinish })
         
         {/* Header */}
         <div className="bg-[#0f1219] p-6 border-b border-amber-700 flex justify-between items-center relative overflow-hidden">
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] opacity-10"></div>
+            {/* CSS wood texture pattern */}
+            <div className="absolute inset-0 opacity-10" style={{
+              background: 'repeating-linear-gradient(90deg, rgba(139,90,43,0.15) 0px, transparent 1px, transparent 8px)'
+            }}></div>
             <div className="flex items-center gap-4 z-10">
                 <div className="bg-amber-900/30 p-3 rounded-full border border-amber-600">
                     <ShoppingBag className="text-amber-500" size={32} />

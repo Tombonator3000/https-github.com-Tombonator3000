@@ -18,7 +18,10 @@ const EventModal: React.FC<EventModalProps> = ({ event, onResolve }) => {
         </div>
         
         <div className="p-8 text-center">
-          <div className="mb-6 h-32 w-full bg-[url('https://picsum.photos/400/200?grayscale&blur=2')] bg-cover rounded border border-slate-700 opacity-60"></div>
+          {/* CSS gradient instead of external image */}
+          <div className="mb-6 h-32 w-full rounded border border-slate-700 opacity-60" style={{
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f1a 100%)'
+          }}></div>
           
           <p className="text-lg text-slate-200 italic mb-8 font-serif">"{event.description}"</p>
           

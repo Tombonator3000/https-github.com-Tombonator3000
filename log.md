@@ -1,5 +1,72 @@
 # Project Log - Shadows of the 1920s
 
+## [v3.10.32 - External Texture URLs Removed] - 2026-01-19
+
+### Problem:
+Spillet viste fortsatt feil i konsollen på GitHub Pages:
+- "Failed to load resource: the server responded with a status of 404 ()"
+- Kilden var merket som "index.tsx:1"
+
+### Rotårsak Identifisert:
+**Eksterne teksturer fra transparenttextures.com blokkert med 403 Forbidden**
+
+Flere komponenter brukte eksterne URL-er til teksturer:
+```tsx
+// Disse URL-ene returnerte 403 "host_not_allowed":
+bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]
+bg-[url('https://www.transparenttextures.com/patterns/leather.png')]
+bg-[url('https://www.transparenttextures.com/patterns/aged-paper.png')]
+bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')]
+bg-[url('https://picsum.photos/400/200?grayscale&blur=2')]
+```
+
+Nettstedet transparenttextures.com blokkerer hotlinking fra andre domener.
+
+### Utført Fix:
+Erstattet alle eksterne tekstur-URL-er med CSS gradient/pattern alternativ:
+
+1. **MainMenu.tsx** - dark-matter.png → radial-gradient mønster
+2. **JournalModal.tsx** - leather.png og aged-paper.png → repeating-linear-gradient
+3. **CharacterPanel.tsx** - leather.png → repeating-linear-gradient
+4. **EventModal.tsx** - picsum.photos → linear-gradient
+5. **MerchantShop.tsx** - wood-pattern.png → repeating-linear-gradient
+6. **EnemyPanel.tsx** - leather.png → repeating-linear-gradient
+
+```tsx
+// FØR (blokkert):
+<div className="bg-[url('https://www.transparenttextures.com/patterns/leather.png')]" />
+
+// ETTER (fungerer):
+<div style={{
+  background: 'repeating-linear-gradient(45deg, rgba(139,90,43,0.1) 0px, transparent 2px, transparent 4px)'
+}} />
+```
+
+### Endrede Filer:
+- `App.tsx` - Versjon oppdatert til 3.10.32
+- `components/MainMenu.tsx` - CSS mønster i stedet for dark-matter.png
+- `components/JournalModal.tsx` - CSS mønster for leather og aged-paper
+- `components/CharacterPanel.tsx` - CSS mønster for leather
+- `components/EventModal.tsx` - CSS gradient i stedet for picsum.photos
+- `components/MerchantShop.tsx` - CSS mønster for wood-pattern
+- `components/EnemyPanel.tsx` - CSS mønster for leather
+
+### Build Output:
+```
+vite v6.4.1 building for production...
+✓ 1715 modules transformed
+dist/index.html                  7.80 kB
+dist/assets/index-I4o7aHHW.js  349.34 kB
+✓ built in 6.16s
+```
+
+### Konsekvens:
+- Ingen eksterne ressursforespørsler som kan blokkeres
+- Spillet starter uavhengig av tredjeparts nettsteder
+- Visuelt tilnærmet likt originaldesignet
+
+---
+
 ## [v3.10.31 - GoogleGenAI Lazy Initialization Fix] - 2026-01-19
 
 ### Problem:
