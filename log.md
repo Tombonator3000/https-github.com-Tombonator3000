@@ -1,5 +1,68 @@
 # Project Log - Shadows of the 1920s
 
+## [v3.10.31 - GoogleGenAI Lazy Initialization Fix] - 2026-01-19
+
+### Problem:
+Spillet viste fortsatt blank/svart side pa GitHub Pages til tross for tidligere fixes (v3.10.28-30).
+Ingen synlige feilmeldinger, men appen krasjet for React kunne rendere.
+
+### Rotarsak Identifisert:
+**GoogleGenAI initialisering pa modulniva med undefined API-nokkel**
+
+Problemet var i to filer:
+1. `App.tsx:30` - `const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });`
+2. `utils/AssetLibrary.ts:7` - `const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });`
+
+Nar `process.env.API_KEY` er `undefined` (som pa GitHub Pages), kaster GoogleGenAI SDK en feil **umiddelbart ved modullasting**, for React kan rendere noe.
+
+```typescript
+// FOR (krasjer pa modulniva):
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY }); // KRASJ hvis undefined!
+
+// ETTER (lazy initialisering):
+let _ai: GoogleGenAI | null = null;
+const getAI = (): GoogleGenAI | null => {
+    if (_ai) return _ai;
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) return null; // Graceful fallback
+    try {
+        _ai = new GoogleGenAI({ apiKey });
+        return _ai;
+    } catch (e) {
+        console.warn("Failed to initialize GoogleGenAI:", e);
+        return null;
+    }
+};
+```
+
+### Utfort Fix:
+1. **App.tsx** - Fjernet modulniva AI-initialisering, lagt til `getAI()` helper
+2. **AssetLibrary.ts** - Samme lazy-initialiserings-monster
+3. **Oppdatert alle funksjoner** som brukte `ai.` til a bruke `getAI()`
+4. **Graceful degradation** - Spillet fungerer uten AI (narrative/bilde-generering skips)
+
+### Endrede Filer:
+- `App.tsx` - Lazy AI init, versjon oppdatert til 3.10.31
+- `utils/AssetLibrary.ts` - Lazy AI init i alle 3 asset-funksjoner
+
+### Build Output:
+```
+vite v6.4.1 building for production...
+✓ 1715 modules transformed
+dist/index.html                  7.80 kB
+dist/assets/index-CVao2MiE.js  349.02 kB  (NED fra 554.84 kB!)
+✓ built in 5.69s
+```
+
+**Merk:** Bundle storrelsen gikk ned ~37% fordi GoogleGenAI SDK na blir bedre tree-shaken.
+
+### Konsekvens:
+- Spillet starter na pa GitHub Pages
+- AI-funksjoner (narrative, bilde-generering) fungerer KUN med API-nokkel
+- Kjerrespillet fungerer fullt ut uten API-nokkel
+
+---
+
 ## [v3.10.30 - GitHub Pages Asset Path Fix] - 2026-01-19
 
 ### Problem:
