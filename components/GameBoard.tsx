@@ -1,7 +1,6 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Tile, Player, Enemy, FloatingText, EnemyType, ScenarioModifier, WeatherType } from '../types';
-// Fixed: Added BookOpen, Church, and Anchor to the lucide-react imports
 import { 
   User, Skull, DoorOpen, Lock, Flame, Hammer, Sparkles, Ghost,
   CloudFog, Zap, Fish, PawPrint, Biohazard, Bug, ShoppingBag, MapPin,
@@ -24,6 +23,34 @@ interface GameBoardProps {
 
 const HEX_SIZE = 95;
 
+const VoxelCloud: React.FC<{ style: React.CSSProperties }> = ({ style }) => {
+    // Genererer en klynge av blokker for å lage en "sky"
+    const blocks = Array.from({ length: 6 + Math.floor(Math.random() * 8) });
+    return (
+        <div className="absolute animate-voxel-drift" style={style}>
+            {blocks.map((_, i) => {
+                const size = 16 + Math.random() * 24;
+                const ox = (Math.random() - 0.5) * 60;
+                const oy = (Math.random() - 0.5) * 60;
+                return (
+                    <div 
+                        key={i} 
+                        className="voxel-block" 
+                        style={{ 
+                            width: `${size}px`, 
+                            height: `${size}px`,
+                            left: `${ox}px`,
+                            top: `${oy}px`,
+                            background: i % 2 === 0 ? '#1a1a2e' : '#0a0a1a',
+                            opacity: 0.4 + Math.random() * 0.4
+                        }} 
+                    />
+                );
+            })}
+        </div>
+    );
+};
+
 const WeatherOverlay: React.FC<{ modifiers: ScenarioModifier[] }> = ({ modifiers }) => {
     const activeWeather = modifiers.find(m => m.weatherType && m.weatherType !== 'clear')?.weatherType;
 
@@ -43,6 +70,21 @@ const WeatherOverlay: React.FC<{ modifiers: ScenarioModifier[] }> = ({ modifiers
                                 left: `${Math.random() * 100}%`,
                                 animationDelay: `${Math.random() * 5}s`,
                                 animationDuration: `${20 + Math.random() * 20}s`
+                            }} 
+                        />
+                    ))}
+                </div>
+            )}
+            {activeWeather === 'void_storm' && (
+                <div className="absolute inset-0">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                        <VoxelCloud 
+                            key={i} 
+                            style={{ 
+                                left: `${-20 + Math.random() * 120}%`,
+                                top: `${-20 + Math.random() * 120}%`,
+                                animationDuration: `${30 + Math.random() * 40}s`,
+                                animationDelay: `${-Math.random() * 40}s`
                             }} 
                         />
                     ))}

@@ -251,7 +251,8 @@ export const MADNESS_CONDITIONS: Madness[] = [
 export const SCENARIO_MODIFIERS: ScenarioModifier[] = [
     { id: 'mod1', name: 'Thick Fog', description: 'The town is shrouded in an unnatural mist. Vision is severely reduced.', effect: 'reduced_vision', weatherType: 'fog' },
     { id: 'mod2', name: 'Cursed Rain', description: 'A black, oily rain falls from the sky, chilling you to the bone.', effect: 'hazardous_weather', weatherType: 'rain' },
-    { id: 'mod3', name: 'Cosmic Miasma', description: 'The air glows with a sickly purple light.', effect: 'reduced_vision', weatherType: 'miasma' }
+    { id: 'mod3', name: 'Cosmic Miasma', description: 'The air glows with a sickly purple light.', effect: 'reduced_vision', weatherType: 'miasma' },
+    { id: 'mod4', name: 'Void Storm', description: 'Cubes of non-existence float through the air.', effect: 'reduced_vision', weatherType: 'void_storm' }
 ];
 
 export const TRAIT_POOL: Trait[] = [
