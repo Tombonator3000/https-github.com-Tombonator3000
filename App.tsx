@@ -1,21 +1,21 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, EnemyType, GameSettings, TileObject, ScenarioModifier } from './types';
-import { CHARACTERS, START_TILE, BESTIARY, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, INDOOR_CONNECTORS, OUTDOOR_CONNECTORS, SCENARIO_MODIFIERS, ITEMS } from './constants';
+import { GamePhase, GameState, Player, Tile, CharacterType, Enemy, EnemyType, GameSettings, TileObject, ScenarioModifier, Item } from './types';
+import { CHARACTERS, START_TILE, BESTIARY, INDOOR_LOCATIONS, OUTDOOR_LOCATIONS, INDOOR_CONNECTORS, OUTDOOR_CONNECTORS, SCENARIO_MODIFIERS, ITEMS, SCENARIOS } from './constants';
 import GameBoard from './components/GameBoard';
 import ActionBar from './components/ActionBar';
 import MainMenu from './components/MainMenu';
 import OptionsMenu from './components/OptionsMenu';
-import TurnNotification from './components/TurnNotification';
+import TurnNotification from './components/TurnNotification'; 
 import PuzzleModal from './components/PuzzleModal';
 import CharacterPanel from './components/CharacterPanel';
 import LogPanel from './components/LogPanel';
 import DiceRoller from './components/DiceRoller';
+import JournalModal from './components/JournalModal';
 import { loadSettings } from './utils/Settings';
-import { useIsMobile } from './utils/useMobile';
 
 const STORAGE_KEY = 'shadows_1920s_save_v4';
-const APP_VERSION = "3.12.0"; 
+const APP_VERSION = "3.15.0"; 
 
 const DEFAULT_STATE: GameState = {
     phase: GamePhase.SETUP,
@@ -43,12 +43,22 @@ const DEFAULT_STATE: GameState = {
     questItemsCollected: []
 };
 
+// Neighbor directions for flat-top hexes
+const HEX_DIRECTIONS = [
+    { q: 1, r: -1 }, // 0: Top-Right
+    { q: 1, r: 0 },  // 1: Right
+    { q: 0, r: 1 },  // 2: Bottom-Right
+    { q: -1, r: 1 }, // 3: Bottom-Left
+    { q: -1, r: 0 }, // 4: Left
+    { q: 0, r: -1 }  // 5: Top-Left
+];
+
 const App: React.FC = () => {
-  const isMobile = useIsMobile();
   const [isMainMenuOpen, setIsMainMenuOpen] = useState(true);
   const [showOptions, setShowOptions] = useState(false);
   const [showLeftPanel, setShowLeftPanel] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
+  const [showJournal, setShowJournal] = useState(false);
   const [gameSettings, setGameSettings] = useState<GameSettings>(loadSettings());
 
   const [state, setState] = useState<GameState>(() => {
@@ -86,10 +96,17 @@ const App: React.FC = () => {
           attackType: 'melee',
           traits: info.traits
       };
-      setState(prev => ({ ...prev, enemies: [...prev.enemies, newEnemy] }));
+      
+      setState(prev => ({ 
+          ...prev, 
+          enemies: [...prev.enemies, newEnemy],
+          encounteredEnemies: prev.encounteredEnemies.includes(type) 
+            ? prev.encounteredEnemies 
+            : [...prev.encounteredEnemies, type]
+      }));
   }, []);
 
-  const spawnRoom = useCallback((q: number, r: number) => {
+  const spawnRoom = useCallback((q: number, r: number, fromCoord?: { q: number, r: number }) => {
       const isConnector = Math.random() > 0.7; 
       const pool = isConnector ? OUTDOOR_CONNECTORS : OUTDOOR_LOCATIONS;
       const roomName = pool[Math.floor(Math.random() * pool.length)];
@@ -111,6 +128,37 @@ const App: React.FC = () => {
           }
       }
 
+      // Generate walls (dead ends)
+      // Connectors have more open sides than locations
+      const openCount = isConnector ? 3 + Math.floor(Math.random() * 3) : 1 + Math.floor(Math.random() * 3);
+      const walls = Array(6).fill(true);
+      let indices = [0, 1, 2, 3, 4, 5];
+      
+      // Ensure the side we came from is always open
+      if (fromCoord) {
+          const dq = q - fromCoord.q;
+          const dr = r - fromCoord.r;
+          const enteringIndex = HEX_DIRECTIONS.findIndex(d => d.q === -dq && d.r === -dr);
+          if (enteringIndex !== -1) {
+              walls[enteringIndex] = false;
+              indices = indices.filter(i => i !== enteringIndex);
+          }
+      } else {
+          // If no fromCoord, pick a random starting open side
+          const startOpen = Math.floor(Math.random() * 6);
+          walls[startOpen] = false;
+          indices = indices.filter(i => i !== startOpen);
+      }
+
+      // Open other random sides
+      for (let i = 0; i < openCount - 1; i++) {
+          if (indices.length === 0) break;
+          const randIdx = Math.floor(Math.random() * indices.length);
+          const wallIdx = indices[randIdx];
+          walls[wallIdx] = false;
+          indices.splice(randIdx, 1);
+      }
+
       const newTile: Tile = {
           id: `tile-${Date.now()}-${Math.random()}`,
           q, r,
@@ -119,12 +167,56 @@ const App: React.FC = () => {
           explored: true,
           searchable: !isConnector,
           searched: false,
-          object
+          object,
+          walls
       };
 
       setState(prev => ({ ...prev, board: [...prev.board, newTile] }));
       addToLog(`Utforsket: ${roomName}${object ? ' (Noe virker merkelig her...)' : ''}`);
-  }, []);
+
+      if (!isConnector && Math.random() > 0.85) {
+          const types: EnemyType[] = ['cultist', 'ghoul', 'deepone', 'shade', 'dimensional_shambler', 'nightgaunt'];
+          const randomType = types[Math.floor(Math.random() * types.length)];
+          setTimeout(() => spawnEnemy(randomType, q, r), 500);
+          addToLog(`En skikkelse beveger seg i skyggene av ${roomName}!`);
+      }
+  }, [spawnEnemy]);
+
+  // Handle dropping an item from the investigator's inventory
+  const handleDropItem = (item: Item) => {
+    setState(prev => ({
+        ...prev,
+        players: prev.players.map((p, i) => i === prev.activePlayerIndex ? {
+            ...p,
+            inventory: p.inventory.filter(it => it.id !== item.id)
+        } : p)
+    }));
+    addToLog(`You dropped: ${item.name}`);
+  };
+
+  // Handle using a consumable item from the investigator's inventory
+  const handleUseItem = (item: Item) => {
+    const p = state.players[state.activePlayerIndex];
+    if (!p) return;
+
+    let hpChange = 0;
+    let sanChange = 0;
+
+    // Apply specific item effects
+    if (item.id === 'med') hpChange = 2;
+    if (item.id === 'whiskey') sanChange = 2;
+
+    setState(prev => ({
+        ...prev,
+        players: prev.players.map((pl, i) => i === prev.activePlayerIndex ? {
+            ...pl,
+            hp: Math.min(pl.maxHp, pl.hp + hpChange),
+            sanity: Math.min(pl.maxSanity, pl.sanity + sanChange),
+            inventory: pl.inventory.filter(it => it.id !== item.id)
+        } : pl)
+    }));
+    addToLog(`You used ${item.name}.`);
+  };
 
   const handleAction = (actionType: string, payload?: any) => {
     const activePlayer = state.players[state.activePlayerIndex];
@@ -132,14 +224,41 @@ const App: React.FC = () => {
 
     if (actionType === 'move') {
         const { q, r } = payload;
+        const currentTile = state.board.find(t => t.q === activePlayer.position.q && t.r === activePlayer.position.r);
         const targetTile = state.board.find(t => t.q === q && t.r === r);
         
+        // Check connectivity if moving between existing tiles
+        if (currentTile && targetTile) {
+            const dq = q - currentTile.q;
+            const dr = r - currentTile.r;
+            const sideIndex = HEX_DIRECTIONS.findIndex(d => d.q === dq && d.r === dr);
+            const oppositeSideIndex = HEX_DIRECTIONS.findIndex(d => d.q === -dq && d.r === -dr);
+
+            if (currentTile.walls?.[sideIndex]) {
+                addToLog("Du ser en vegg foran deg. Denne veien er stengt.");
+                return;
+            }
+            if (targetTile.walls?.[oppositeSideIndex]) {
+                addToLog("Vei blokkert fra den andre siden!");
+                return;
+            }
+        } else if (currentTile && !targetTile) {
+            // Check if exiting the current tile is allowed
+            const dq = q - currentTile.q;
+            const dr = r - currentTile.r;
+            const sideIndex = HEX_DIRECTIONS.findIndex(d => d.q === dq && d.r === dr);
+            if (currentTile.walls?.[sideIndex]) {
+                addToLog("En massiv mur stanser din ferd her.");
+                return;
+            }
+        }
+
         if (targetTile?.object?.blocking) {
             addToLog(`Vei sperret av ${targetTile.object.type.replace('_', ' ')}! Du må fjerne den først.`);
             return;
         }
 
-        if (!targetTile) spawnRoom(q, r);
+        if (!targetTile) spawnRoom(q, r, activePlayer.position);
 
         setState(prev => ({
             ...prev,
@@ -186,7 +305,6 @@ const App: React.FC = () => {
                 case 'switch':
                     addToLog("Du legger over den tunge kobberbryteren. Strømmen suser gjennom veggene!");
                     globalClearFog = true;
-                    // Hope restored
                     sanChange = 1;
                     removeObject = true; 
                     break;
@@ -214,7 +332,7 @@ const App: React.FC = () => {
                     } else {
                         addToLog("Tåken er for tett! Du mister orienteringen og blir skremt.");
                         sanChange = -1;
-                        removeObject = false; // Stay blocking
+                        removeObject = false; 
                     }
                     break;
 
@@ -258,16 +376,49 @@ const App: React.FC = () => {
         
         const success = dice.some(v => v >= 5);
         if (success) {
-            const foundItem = ITEMS[Math.floor(Math.random() * ITEMS.length)];
-            addToLog(`Suksess! Du fant: ${foundItem.name}`);
-            setState(prev => ({
-                ...prev,
-                players: prev.players.map((p, i) => i === prev.activePlayerIndex ? {
-                    ...p,
-                    inventory: [...p.inventory, foundItem].slice(0, 6),
-                    actions: p.actions - 1
-                } : p)
-            }));
+            let foundItem: Item;
+            
+            const currentScenario = state.activeScenario;
+            const questStep = currentScenario?.steps.find(s => s.type === 'find_item' && !s.completed);
+            
+            if (questStep && Math.random() > 0.6) {
+                foundItem = ITEMS.find(it => it.id === questStep.targetId) || ITEMS[Math.floor(Math.random() * ITEMS.length)];
+            } else {
+                foundItem = ITEMS.filter(it => !it.isQuestItem)[Math.floor(Math.random() * (ITEMS.length - 2))];
+            }
+
+            if (activePlayer.inventory.length >= 6) {
+                addToLog(`Lommene dine er fulle! Du ser ${foundItem.name}, men kan ikke bære den.`);
+            } else {
+                addToLog(`Suksess! Du fant: ${foundItem.name}`);
+                
+                setState(prev => {
+                    const newPlayers = prev.players.map((p, i) => i === prev.activePlayerIndex ? {
+                        ...p,
+                        inventory: [...p.inventory, foundItem],
+                        actions: p.actions - 1
+                    } : p);
+
+                    const newQuestItems = foundItem.isQuestItem && !prev.questItemsCollected.includes(foundItem.id) 
+                        ? [...prev.questItemsCollected, foundItem.id] 
+                        : prev.questItemsCollected;
+
+                    let newScenario = prev.activeScenario;
+                    if (newScenario && foundItem.isQuestItem) {
+                        newScenario = {
+                            ...newScenario,
+                            steps: newScenario.steps.map(s => s.targetId === foundItem.id ? { ...s, completed: true } : s)
+                        };
+                    }
+
+                    return {
+                        ...prev,
+                        players: newPlayers,
+                        questItemsCollected: newQuestItems,
+                        activeScenario: newScenario
+                    };
+                });
+            }
         } else {
             addToLog("Du lette overalt, men fant ingenting av verdi.");
             setState(prev => ({
@@ -333,8 +484,9 @@ const App: React.FC = () => {
         ...DEFAULT_STATE,
         players: [startPlayer],
         phase: GamePhase.INVESTIGATOR,
-        board: [{ ...START_TILE, id: 'start' }],
+        board: [{ ...START_TILE, id: 'start', walls: [false, false, false, false, false, false] }],
         activeModifiers: [SCENARIO_MODIFIERS[0]],
+        activeScenario: SCENARIOS[0],
         log: [`Velkommen, ${char.name}. Etterforskningen i Arkham begynner.`]
     });
     setIsMainMenuOpen(false);
@@ -362,72 +514,51 @@ const App: React.FC = () => {
             enemies={state.enemies} 
             onTileClick={(q, r) => handleAction('move', { q, r })} 
             doom={state.doom} 
-            activeModifiers={state.activeModifiers} 
+            activeModifiers={state.activeModifiers}
+            screenShake={state.screenShake}
           />
 
           <TurnNotification player={state.players[state.activePlayerIndex]} phase={state.phase} />
 
-          {/* Character Panel - Full screen on mobile, sidebar on desktop */}
-          <div className={`fixed left-0 top-0 bottom-0 z-[60] transition-transform duration-300 ease-out shadow-2xl ${isMobile ? 'w-full' : 'w-80'} ${showLeftPanel ? 'translate-x-0' : '-translate-x-full'}`}>
-            <CharacterPanel
-                player={state.players[state.activePlayerIndex]}
-                allPlayers={state.players}
-                onTrade={() => {}}
-                onDrop={() => {}}
+          <div className={`fixed left-0 top-0 bottom-0 w-80 z-[60] transition-transform duration-500 shadow-2xl ${showLeftPanel ? 'translate-x-0' : '-translate-x-full'}`}>
+            <CharacterPanel 
+                player={state.players[state.activePlayerIndex]} 
+                allPlayers={state.players} 
+                onTrade={() => {}} 
+                onDrop={handleDropItem}
+                onUse={handleUseItem}
             />
-            {/* Mobile close button overlay */}
-            {isMobile && showLeftPanel && (
-              <button
-                onClick={() => setShowLeftPanel(false)}
-                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white z-10 active:scale-95"
-                aria-label="Lukk panel"
-              >
-                ✕
-              </button>
-            )}
           </div>
 
-          {/* Log Panel - Full screen on mobile, sidebar on desktop */}
-          <div className={`fixed right-0 top-0 bottom-0 z-[60] transition-transform duration-300 ease-out shadow-2xl ${isMobile ? 'w-full' : 'w-80'} ${showRightPanel ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className={`fixed right-0 top-0 bottom-0 w-80 z-[60] transition-transform duration-500 shadow-2xl ${showRightPanel ? 'translate-x-0' : 'translate-x-full'}`}>
             <LogPanel logs={state.log} onClose={() => setShowRightPanel(false)} />
           </div>
 
-          {/* Mobile panel backdrop */}
-          {isMobile && (showLeftPanel || showRightPanel) && (
-            <div
-              className="fixed inset-0 bg-black/50 z-[55] transition-opacity duration-300"
-              onClick={() => {
-                setShowLeftPanel(false);
-                setShowRightPanel(false);
-              }}
-            />
-          )}
-
-          {/* Footer - Responsive height and padding for mobile */}
-          <footer className={`fixed bottom-0 left-0 right-0 flex items-center justify-center gap-2 md:gap-4 z-50 bg-gradient-to-t from-black via-black/90 to-transparent safe-area-bottom ${isMobile ? 'h-28 pb-4 px-2' : 'h-24 px-4'}`}>
-              <ActionBar
+          <footer className="fixed bottom-0 left-0 right-0 h-24 flex items-center justify-center gap-4 z-50 bg-gradient-to-t from-black to-transparent">
+              <ActionBar 
                   onAction={(type) => {
                       if (type === 'end_turn') handleEndTurn();
+                      else if (type === 'journal') setShowJournal(true);
                       else handleAction(type);
-                  }}
-                  actionsRemaining={state.players[state.activePlayerIndex]?.actions || 0}
-                  isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR}
-                  contextAction={activeTile?.object ? {
-                      id: 'obj',
-                      label: activeTile.object.type.replace('_', ' '),
-                      iconType: activeTile.object.type === 'switch' ? 'agility' : activeTile.object.type === 'fog_wall' ? 'strength' : 'insight',
-                      difficulty: activeTile.object.difficulty || 4
+                  }} 
+                  actionsRemaining={state.players[state.activePlayerIndex]?.actions || 0} 
+                  isInvestigatorPhase={state.phase === GamePhase.INVESTIGATOR} 
+                  contextAction={activeTile?.object ? { 
+                      id: 'obj', 
+                      label: activeTile.object.type.replace('_', ' '), 
+                      iconType: activeTile.object.type === 'switch' ? 'agility' : activeTile.object.type === 'fog_wall' ? 'strength' : 'insight', 
+                      difficulty: activeTile.object.difficulty || 4 
                   } : null}
-                  spells={[]}
-                  activeSpell={null}
-                  onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)}
-                  showCharacter={showLeftPanel}
-                  onToggleInfo={() => setShowRightPanel(!showRightPanel)}
-                  showInfo={showRightPanel}
+                  spells={[]} 
+                  activeSpell={null} 
+                  onToggleCharacter={() => setShowLeftPanel(!showLeftPanel)} 
+                  showCharacter={showLeftPanel} 
+                  onToggleInfo={() => setShowRightPanel(!showRightPanel)} 
+                  showInfo={showRightPanel} 
               />
-              <button
+              <button 
                 onClick={handleEndTurn}
-                className={`bg-[#e94560] rounded-xl border border-white/20 font-bold uppercase tracking-widest hover:bg-[#c9354d] transition-all shadow-lg active:scale-95 ${isMobile ? 'px-4 py-3 text-[10px]' : 'px-6 py-3 text-xs'}`}
+                className="bg-[#e94560] px-6 py-3 rounded-xl border border-white/20 font-bold uppercase tracking-widest text-xs hover:bg-[#c9354d] transition-all shadow-lg active:scale-95"
               >
                 End Turn
               </button>
@@ -455,6 +586,10 @@ const App: React.FC = () => {
                     }}
                 />
             )}
+
+          {showJournal && (
+              <JournalModal unlockedIds={state.encounteredEnemies} onClose={() => setShowJournal(false)} />
+          )}
 
           {showOptions && (
               <OptionsMenu 

@@ -59,7 +59,7 @@ export const SCENARIOS: Scenario[] = [
     tileSet: 'indoor',
     victoryType: 'escape',
     steps: [
-        { id: 'step1', description: 'Find the Iron Key (Investigate locations)', type: 'find_item', targetId: 'quest_key', completed: false },
+        { id: 'step1', description: 'Find the Iron Key (Investigate locations)', type: 'find_item', targetId: 'quest_iron_key', completed: false },
         { id: 'step2', description: 'Locate the Exit Door', type: 'find_tile', targetId: 'Exit Door', completed: false },
         { id: 'step3', description: 'Unlock the Door and Escape', type: 'interact', targetId: 'Exit Door', completed: false }
     ],
@@ -71,18 +71,18 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: 's2',
-    title: 'Assassination of the High Priest',
-    description: 'The Order of the Black Sun is performing a ritual to summon a Great Old One. You must silence their leader before the ritual completes.',
+    title: 'Shadow over Innsmouth',
+    description: 'The townspeople of Innsmouth are more than human. You must find the Silver Key to the hidden temple.',
     startDoom: 10,
-    startLocation: 'Town Square',
-    goal: 'Find and kill the Dark Priest.',
-    specialRule: 'Enemies are stronger. Time is short.',
+    startLocation: 'Train Station',
+    goal: 'Find the Silver Key and locate the Esoteric Order Hall.',
+    specialRule: 'Water locations have +1 Deep One spawn.',
     difficulty: 'Hard',
     tileSet: 'mixed',
-    victoryType: 'assassination',
+    victoryType: 'escape',
     steps: [
-        { id: 'step1', description: 'Find the Dark Priest', type: 'find_item', targetId: 'location_intel', completed: false },
-        { id: 'step2', description: 'Kill the Dark Priest', type: 'kill_enemy', targetId: 'priest', amount: 1, completed: false }
+        { id: 'step1', description: 'Find the Silver Key', type: 'find_item', targetId: 'quest_silver_key', completed: false },
+        { id: 'step2', description: 'Locate the Esoteric Order Hall', type: 'find_tile', targetId: 'Esoteric Order of Dagon Hall', completed: false }
     ],
     doomEvents: [
         { threshold: 7, triggered: false, type: 'spawn_enemy', targetId: 'deepone', amount: 2, message: 'Deep Ones rise from the sewers.' },
@@ -96,143 +96,182 @@ export const START_TILE: Tile = {
   id: 'start', q: 0, r: 0, name: 'Train Station', type: 'street', category: 'location', explored: true, searchable: true, searched: false
 };
 
-// Added missing 'shade' entry to fulfill Record<EnemyType, BestiaryEntry>
 export const BESTIARY: Record<EnemyType, BestiaryEntry> = {
   cultist: {
     name: 'Cultist', type: 'cultist', hp: 2, damage: 1, horror: 1,
     description: 'A brainwashed servant of the Outer Gods.',
-    visualPrompt: 'A sinister cultist in hooded robes, 1920s horror style.',
-    lore: 'Recruited from the desperate and the mad.',
-    defeatFlavor: 'The cultist collapses, a dark amulet shattering.',
+    visualPrompt: 'A sinister 1920s cultist in dark hooded robes, shadows obscuring their face, holding a ritual dagger.',
+    lore: 'These deluded individuals have traded their souls for a glimpse of forbidden truth.',
+    defeatFlavor: 'The cultist collapses, a dark amulet shattering into pieces.',
     traits: []
   },
   ghoul: {
     name: 'Ghoul', type: 'ghoul', hp: 3, damage: 2, horror: 2,
     description: 'A flesh-eating subterranean dweller.',
-    visualPrompt: 'A hunched, canine-like humanoid with rubbery skin.',
-    lore: 'Subterranean dwellers that feast on the dead.',
-    defeatFlavor: 'It collapses into grave dirt.',
+    visualPrompt: 'A hunched, pale, canine-like humanoid with rubbery skin and sharp claws, crouching in a dark graveyard.',
+    lore: 'Subterranean scavengers that feast on the interred dead, often found in ancient burial grounds.',
+    defeatFlavor: 'It collapses into a pile of foul-smelling grave dirt.',
     traits: ['scavenger']
   },
   deepone: {
     name: 'Deep One', type: 'deepone', hp: 3, damage: 2, horror: 2,
     description: 'An immortal amphibious humanoid.',
-    visualPrompt: 'A fish-frog hybrid humanoid with glistening scales.',
-    lore: 'Immortal servants of Father Dagon.',
-    defeatFlavor: 'The creature dissolves into brine.',
+    visualPrompt: 'A fish-frog hybrid humanoid with glistening scales, bulbous eyes, and webbed hands, emerging from dark water.',
+    lore: 'Eternal servants of Father Dagon and Mother Hydra, they dwell in sunken cities beneath the waves.',
+    defeatFlavor: 'The creature dissolves into a puddle of thick, salty brine.',
     traits: ['aquatic']
   },
   shoggoth: {
     name: 'Shoggoth', type: 'shoggoth', hp: 6, damage: 3, horror: 4,
     description: 'A protoplasmic mass of eyes and mouths.',
-    visualPrompt: 'A massive monstrosity of iridescent black slime.',
-    lore: 'A nightmarish slave race created by the Elder Things.',
+    visualPrompt: 'A massive, bubbling monstrosity of iridescent black slime covered in shifting eyes and gaping mouths.',
+    lore: 'A nightmarish slave race created by the Elder Things, now possessing a chaotic and rebellious will.',
     traits: ['massive', 'slow'],
-    defeatFlavor: 'The massive form loses cohesion.'
+    defeatFlavor: 'The massive form loses all cohesion and flows into the cracks of the floor.'
   },
   sniper: {
     name: 'Cultist Sniper', type: 'sniper', hp: 2, damage: 2, horror: 1,
     description: 'A cultist armed with a long-range rifle.',
-    visualPrompt: 'A hooded cultist with a vintage sniper rifle, 1920s horror style.',
-    lore: 'Chosen for their steady hands and lack of remorse.',
+    visualPrompt: 'A hooded figure perched in a dark attic window, aiming a vintage 1920s rifle into the misty street.',
+    lore: 'Chosen for their steady hands and absolute lack of remorse for their victims.',
     traits: ['ranged'],
-    defeatFlavor: 'The sniper falls from their perch.'
+    defeatFlavor: 'The sniper falls from their perch, their weapon clattering to the ground.'
   },
   priest: {
     name: 'Dark Priest', type: 'priest', hp: 5, damage: 2, horror: 3,
     description: 'A high-ranking member of the cult, channeling dark energies.',
-    visualPrompt: 'A cult priest in ornate robes, surrounded by dark energy.',
-    lore: 'They have traded their humanity for forbidden power.',
+    visualPrompt: 'A cult priest in ornate silk robes, arms raised as dark purple energy crackles around their fingers.',
+    lore: 'They have traded every shred of their humanity for a taste of the Great Old Ones\' power.',
     traits: ['elite'],
-    defeatFlavor: 'The priest screams as the darkness consumes them.'
+    defeatFlavor: 'The priest screams as the very darkness they summoned consumes them from within.'
   },
   'mi-go': {
     name: 'Mi-Go', type: 'mi-go', hp: 3, damage: 1, horror: 1,
     description: 'A fungoid crustacean from Yuggoth.',
-    visualPrompt: 'A pinkish, fungoid alien with large wings.',
-    lore: 'Fungi from Yuggoth who fly through space.',
+    visualPrompt: 'A pinkish, fungoid alien with multiple jointed limbs and large membranous wings, floating in a dark forest.',
+    lore: 'Fungi from Yuggoth who harvest resources across the cosmos, often taking human brains for study.',
     traits: ['flying'],
-    defeatFlavor: 'The body disintegrates.'
+    defeatFlavor: 'The alien body disintegrates into a cloud of fine, grey spores.'
   },
   nightgaunt: {
     name: 'Nightgaunt', type: 'nightgaunt', hp: 3, damage: 1, horror: 1,
     description: 'A faceless, horned flyer.',
-    visualPrompt: 'A sleek black humanoid with bat wings and no face.',
-    lore: 'Faceless servants of Nodens.',
+    visualPrompt: 'A sleek, black humanoid creature with leather-like skin, bat wings, and a blank, faceless head.',
+    lore: 'Faceless servants of Nodens, they are known for tickling their victims before carrying them into the void.',
     traits: ['flying'],
-    defeatFlavor: 'It vanishes into the night sky.'
+    defeatFlavor: 'It vanishes into the night sky like a wisp of smoke.'
   },
   hound: {
     name: 'Hound of Tindalos', type: 'hound', hp: 4, damage: 2, horror: 3,
     description: 'A predator from the angles of time.',
-    visualPrompt: 'A lean, emaciated beast emerging from a corner.',
-    lore: 'Predators that inhabit the angles of time.',
+    visualPrompt: 'A lean, emaciated, blueish beast with a long proboscis, emerging from a sharp corner of a room.',
+    lore: 'Predators that inhabit the angles of time, tracking their prey through any sharp-cornered space.',
     traits: ['fast', 'ambusher'],
-    defeatFlavor: 'The beast recedes into the angles.'
+    defeatFlavor: 'The beast recedes back into the impossible angles from which it came.'
   },
   dark_young: {
     name: 'Dark Young', type: 'dark_young', hp: 6, damage: 2, horror: 3,
     description: 'Offspring of Shub-Niggurath.',
-    visualPrompt: 'A mass of black tentacles and hooves.',
-    lore: 'The Black Goat of the Woods.',
+    visualPrompt: 'A massive, tree-like monstrosity with black tentacles, multiple cloven hooves, and dripping mouths.',
+    lore: 'The terrifying progeny of the Black Goat of the Woods, they guard her sacred groves.',
     traits: ['massive'],
-    defeatFlavor: 'The monstrosity withers.'
+    defeatFlavor: 'The monstrosity withers and turns into black, decaying wood.'
   },
   byakhee: {
     name: 'Byakhee', type: 'byakhee', hp: 3, damage: 2, horror: 1,
     description: 'An interstellar steed.',
-    visualPrompt: 'A disturbing hybrid monster of crow, mole, and ant.',
-    lore: 'Interstellar steeds serving Hastur.',
+    visualPrompt: 'A disturbing hybrid monster with features of crow, mole, ant, and humanoid, flying through space.',
+    lore: 'Interstellar steeds serving Hastur the Unspeakable, summoned by the blowing of a silver whistle.',
     traits: ['flying', 'fast'],
-    defeatFlavor: 'It dissolves into cosmic dust.'
+    defeatFlavor: 'It dissolves into a handful of cosmic dust and foul-smelling feathers.'
   },
   star_spawn: {
     name: 'Star Spawn', type: 'star_spawn', hp: 8, damage: 3, horror: 5,
     description: 'A colossal kin of Cthulhu.',
-    visualPrompt: 'A gigantic, green monster with octopus head.',
-    lore: 'Smaller versions of the Great Dreamer.',
+    visualPrompt: 'A gigantic, green, winged monster with an octopus head and massive claws, towering over a coastal city.',
+    lore: 'Lesser versions of the Great Dreamer himself, they await his awakening in sunken R\'lyeh.',
     traits: ['massive'],
-    defeatFlavor: 'The entity liquefies into green ooze.'
+    defeatFlavor: 'The entity liquefies into a mountain of foul green ooze.'
   },
   formless_spawn: {
     name: 'Formless Spawn', type: 'formless_spawn', hp: 5, damage: 2, horror: 2,
     description: 'Black ooze of Tsathoggua.',
-    visualPrompt: 'A pitch-black, liquid shapeshifter.',
-    lore: 'Living puddles of black ichor.',
+    visualPrompt: 'A pitch-black, liquid shapeshifter forming tentacles and eyes as it flows across a cavern floor.',
+    lore: 'Living puddles of black ichor that serve the sleepy god Tsathoggua in the depths of N\'kai.',
     traits: ['regenerate'],
-    defeatFlavor: 'The ooze evaporates into foul steam.'
+    defeatFlavor: 'The ooze evaporates into a cloud of foul-smelling steam.'
   },
   hunting_horror: {
     name: 'Hunting Horror', type: 'hunting_horror', hp: 4, damage: 3, horror: 3,
     description: 'A viper of the void.',
-    visualPrompt: 'A colossal, serpentine flyer with a distorted face.',
-    lore: 'A serpentine entity that serves Nyarlathotep.',
+    visualPrompt: 'A colossal, serpentine winged creature with a distorted, shifting face, coiling in the air.',
+    lore: 'Great serpentine entities that serve as the hunting beasts of Nyarlathotep.',
     traits: ['fast', 'flying'],
-    defeatFlavor: 'It coils in and vanishes.'
+    defeatFlavor: 'It coils in on itself and vanishes into a pinpoint of light.'
   },
   moon_beast: {
     name: 'Moon-Beast', type: 'moon_beast', hp: 4, damage: 1, horror: 2,
     description: 'Sadistic torturers from the moon.',
-    visualPrompt: 'A pale, toad-like abomination with no eyes.',
-    lore: 'Sadistic beings from the Dreamlands.',
+    visualPrompt: 'A pale, toad-like abomination with no eyes and pink tentacles where its face should be.',
+    lore: 'Cruel and sadistic beings from the Dreamlands moon who trade in slaves and secrets.',
     traits: ['ranged'],
-    defeatFlavor: 'The abomination falls silent.'
+    defeatFlavor: 'The abomination falls silent, its tentacles twitching one last time.'
   },
   shade: {
     name: 'Shade', type: 'shade', hp: 2, damage: 1, horror: 3,
-    description: 'A flickering remnant of a soul, or something far worse.',
-    visualPrompt: 'A semi-transparent, elongated shadow reaching out from corners.',
-    lore: 'Some say they are the echoes of those taken by the void.',
+    description: 'A flickering remnant of a soul.',
+    visualPrompt: 'A semi-transparent, elongated shadow reaching out from the corners of a dim library.',
+    lore: 'Some say they are the echoes of those taken by the void, wandering forever in search of warmth.',
     traits: ['ethereal'],
-    defeatFlavor: 'The darkness loses its shape and vanishes.'
+    defeatFlavor: 'The darkness loses its shape and vanishes into the floorboards.'
+  },
+  dimensional_shambler: {
+    name: 'Dimensional Shambler', type: 'dimensional_shambler', hp: 4, damage: 2, horror: 3,
+    description: 'A hunter between planes.',
+    visualPrompt: 'A rugose, loose-skinned humanoid with massive talons, partially fading in and out of existence.',
+    lore: 'Creatures that can step through dimensions at will, often snatching victims into other planes.',
+    traits: ['ethereal', 'ambusher'],
+    defeatFlavor: 'It blinks out of existence, leaving only a faint smell of ozone.'
+  },
+  elder_thing: {
+    name: 'Elder Thing', type: 'elder_thing', hp: 5, damage: 2, horror: 2,
+    description: 'A star-headed scientist.',
+    visualPrompt: 'A barrel-shaped entity with five-fold symmetry, a starfish head, and leathery wings, standing in an ice cave.',
+    lore: 'Ancient scientists who ruled Earth millions of years ago, creators of the Shoggoths.',
+    traits: ['flying', 'elite'],
+    defeatFlavor: 'The creature stiffens and turns into a brittle, frozen statue.'
+  },
+  yithian: {
+    name: 'Yithian', type: 'yithian', hp: 5, damage: 1, horror: 1,
+    description: 'A cone-shaped scholar of time.',
+    visualPrompt: 'A tall, iridescent cone-shaped body with four long tentacles, two ending in claws and one in a head with three eyes.',
+    lore: 'Members of the Great Race of Yith who have swapped minds with creatures across time to gather knowledge.',
+    traits: ['elite', 'insightful'],
+    defeatFlavor: 'The iridescent body loses its shimmer and collapses inward.'
+  },
+  fire_vampire: {
+    name: 'Fire Vampire', type: 'fire_vampire', hp: 2, damage: 2, horror: 2,
+    description: 'A sentient spark of living flame.',
+    visualPrompt: 'A swirling vortex of crimson and orange flame, with a core of intense white light, floating in the air.',
+    lore: 'Sentient sparks from the star Fomalhaut that serve Cthugha, burning everything they touch.',
+    traits: ['fast', 'ethereal'],
+    defeatFlavor: 'The flame flickers out, leaving only a small pile of grey ash.'
+  },
+  colour_out_of_space: {
+    name: 'Colour out of Space', type: 'colour_out_of_space', hp: 6, damage: 2, horror: 4,
+    description: 'A nebulous, glowing entity of impossible hue.',
+    visualPrompt: 'A shimmering, iridescent cloud of light of a colour that does not exist in the visible spectrum, floating over a blasted heath.',
+    lore: 'An alien entity that fallen from the stars as a meteorite, draining the life and sanity from all living things nearby.',
+    traits: ['ethereal', 'massive'],
+    defeatFlavor: 'The impossible glow fades, leaving the area cold and lifeless.'
   },
   boss: {
     name: 'Ancient One', type: 'boss', hp: 10, damage: 4, horror: 6,
     description: 'An avatar of cosmic destruction.',
-    visualPrompt: 'A cosmic entity of impossible geometry.',
-    lore: 'An intrusion from outside the ordered universe.',
+    visualPrompt: 'A cosmic entity of impossible geometry and scales, shadows of galaxies swirling within its form.',
+    lore: 'An intrusion from outside the ordered universe, whose very presence unravels the laws of physics.',
     traits: ['massive'],
-    defeatFlavor: 'The avatar is pulled back into the void.'
+    defeatFlavor: 'The avatar is pulled back into the void, its scream echoing through time.'
   }
 };
 
@@ -243,7 +282,11 @@ export const ITEMS: Item[] = [
   { id: 'med', name: 'Medical Kit', type: 'consumable', effect: 'Heal 2 HP', bonus: 2, cost: 3 },
   { id: 'whiskey', name: 'Old Whiskey', type: 'consumable', effect: 'Heal 2 Sanity', bonus: 2, cost: 2 },
   { id: 'flash', name: 'Flashlight', type: 'tool', effect: '+1 Investigation Die', bonus: 1, cost: 2, statModifier: 'investigation' },
-  { id: 'book', name: 'Necronomicon', type: 'relic', effect: '+3 Insight, -1 Sanity', bonus: 3, cost: 8 }
+  { id: 'book', name: 'Necronomicon', type: 'relic', effect: '+3 Insight, -1 Sanity', bonus: 3, cost: 8 },
+  
+  // Quest Items
+  { id: 'quest_iron_key', name: 'Iron Key', type: 'quest', effect: 'Unlocks the Exit Door.', isQuestItem: true },
+  { id: 'quest_silver_key', name: 'Silver Key', type: 'quest', effect: 'Required for the Temple of Dagon.', isQuestItem: true }
 ];
 
 export const EVENTS: EventCard[] = [

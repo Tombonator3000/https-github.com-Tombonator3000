@@ -19,7 +19,7 @@ const LogPanel: React.FC<LogPanelProps> = ({ logs, onClose }) => {
         </button>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar momentum-scroll">
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
         {logs.length === 0 ? (
           <p className="text-slate-600 italic text-center mt-10">No entries yet...</p>
         ) : (

@@ -70,13 +70,14 @@ export interface SavedInvestigator extends Player {
 export interface Item {
   id: string;
   name: string;
-  type: 'weapon' | 'tool' | 'relic' | 'armor' | 'consumable';
+  type: 'weapon' | 'tool' | 'relic' | 'armor' | 'consumable' | 'quest';
   effect: string;
   bonus?: number;
   cost?: number;
   statModifier?: 'combat' | 'investigation' | 'agility' | 'physical_defense' | 'mental_defense';
   curse?: string;
   curseEffect?: 'drain_hp_on_kill' | 'cap_hp' | 'hallucinations' | 'sanity_cost_clue' | 'no_rest';
+  isQuestItem?: boolean;
 }
 
 export type EnemyAttackType = 'melee' | 'ranged' | 'sanity' | 'doom';
@@ -85,7 +86,8 @@ export type EnemyType =
   | 'cultist' | 'deepone' | 'ghoul' | 'shoggoth' | 'boss' 
   | 'sniper' | 'priest' | 'mi-go' | 'nightgaunt' | 'hound' 
   | 'dark_young' | 'byakhee' | 'star_spawn' | 'formless_spawn' 
-  | 'hunting_horror' | 'moon_beast' | 'shade';
+  | 'hunting_horror' | 'moon_beast' | 'shade'
+  | 'dimensional_shambler' | 'elder_thing' | 'yithian' | 'fire_vampire' | 'colour_out_of_space';
 
 export interface Enemy {
   id: string;
@@ -149,6 +151,7 @@ export interface Tile {
   object?: TileObject;
   isGate?: boolean;
   imageUrl?: string;
+  walls?: boolean[]; // 0-5 indices representing the 6 sides of a hex
 }
 
 export type VictoryType = 'escape' | 'assassination' | 'collection' | 'survival';

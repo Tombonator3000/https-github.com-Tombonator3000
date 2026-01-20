@@ -3,11 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#05050a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shadows of the 1920s</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,700;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
@@ -82,73 +78,6 @@
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #16213e; }
         ::-webkit-scrollbar-thumb { background: #e94560; border-radius: 3px; }
-
-        /* Touch optimization */
-        * {
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-        }
-
-        /* Prevent text selection on game elements */
-        .no-select {
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-        }
-
-        /* Better touch targets */
-        button, [role="button"] {
-            min-height: 44px;
-            min-width: 44px;
-        }
-
-        /* Safe area support for notched devices */
-        .safe-area-bottom {
-            padding-bottom: env(safe-area-inset-bottom, 0px);
-        }
-
-        .safe-area-top {
-            padding-top: env(safe-area-inset-top, 0px);
-        }
-
-        /* Active state for touch feedback */
-        button:active, [role="button"]:active {
-            transform: scale(0.97);
-        }
-
-        /* Hide scrollbar on mobile for cleaner UI */
-        .hide-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        .hide-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-
-        /* Smooth momentum scrolling on iOS */
-        .momentum-scroll {
-            -webkit-overflow-scrolling: touch;
-        }
-
-        /* Prevent zoom on double-tap for interactive elements */
-        input, button, select, textarea {
-            touch-action: manipulation;
-        }
-
-        /* Responsive font sizes */
-        @media (max-width: 640px) {
-            html {
-                font-size: 14px;
-            }
-        }
-
-        /* Landscape mobile adjustments */
-        @media (max-height: 500px) and (orientation: landscape) {
-            .hide-landscape {
-                display: none !important;
-            }
-        }
     </style>
 <script type="importmap">
 {

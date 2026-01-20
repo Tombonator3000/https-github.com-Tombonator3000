@@ -1,11 +1,10 @@
 
-import React, { useRef, useState, useEffect } from 'react';
-import { Tile, Player, Enemy, ScenarioModifier } from '../types';
-import {
-  User, MapPin, DoorOpen, BookOpen, Church, Anchor, Building,
-  Radio, Power, Eye, CloudFog, Lock, ShieldAlert, Ghost, ZoomIn, ZoomOut, Crosshair
+import React, { useRef, useState, useMemo } from 'react';
+import { Tile, Player, Enemy, ScenarioModifier, WeatherType } from '../types';
+import { 
+  User, MapPin, DoorOpen, BookOpen, Church, Anchor, Building, 
+  Radio, Power, Eye, CloudFog, Lock, ShieldAlert, Ghost
 } from 'lucide-react';
-import { useTouchGestures, useIsMobile } from '../utils/useMobile';
 
 interface GameBoardProps {
   tiles: Tile[];
@@ -14,11 +13,10 @@ interface GameBoardProps {
   onTileClick: (q: number, r: number) => void;
   doom: number;
   activeModifiers?: ScenarioModifier[];
+  screenShake?: boolean;
 }
 
-// Responsive hex size - smaller on mobile for better overview
-const HEX_SIZE_DESKTOP = 110;
-const HEX_SIZE_MOBILE = 90;
+const HEX_SIZE = 110;
 
 const getTileVisuals = (name: string, type: 'building' | 'room' | 'street') => {
   const n = name.toLowerCase();
@@ -43,52 +41,127 @@ const getObjectIcon = (type: string) => {
     }
 };
 
-const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileClick }) => {
-  const isMobile = useIsMobile();
-  const HEX_SIZE = isMobile ? HEX_SIZE_MOBILE : HEX_SIZE_DESKTOP;
+const HexWall: React.FC<{ index: number; color: string }> = ({ index, color }) => {
+    const angles = [30, 90, 150, 210, 270, 330];
+    const angle = angles[index];
+    
+    return (
+        <div 
+            className="absolute h-1.5 rounded-full z-20 shadow-[0_0_10px_rgba(0,0,0,0.8)]"
+            style={{ 
+                width: `${HEX_SIZE}px`,
+                backgroundColor: color,
+                top: '50%',
+                left: '50%',
+                transformOrigin: 'center center',
+                transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-${HEX_SIZE * 0.866}px)`,
+                border: '1px solid rgba(255,255,255,0.2)'
+            }}
+        />
+    );
+};
 
-  // Use touch gestures hook for pan/zoom
-  const {
-    position,
-    setPosition,
-    scale,
-    setScale,
-    isDragging,
-    handlers
-  } = useTouchGestures(
-    { x: typeof window !== 'undefined' ? window.innerWidth / 2 : 400, y: typeof window !== 'undefined' ? window.innerHeight / 2 - 50 : 300 },
-    isMobile ? 0.7 : 0.85,
-    0.3,
-    1.5
-  );
+const WeatherOverlay: React.FC<{ weather?: WeatherType }> = ({ weather }) => {
+    if (!weather || weather === 'clear') return null;
+
+    return (
+        <div className="fixed inset-0 pointer-events-none z-[100]">
+            {weather === 'fog' && (
+                <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] animate-pulse">
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/fog.png')] opacity-30 animate-float-slow"></div>
+                </div>
+            )}
+            {weather === 'rain' && (
+                <div className="absolute inset-0 overflow-hidden">
+                    {Array.from({ length: 50 }).map((_, i) => (
+                        <div 
+                            key={i} 
+                            className="absolute bg-blue-400/30 w-[1px] h-10 animate-rain-fall"
+                            style={{ 
+                                left: `${Math.random() * 100}%`, 
+                                top: `-${Math.random() * 20}%`,
+                                animationDelay: `${Math.random() * 2}s`,
+                                animationDuration: `${0.5 + Math.random() * 0.5}s`
+                            }}
+                        ></div>
+                    ))}
+                </div>
+            )}
+            {weather === 'miasma' && (
+                <div className="absolute inset-0 bg-purple-900/10 mix-blend-color-dodge">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle,rgba(168,85,247,0.1)_0%,transparent_70%)] animate-pulse"></div>
+                </div>
+            )}
+            {weather === 'void_storm' && (
+                <div className="absolute inset-0 overflow-hidden bg-black/20">
+                     {Array.from({ length: 20 }).map((_, i) => (
+                        <div 
+                            key={i} 
+                            className="absolute w-8 h-8 bg-black border border-purple-500/20 shadow-[0_0_20px_rgba(168,85,247,0.2)] animate-voxel-drift"
+                            style={{ 
+                                left: `${Math.random() * 100}%`, 
+                                top: `${Math.random() * 100}%`,
+                                animationDuration: `${20 + Math.random() * 40}s`,
+                                transform: `rotate(${Math.random() * 360}deg)`
+                            }}
+                        ></div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileClick, activeModifiers, screenShake }) => {
+  const [scale, setScale] = useState(0.85);
+  const [position, setPosition] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 - 50 });
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+
+  const activeWeather = useMemo(() => activeModifiers?.find(m => m.weatherType)?.weatherType, [activeModifiers]);
 
   const hexToPixel = (q: number, r: number) => {
-    const x = HEX_SIZE * (3 / 2 * q);
-    const y = HEX_SIZE * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
+    const x = HEX_SIZE * (3/2 * q);
+    const y = HEX_SIZE * (Math.sqrt(3)/2 * q + Math.sqrt(3) * r);
     return { x, y };
   };
 
-  // Center on player
-  const centerOnPlayer = () => {
-    if (players.length > 0) {
-      const playerPos = hexToPixel(players[0].position.q, players[0].position.r);
-      setPosition({
-        x: window.innerWidth / 2 - playerPos.x * scale,
-        y: window.innerHeight / 2 - playerPos.y * scale
-      });
-    }
-  };
-
-  // Zoom controls for mobile
-  const zoomIn = () => setScale(prev => Math.min(prev + 0.15, 1.5));
-  const zoomOut = () => setScale(prev => Math.max(prev - 0.15, 0.3));
+  // Generate background voxel blocks for depth
+  const backgroundVoxels = useMemo(() => Array.from({ length: 15 }).map((_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      size: 40 + Math.random() * 100,
+      duration: 30 + Math.random() * 60,
+      delay: Math.random() * -60
+  })), []);
 
   return (
-    <div
-      className="w-full h-full overflow-hidden relative cursor-move bg-[#020205]"
-      style={{ touchAction: 'none' }}
-      {...handlers}
+    <div 
+      className={`w-full h-full overflow-hidden relative cursor-move bg-[#020205] touch-none ${screenShake ? 'animate-shake' : ''}`}
+      onMouseDown={(e) => { isDragging.current = true; dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y }; }}
+      onMouseMove={(e) => { if (isDragging.current) setPosition({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y }); }}
+      onMouseUp={() => isDragging.current = false}
+      onWheel={(e) => setScale(prev => Math.min(Math.max(prev + (e.deltaY > 0 ? -0.05 : 0.05), 0.3), 1.5))}
     >
+      {/* Background Atmosphere */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {backgroundVoxels.map(v => (
+              <div 
+                key={v.id}
+                className="voxel-block animate-voxel-drift"
+                style={{
+                    left: `${v.left}%`,
+                    top: `${v.top}%`,
+                    width: `${v.size}px`,
+                    height: `${v.size}px`,
+                    animationDuration: `${v.duration}s`,
+                    animationDelay: `${v.delay}s`
+                }}
+              />
+          ))}
+      </div>
+
       <div 
         style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, transition: isDragging.current ? 'none' : 'transform 0.1s ease-out' }} 
         className="absolute top-0 left-0"
@@ -97,6 +170,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileCl
         {tiles.map(tile => {
           const { x, y } = hexToPixel(tile.q, tile.r);
           const visuals = getTileVisuals(tile.name, tile.type);
+          const wallColor = tile.type === 'street' ? '#334155' : '#450a0a';
+
           return (
             <div 
               key={tile.id} 
@@ -107,7 +182,11 @@ const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileCl
                   onTileClick(tile.q, tile.r);
               }}
             >
-              <div className={`absolute inset-0 hex-clip transition-all duration-300 ${visuals.bg} border-2 border-[${visuals.stroke}] group-hover:brightness-125 shadow-2xl`}>
+              <div className={`absolute inset-0 hex-clip transition-all duration-300 ${visuals.bg} border-2 border-[${visuals.stroke}] group-hover:brightness-125 shadow-2xl overflow-hidden`}>
+                 {tile.imageUrl && (
+                     <img src={tile.imageUrl} className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-overlay" alt="" />
+                 )}
+                 
                  <div className="absolute inset-0 flex flex-col items-center justify-center opacity-40 group-hover:opacity-80 transition-opacity">
                     <visuals.Icon className={visuals.color} size={44} />
                     <span className="text-[10px] uppercase tracking-tighter text-white font-bold mt-2 text-center px-4 leading-none drop-shadow-md">{tile.name}</span>
@@ -122,6 +201,11 @@ const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileCl
                      </div>
                  )}
               </div>
+
+              {/* Render Walls (Blocked Sides) */}
+              {tile.walls?.map((isWall, idx) => (
+                  isWall && <HexWall key={idx} index={idx} color={wallColor} />
+              ))}
             </div>
           );
         })}
@@ -129,16 +213,23 @@ const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileCl
         {/* Possible movement indicators */}
         {players.length > 0 && (
             (() => {
-                const p = players[0].position;
-                const neighbors = [
-                    {q: p.q + 1, r: p.r}, {q: p.q - 1, r: p.r},
-                    {q: p.q, r: p.r + 1}, {q: p.q, r: p.r - 1},
-                    {q: p.q + 1, r: p.r - 1}, {q: p.q - 1, r: p.r + 1}
+                const player = players[0];
+                const p = player.position;
+                const currentTile = tiles.find(t => t.q === p.q && t.r === p.r);
+                
+                const HEX_DIRECTIONS = [
+                    { q: 1, r: -1 }, { q: 1, r: 0 }, { q: 0, r: 1 }, 
+                    { q: -1, r: 1 }, { q: -1, r: 0 }, { q: 0, r: -1 }
                 ];
-                return neighbors.map((n, i) => {
+
+                return HEX_DIRECTIONS.map((dir, i) => {
+                    const n = { q: p.q + dir.q, r: p.r + dir.r };
                     const { x, y } = hexToPixel(n.q, n.r);
                     const alreadyExists = tiles.find(t => t.q === n.q && t.r === n.r);
+                    
+                    if (currentTile?.walls?.[i]) return null;
                     if (alreadyExists) return null;
+
                     return (
                         <div 
                             key={`neighbor-${i}`} 
@@ -168,46 +259,17 @@ const GameBoard: React.FC<GameBoardProps> = ({ tiles, players, enemies, onTileCl
         {/* Render Players */}
         {players.map(player => {
             const { x, y } = hexToPixel(player.position.q, player.position.r);
-            const playerSize = isMobile ? 12 : 16;
             return (
-                <div key={player.id} className={`absolute ${isMobile ? 'w-12 h-12 border-2' : 'w-16 h-16 border-4'} rounded-full border-white shadow-[0_0_30px_rgba(255,255,255,0.7)] flex items-center justify-center bg-[#1a1a2e] z-50 transition-all duration-500`} style={{ left: `${x - playerSize * 2}px`, top: `${y - playerSize * 2}px` }}>
-                    {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-cover rounded-full" alt="" /> : <User className="text-white" size={isMobile ? 24 : 32} />}
+                <div key={player.id} className="absolute w-16 h-16 rounded-full border-4 border-white shadow-[0_0_30px_rgba(255,255,255,0.7)] flex items-center justify-center bg-[#1a1a2e] z-50 transition-all duration-500" style={{ left: `${x - 32}px`, top: `${y - 32}px` }}>
+                    {player.imageUrl ? <img src={player.imageUrl} className="w-full h-full object-cover rounded-full" /> : <User className="text-white" size={32} />}
                 </div>
             );
         })}
       </div>
 
-      {/* Mobile Zoom Controls */}
-      {isMobile && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[100]">
-          <button
-            onClick={zoomIn}
-            className="w-12 h-12 rounded-full bg-[#1a1a2e]/90 border-2 border-slate-600 flex items-center justify-center text-white active:scale-95 active:bg-[#2a2a3e] shadow-lg"
-            aria-label="Zoom inn"
-          >
-            <ZoomIn size={22} />
-          </button>
-          <button
-            onClick={centerOnPlayer}
-            className="w-12 h-12 rounded-full bg-[#1a1a2e]/90 border-2 border-[#e94560] flex items-center justify-center text-[#e94560] active:scale-95 active:bg-[#2a2a3e] shadow-lg"
-            aria-label="Sentrer på spiller"
-          >
-            <Crosshair size={22} />
-          </button>
-          <button
-            onClick={zoomOut}
-            className="w-12 h-12 rounded-full bg-[#1a1a2e]/90 border-2 border-slate-600 flex items-center justify-center text-white active:scale-95 active:bg-[#2a2a3e] shadow-lg"
-            aria-label="Zoom ut"
-          >
-            <ZoomOut size={22} />
-          </button>
-        </div>
-      )}
-
-      {/* Zoom indicator */}
-      <div className="absolute left-3 bottom-28 md:bottom-3 bg-black/60 px-2 py-1 rounded text-[10px] text-slate-400 z-[100]">
-        {Math.round(scale * 100)}%
-      </div>
+      {/* Global Atmosphere Layers */}
+      <WeatherOverlay weather={activeWeather} />
+      <div className="fixed inset-0 pointer-events-none z-[110] shadow-[inset_0_0_150px_rgba(0,0,0,0.9)]"></div>
     </div>
   );
 };

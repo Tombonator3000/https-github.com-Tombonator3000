@@ -1,47 +1,6 @@
 
 # Project Log - Shadows of the 1920s
 
-## [v3.12.1 - Mobile UI & Touch Optimization] - 2026-01-19
-### 🔍 Status Report:
-- **NEW: Touch Gesture System:** Implementert fullstendig touch-støtte med pan og pinch-to-zoom for GameBoard.
-- **NEW: Mobile Detection Hook:** `useIsMobile()` og `useTouchGestures()` hooks i ny `utils/useMobile.ts`.
-- **ENHANCED: Responsive Side Panels:** CharacterPanel og LogPanel er nå fullskjerm på mobil med backdrop og lukkeknapper.
-- **ENHANCED: Footer & ActionBar:** Optimalisert for touch med større trykk-områder og responsiv layout.
-- **ENHANCED: CSS Touch Optimization:** Lagt til safe-area insets, momentum scrolling, og touch-feedback styling.
-
-### ✅ Added:
-* **`utils/useMobile.ts`:** Ny utility-fil med mobil-relaterte hooks:
-  - `useIsMobile()` - Detekterer touch-enheter og små skjermer
-  - `useTouchGestures()` - Håndterer pan/drag og pinch-to-zoom
-  - `useHapticFeedback()` - Vibrasjons-feedback på støttede enheter
-* **GameBoard Mobile Controls:**
-  - Zoom inn/ut knapper på høyre side
-  - Sentrer-på-spiller knapp (Crosshair)
-  - Zoom-indikator (prosent)
-  - Responsiv hex-størrelse (90px mobil, 110px desktop)
-* **Panel Improvements:**
-  - Fullskjerm paneler på mobil
-  - Mørk backdrop når panel er åpen
-  - Touch-vennlig lukkeknapp
-* **CSS Enhancements:**
-  - `safe-area-bottom/top` for notched devices
-  - `momentum-scroll` for iOS smooth scrolling
-  - `no-select` for å forhindre tekst-markering
-  - `hide-scrollbar` for renere mobil-UI
-  - Minimum touch target størrelse (44px)
-  - Landscape-tilpasninger
-
-### 📁 Endrede filer:
-- `utils/useMobile.ts` (ny)
-- `components/GameBoard.tsx`
-- `components/ActionBar.tsx`
-- `components/CharacterPanel.tsx`
-- `components/LogPanel.tsx`
-- `App.tsx`
-- `index.html`
-
----
-
 ## [v3.10.27 - Chiaroscuro Tile Specification] - 2024-05-26 14:30
 ### 🔍 Status Report:
 - **NEW: Art Style Definition:** Implementert "Chiaroscuro Oil Painting" som global stilguide for alle AI-genererte brikker.

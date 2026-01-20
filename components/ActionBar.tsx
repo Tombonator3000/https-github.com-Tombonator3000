@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Search, Sword, Heart, Package, LockOpen, Hammer, Wind, Zap, X, Eye, User, BookOpen } from 'lucide-react';
+import { Search, Sword, Heart, Package, LockOpen, Hammer, Wind, Zap, X, Eye, User, BookOpen, Skull } from 'lucide-react';
 import { ContextAction, Spell } from '../types';
 import Tooltip from './Tooltip';
 
@@ -86,7 +86,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
   );
 
   return (
-    <div className="flex items-center gap-2 md:gap-4 overflow-x-auto max-w-[85vw] md:max-w-none pb-1 md:pb-0 hide-scrollbar momentum-scroll relative no-select">
+    <div className="flex items-center gap-2 md:gap-4 overflow-x-auto max-w-[90vw] md:max-w-none pb-1 md:pb-0 hide-scrollbar relative">
       
       {/* LEFT TOGGLE: CHARACTER SHEET */}
       <button 
@@ -96,6 +96,17 @@ const ActionBar: React.FC<ActionBarProps> = ({
           <User size={20} className="mb-1" />
           <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-wider hidden md:block">Char</span>
       </button>
+
+      {/* JOURNAL BUTTON */}
+      <Tooltip variant="lore" content={renderTooltipContent("Field Guide", "Review notes on encountered horrors.")} position="top">
+        <button 
+            onClick={() => onAction('journal')}
+            className={`group flex flex-col items-center justify-center w-14 h-14 md:w-20 md:h-20 rounded border transition-all duration-200 shrink-0 bg-[#1a120b] border-amber-900 text-amber-700 hover:border-amber-500 hover:text-amber-300`}
+        >
+            <Skull size={20} className="mb-1" />
+            <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-wider hidden md:block">Guide</span>
+        </button>
+      </Tooltip>
 
       <div className="w-px h-12 bg-slate-800 mx-1"></div>
 

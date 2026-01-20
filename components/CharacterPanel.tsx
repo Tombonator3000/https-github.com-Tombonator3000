@@ -1,11 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Player, Item } from '../types';
 import { 
-    Heart, Brain, Eye, Star, AlertCircle, Trash2, Gift, ShieldCheck, 
-    Backpack, Sword, Search, Zap, Cross, FileQuestion, X, Syringe, User
+    Heart, Brain, Eye, Star, Trash2, ShieldCheck, 
+    Backpack, Sword, Search, Zap, Cross, FileQuestion, User, Key
 } from 'lucide-react';
-import Tooltip from './Tooltip';
 
 interface CharacterPanelProps {
   player: Player | null;
@@ -30,6 +29,7 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
           case 'relic': return <Zap size={18} />;
           case 'armor': return <ShieldCheck size={18} />;
           case 'consumable': return <Cross size={18} />;
+          case 'quest': return <Key size={18} />;
           default: return <FileQuestion size={18} />;
       }
   };
@@ -55,7 +55,7 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 relative z-10 custom-scrollbar momentum-scroll">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 relative z-10 custom-scrollbar">
         <div className="space-y-4">
             <div>
                 <div className="flex justify-between items-end mb-1 px-1">
@@ -94,26 +94,59 @@ const CharacterPanel: React.FC<CharacterPanelProps> = ({ player, allPlayers, onT
             </div>
         </div>
 
-        <div className="pt-4 border-t border-[#3e2c20]/50">
-            <h3 className="text-[10px] text-[#8b6b4e] uppercase tracking-widest mb-1">Ability</h3>
-            <p className="text-sm text-[#d4c5a3] italic">"{player.special}"</p>
-        </div>
-
         <div className="pt-4 border-t-2 border-[#3e2c20]">
-            <h3 className="text-[10px] font-bold text-[#eecfa1] uppercase tracking-widest mb-3 flex items-center gap-2">
-                <Backpack size={12} /> Inventory ({player.inventory.length}/6)
+            <h3 className="text-[10px] font-bold text-[#eecfa1] uppercase tracking-widest mb-3 flex items-center justify-between">
+                <span className="flex items-center gap-2"><Backpack size={12} /> Inventory ({player.inventory.length}/6)</span>
             </h3>
             <div className="grid grid-cols-3 gap-2">
                 {Array.from({ length: 6 }).map((_, index) => {
                     const item = player.inventory[index];
+                    const isSelected = selectedItem && item && selectedItem.id === item.id;
                     return (
-                        <div key={index} className={`aspect-square border-2 rounded-lg flex items-center justify-center transition-all ${item ? 'bg-[#150f0a] border-[#eecfa1] text-[#eecfa1]' : 'bg-black/40 border-[#3e2c20] opacity-30'}`}>
+                        <button 
+                            key={index} 
+                            onClick={() => item ? setSelectedItem(item) : setSelectedItem(null)}
+                            className={`
+                                aspect-square border-2 rounded-lg flex items-center justify-center transition-all 
+                                ${item ? 'bg-[#150f0a] text-[#eecfa1]' : 'bg-black/40 border-[#3e2c20] opacity-30'}
+                                ${isSelected ? 'border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 'border-[#3e2c20]'}
+                                ${item?.isQuestItem ? 'border-amber-600/50' : ''}
+                            `}
+                        >
                             {item && getItemIcon(item.type)}
-                        </div>
+                            {item?.isQuestItem && <div className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full shadow-[0_0_5px_#f59e0b]"></div>}
+                        </button>
                     );
                 })}
             </div>
         </div>
+
+        {selectedItem && (
+            <div className="p-4 bg-black/40 border border-amber-900/30 rounded-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-display text-[#eecfa1] text-lg">{selectedItem.name}</h4>
+                    <span className="text-[8px] uppercase tracking-widest text-[#8b6b4e] border border-[#8b6b4e] px-1 rounded">{selectedItem.type}</span>
+                </div>
+                <p className="text-xs italic text-[#d4c5a3] mb-4">"{selectedItem.effect}"</p>
+                
+                <div className="flex gap-2">
+                    {selectedItem.type === 'consumable' && (
+                        <button 
+                            onClick={() => { onUse?.(selectedItem); setSelectedItem(null); }}
+                            className="flex-1 py-2 bg-amber-700 hover:bg-amber-600 text-white text-[10px] uppercase font-bold tracking-widest rounded transition-colors"
+                        >
+                            Use
+                        </button>
+                    )}
+                    <button 
+                        onClick={() => { onDrop(selectedItem); setSelectedItem(null); }}
+                        className="flex-1 py-2 bg-red-900/40 border border-red-500/50 hover:bg-red-900/60 text-red-500 text-[10px] uppercase font-bold tracking-widest rounded transition-colors flex items-center justify-center gap-1"
+                    >
+                        <Trash2 size={10} /> Drop
+                    </button>
+                </div>
+            </div>
+        )}
       </div>
     </div>
   );
